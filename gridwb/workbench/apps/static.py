@@ -38,7 +38,7 @@ class Statics(PWApp):
         self.genpmax = gens['GenMWMax']
         self.genpmin = gens['GenMWMin']
 
-        # Create DF that stores loads for all buses
+        # Create DF that stores manipultable loads for all buses
         l = buses[['BusNum', 'BusName_NomVolt']].copy()
         l.loc[:,zipfields] = 0.0
         l['LoadID'] = 99 # NOTE Random Large ID so that it does not interfere
@@ -73,6 +73,10 @@ class Statics(PWApp):
 
     @griditer
     def solve(self, ctgs: list[Contingency] = None):
+
+        
+        return "Depricated functions used."
+    
         # Cast to List
         if ctgs is None:
             ctgs = ["SimOnly"]

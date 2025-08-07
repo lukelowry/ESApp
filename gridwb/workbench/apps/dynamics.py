@@ -21,14 +21,14 @@ class Dynamics(PWApp):
 
     def fields(self, metric):
         '''Get TS Formatted Fields for Requested Objects'''
-        objs = self.io.get(metric["Type"]) # TODO I don't need to retrieve from PW I have it local. Will Speed up
+        objs = self.io[metric["Type"]] # TODO I don't need to retrieve from PW I have it local. Will Speed up
         os = objs['ObjectID']
         flist = [f"{str(os.loc[i])} | {metric['Dynamic']}" for i in range(len(os))]
         return flist
 
     # Set Run Time for list of contingencies
     def setRuntime(self, sec):
-        ctgs = self.io.get(TSContingency, keysonly=True)
+        ctgs = self.io[TSContingency]
         ctgs["StartTime"] = 0
         ctgs["EndTime"] = sec
         self.io.upload({TSContingency: ctgs})

@@ -17,13 +17,6 @@ fexcept = lambda t: "3" + t[5:] if t[:5] == "Three" else t
 class PowerWorldIO(IModelIO):
     esa: SAW
 
-    def TSInit(self):
-        ''' Initialize Transient Stability Parameters '''
-        try:
-            self.esa.RunScriptCommand("TSInitialize()")
-        except:
-            print("Failed to Initialize TS Values")
-
     @timing
     def open(self):
         # Validate Path Name
@@ -75,14 +68,14 @@ class PowerWorldIO(IModelIO):
         
         return df
     
+    # TODO remove the conditional index, too confusing.
     def __setitem__(self, args, value) -> None:
         '''Set grid data using indexors directly to Power World
         Must be atleast 2 args: Type & Field
 
         Examples:
         wb.pw[Bus, 'BusPUVolt'] = 1
-        wb.pw[Bus, v<1, 'BusPUVolt'] = arr
-        wb.pw[Bus, p>10, [xxx,xxx,xxx]] = [arr1, arr2, arr3]
+        wb.pw[Bus, [xxx,xxx,xxx]] = [arr1, arr2, arr3]
         '''
 
         # Type checking is an anti-pattern but this is accepted within community as a necessary part of the magic function
@@ -98,11 +91,7 @@ class PowerWorldIO(IModelIO):
 
             # [Type, [Fields]] -> Target data listed by field, expects array/dataframe with respective ordering
             if len(args)==2:   
-                gtype, where, fields = args[0], None, args[1]
-
-            # [Type, Where, [Fields]] -> Finiky but useful
-            elif len(args)==3: 
-                gtype, where, fields = args
+                gtype, fields = args[0], args[1]
 
             # Format fields passed as list
             if isinstance(fields, str): 
@@ -112,8 +101,7 @@ class PowerWorldIO(IModelIO):
             base = self[gtype,:]
 
             # Assign Values based on index
-            if where is not None: base.loc[where, fields] = value
-            else: base.loc[:,fields] = value
+            base.loc[:,fields] = value
 
         # [Type] -> Try and Create New (Requires properly formatted df)
         else: 
@@ -125,92 +113,34 @@ class PowerWorldIO(IModelIO):
         # Enter back into run mode
         self.run_mode()
 
-
     def save(self):
         '''
-        Save all Open Changes to PWB File.
-        Note: only data/settings written back to PowerWorld will be saved.
+        Description:
+            Save all Open Changes to PWB File.
+        Note: 
+            only data/settings written back to PowerWorld will be saved.
         '''
         return self.esa.SaveCase()
-    
-    def edit_mode(self):
-        self.esa.RunScriptCommand("EnterMode(EDIT);")
+   
+    ''' Power Flow Commands '''
 
-    def run_mode(self):
-        self.esa.RunScriptCommand("EnterMode(RUN);")
-
-    def get(self, gtype: Type[GObject], keysonly=False):
+    def flatstart(self):
         '''
-        Get all Objects of specified type from PowerWorld.
-        
-        Parameters:
-        gtype: Object type to retrieve data,
-        keysonly: Specifiy if GWB should retrieve just key data or ALL data of object type.
+        Description:
+            Resets voltage vector to a flat start.
         '''
+        self.esa.RunScriptCommand("ResetToFlatStart()")
 
-        # Option Handling (.fields includes keys)
-        if keysonly:
-            fields = [fexcept(f) for f in gtype.keys]
-        else:
-            fields = [fexcept(f) for f in gtype.fields]
 
-        # Get Data from SimAuto
-        df = None
-        try:
-            # Successful retrieval of data and requested fields as DataFrame
-            df = self.esa.GetParametersMultipleElement(gtype.TYPE, fields)
-        except:
-            # Failure. Create empty dataframe with expected indecies.
-            print(f"Failed to read {gtype.TYPE} data.")
-        
-        # Creates Empty DF is PW has done of specified object.
-        if df is None:
-            df = DataFrame(columns=fields)
-
-        # Set Name of DF to datatype TODO remove this weird implementation. I think I use .Name for transient data retrieval?
-        df.Name = gtype.TYPE
-
-        return df
-    
-    def get_quick(self, gtype: Type[GObject], fieldname: str | list[str]):
-        '''
-        Helper Function that will retrieve one field from all objects of specified type.
-        Intended for repeated data retrieval.
-        
-        Parameters:
-        gtype: Object type to retrieve data,
-        fieldname: Power-World Compatible Field Name (string)
-
-        Example: get_quick(Bus, 'BusPUVolt')
-        '''
-
-        # Keys of Object type are required to get data
-        request = [fexcept(f) for f in gtype.keys]
-
-        # transformer field name to list if single given
-        if type(fieldname) is str: 
-            fieldname = [fieldname]
-
-        # Add field to search index if not already a key..
-        for fn in fieldname:
-            if fn not in request:
-                request.append(fn)
-
-        # Get Data from Power World 
-        df = None
-        try:
-            df = self.esa.GetParametersMultipleElement(gtype.TYPE, request)
-        except:
-            print(f"Failed to read {gtype.TYPE} data.")
-        
-        return df
-
-    # Solve Power Flow
     def pflow(self, retry=True):
         '''
-        Executes Power Flow in PowerWorld. 
-        
-        If retry is set True, it will reset PF and try one additional time.
+        Description
+            Executes Power Flow in PowerWorld. 
+        Parameters
+            retry: if True (default) this function will reset 
+                    PF if it fails and try one additional time.
+        Other
+            Use do_one_iteration() to pause after each iteration.
         '''
         try:
             self.esa.SolvePowerFlow()
@@ -219,16 +149,14 @@ class PowerWorldIO(IModelIO):
                 self.flatstart()
                 self.esa.SolvePowerFlow()
 
-    def flatstart(self):
-        '''
-        Call to reset PF to a flat start.
-        '''
-        self.esa.RunScriptCommand("ResetToFlatStart()")
 
     ''' Playin Signal Section'''
 
     def clearsignals(self):
-        '''Clears all playin signals'''
+        '''
+        Description
+            Clears all playin signals
+        '''
         self.esa.RunScriptCommand('DELETE(PLAYINSIGNAL);')
 
     def setsignals(self, name, times, signals):
@@ -264,6 +192,110 @@ class PowerWorldIO(IModelIO):
         # Execute
         self.esa.exec_aux(cmd)
 
+    ''' Power World Settings '''
+
+    def set_mva_tol(self, tol=0.1):
+        '''
+        Description
+            Sets the MVA Tolerance for NR Convergence
+        '''
+        self[Sim_Solution_Options,'ConvergenceTol:2'] = tol
+
+    def do_one_iteration(self, enable=True):
+        '''
+        Description
+            Sets the "DoOneIteration" setting.
+        Parameters:
+            enable: True (default) forces one iteration.
+        '''
+        self[Sim_Solution_Options,'DoOneIteration'] = 'YES' if enable else 'NO'
+
+    def inner_loop_check_mvar_immediatly(self, enable=True):
+        ''' 
+        Description
+            Set inner loop of power flow to check mvar limits before proceeding to outer loop.
+        '''
+        self[Sim_Solution_Options,'ChkVars'] = 'YES' if enable else 'NO'
+
+    def get_min_volt(self):
+        '''
+        Description:
+            The minimum p.u. voltage magnitude in the case.
+        '''
+        return self[PWCaseInformation,'BusPUVolt:1'].iloc[0,0]
+    
+    def get_mismatch(self):
+        '''
+        Description:
+            The complex power bus mismatch vector
+        Returns:
+            (P, Q) Tuple of pandas series for P and Q mismatch in MVA
+        '''
+        mm = self[Bus,['BusMismatchP', 'BusMismatchQ']]
+        return mm['BusMismatchP'], mm['BusMismatchQ']
+
+    def save_state(self, statename="GWB"):
+        '''
+        Description
+            Store a state under an alias and restore it later.
+        '''
+        self.run_mode()
+        self.esa.RunScriptCommand(f'StoreState({statename});')
+
+    def restore_state(self, statename="GWB"):
+        '''
+        Description:
+            Restore to a saved state.
+        Parameters:
+            statename: The state name
+        '''
+        self.run_mode()
+        self.esa.RunScriptCommand(f'RestoreState(USER,{statename});')
+
+    def delete_state(self, statename="GWB"):
+        '''
+        Description:
+            Deletes a saved state.
+        Parameters:
+            statename: The state name
+        '''
+        self.esa.RunScriptCommand('EnterMode(RUN);')
+        self.esa.RunScriptCommand(f'DeleteState(USER,{statename});')
+
+    def edit_mode(self):
+        '''
+        Description:
+            Enters PowerWorld into EDIT mode.
+        '''
+        self.esa.RunScriptCommand("EnterMode(EDIT);")
+
+    def run_mode(self):
+        '''
+        Description:
+            Enters PowerWorld into RUN mode.
+        '''
+        self.esa.RunScriptCommand("EnterMode(RUN);")
+        
+    '''
+    TODO Implement with setitem function
+    def __set_sol_opts(self, name, value):
+        settings = self[Sim_Solution_Options]
+        settings['name'] = value
+        self.upload({
+            Sim_Solution_Options: settings
+        })
+
+    def max_iterations(self, n: int):
+        self.__set_sol_opts('MaxItr', n)
+
+    def zbr_threshold(self, v: float):
+        self.__set_sol_opts('ZBRThreshold', v)
+
+    '''
+
+    ''' Power World Contingency Analysis '''
+
+    
     '''
     Depricated until .upload removed
     def skipallbut(self, ctgs):
@@ -275,6 +307,17 @@ class PowerWorldIO(IModelIO):
 
         self.upload({TSContingency: ctgset})
     '''
+
+    def TSInit(self):
+        '''
+        Description
+            Initialize Transient Stability Parameters
+        '''
+        try:
+            self.esa.RunScriptCommand("TSInitialize()")
+        except:
+            print("Failed to Initialize TS Values")
+
         
     # Execute Dynamic Simulation for Non-Skipped Contingencies
     def TSSolveAll(self):
@@ -327,59 +370,3 @@ class PowerWorldIO(IModelIO):
             ObjectType=objdf.Name,
             command_df=objdf[np.concatenate([keys,savefields])].copy(),
         )
-
-    def set_mva_tol(self, tol=0.1):
-        '''
-        Sets the MVA Tolerance for NR Convergence
-        '''
-        self[Sim_Solution_Options,'ConvergenceTol:2'] = tol
-
-    def inner_loop_check_mvar_immediatly(self, enable=True):
-        ''' 
-        Set inner loop of power flow to check mvar limits before proceeding to outer loop.
-        '''
-        self[Sim_Solution_Options,'ChkVars'] = 'YES' if enable else 'NO'
-
-    def get_min_volt(self):
-        '''
-        Retrieve the active minmimum bus voltage in p.u.
-        '''
-        return self.get_quick(PWCaseInformation,'BusPUVolt:1').iloc[0,0]
-
-    def save_state(self, statename="GWB"):
-        '''
-        Store a state under an alias and restore it later.
-        '''
-        self.run_mode()
-        self.esa.RunScriptCommand(f'StoreState({statename});')
-
-    def restore_state(self, statename="GWB"):
-        '''
-        Restore a saved state.
-        '''
-        self.run_mode()
-        self.esa.RunScriptCommand(f'RestoreState(USER,{statename});')
-
-    def delete_state(self, statename="GWB"):
-        '''
-        Restore a saved state.
-        '''
-        self.esa.RunScriptCommand('EnterMode(RUN);')
-        self.esa.RunScriptCommand(f'DeleteState(USER,{statename});')
-                
-    '''
-    Depricated until .upload removed
-    def __set_sol_opts(self, name, value):
-        settings = self[Sim_Solution_Options]
-        settings['name'] = value
-        self.upload({
-            Sim_Solution_Options: settings
-        })
-
-    def max_iterations(self, n: int):
-        self.__set_sol_opts('MaxItr', n)
-
-    def zbr_threshold(self, v: float):
-        self.__set_sol_opts('ZBRThreshold', v)
-
-    '''
