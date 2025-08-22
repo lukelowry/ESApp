@@ -5,15 +5,14 @@
 
 # Imports
 import numpy as np
-from pandas import DataFrame, Series
-from scipy.sparse import lil_matrix, diags
+from pandas import DataFrame
 
 from gridwb.workbench.utils.math import normlap
 
 from .grid.components import *
 from .apps import GIC, Statics, Network, ForcedOscillation
 from .grid.common import arc_incidence, InjectionVector
-from .core import *
+from .io import Context
 
 class GridWorkBench:
     def __init__(self, fname=None):

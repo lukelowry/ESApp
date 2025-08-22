@@ -1,9 +1,9 @@
 
 
 # WorkBench Imports
-from gridwb.workbench.core.powerworld import PowerWorldIO
+from ..io.powerworld import PowerWorldIO
 from .app import PWApp
-from ..core import Context
+from ..io import Context
 
 import numpy as np
 

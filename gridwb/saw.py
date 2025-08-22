@@ -3425,7 +3425,87 @@ class SAW(object):
     def RenumberCase(self):
         self.RunScriptCommand("RenumberCase;")
 
+    ####################################################################
+    # GIC: Methods of this Fork
+    ####################################################################
+        
 
+    def get_gmatrix(
+            self, full: bool = False, file: Union[str, None] = None
+        ) -> Union[np.ndarray, csr_matrix]:
+            """Helper to obtain the GIC G matrix from PowerWorld (in Matlab sparse
+            matrix format) and then convert to scipy csr_matrix by default.
+            :param full: Convert the csr_matrix to the numpy array (full matrix).
+            :param file: Path to the external G matrix file.
+            """
+
+            print("POWER WORLD VERSION NEEDS TO BE FIXED - This function fails")
+
+            return None
+
+            # Read/Make matlab version of matrix
+            if file:
+                _tempfile_path = file
+            else:
+
+                # Matrix and Description Temp Files
+                _tempfile = tempfile.NamedTemporaryFile(
+                    mode="w", suffix=".mat", delete=False
+                )
+                _descfile = tempfile.NamedTemporaryFile(
+                    mode="w", suffix=".txt", delete=False
+                )
+
+                _tempfile_path = Path(_tempfile.name).as_posix()
+                _descfile_path = Path(_tempfile.name).as_posix()
+
+                _tempfile.close()
+                _descfile.close()
+
+                cmd = f'GICSaveGMatrix("{_tempfile_path}", "{_descfile_path}")'
+                self.RunScriptCommand(cmd)
+
+            # Read matlab matrix
+            with open(_tempfile_path, "r") as f:
+                f.readline()
+                mat_str = f.read()
+
+            # Parsing
+            mat_str = re.sub(r"\s", "", mat_str)
+            lines = re.split(";", mat_str)
+            ie = r"[0-9]+"
+            fe = r"-*[0-9]+\.[0-9]+"
+            dr = re.compile(r"(?:Ybus)=(?:sparse\()({ie})".format(ie=ie))
+            exp = re.compile(
+                r"(?:Ybus\()({ie}),({ie})(?:\)=)({fe})(?:\+j\*)(?:\()({fe})".format(
+                    ie=ie, fe=fe
+                )
+            )
+
+            # Get the dimension from the first line in lines
+            dim = dr.match(lines[0])[1]
+            n = int(dim)
+            row = []
+            col = []
+            data = []
+            for line in lines[1:]:
+                match = exp.match(line)
+                if match is None:
+                    continue
+                idx1, idx2, real, imag = match.groups()
+                # Type conversion can be optimized to provide slightly
+                # improvement
+                admittance = float(real) + 1j * float(imag)
+                row.append(int(idx1))
+                col.append(int(idx2))
+                data.append(admittance)
+            # The row index is always in the ascending order in the mat file
+            sparse_matrix = csr_matrix(
+                (data, (np.asarray(row) - 1, np.asarray(col) - 1)),
+                shape=(n, n),
+                dtype=complex,
+            )
+            return sparse_matrix.toarray() if full else sparse_matrix
 
     ####################################################################
     # Private Methods

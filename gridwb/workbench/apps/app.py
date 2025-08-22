@@ -4,8 +4,8 @@ from pandas import DataFrame, concat
 from functools import wraps
 from itertools import product
 
-from ..core import Context
-from ..io.model import IModelIO
+from ..io import Context
+from ..io import IModelIO
 from ..utils.conditions import *
 
 # TODO App Features

@@ -3,8 +3,8 @@ from pandas import DataFrame, concat
 
 # WorkBench Imports
 from ...saw import CommandNotRespectedError
-from gridwb.workbench.grid.components import TSContingency
-from gridwb.workbench.core.powerworld import PowerWorldIO
+from ..grid.components import TSContingency
+from ..io.powerworld import PowerWorldIO
 from .app import PWApp, griditer
 
 

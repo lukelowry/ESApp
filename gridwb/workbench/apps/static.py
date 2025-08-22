@@ -5,8 +5,7 @@ from numpy import nan, exp, any, arange, nanmin, isnan, inf
 from numpy.random import random
 
 # WorkBench Imports
-from ..core.powerworld import PowerWorldIO
-from ..core import Context
+from ..io import Context, PowerWorldIO
 from ..grid.components import Contingency, Gen, Load, Bus,Shunt, PWCaseInformation, Branch
 from ..utils.metric import Metric
 from ..utils.exceptions import *

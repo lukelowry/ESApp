@@ -16,7 +16,7 @@ from itertools import product
 from .app import PWApp
 from ..grid.components import GIC_Options_Value, GICInputVoltObject
 from ..grid.components import GICXFormer, Branch, Substation, Bus, Gen
-from ..core.powerworld import PowerWorldIO
+from ..io.powerworld import PowerWorldIO
 from ..utils.datawiz import jac_decomp
 from ..io.b3d import B3D
 

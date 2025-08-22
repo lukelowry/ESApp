@@ -1,10 +1,9 @@
 
 
 # WorkBench Imports
-from gridwb.workbench.core.powerworld import PowerWorldIO
-from gridwb.workbench.grid.components import Branch, Bus
+from ..io import Context, PowerWorldIO
+from ..grid.components import Branch, Bus
 from .app import PWApp
-from ..core import Context
 
 from scipy.sparse import diags, lil_matrix
 import numpy as np
