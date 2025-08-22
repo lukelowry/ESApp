@@ -1212,6 +1212,7 @@ class SAW(object):
         temp[self.isl, self.isl] = -1
         self.lodf = temp
 
+    # TODO make this a sparse calculation!
     def get_incidence_matrix(self):
         """
         Obtain the incidence matrix.
@@ -3133,8 +3134,7 @@ class SAW(object):
         # Remove extraneous white space in the strings.
         # https://stackoverflow.com/a/40950485/11052174
         meta = meta.apply(lambda x: x.str.strip(), axis=0)
-        # print(out[0])
-        # print(out[1])
+
         # Extract the data.
         data = pd.DataFrame(out[1])
 
@@ -3362,6 +3362,70 @@ class SAW(object):
                 "Check your version with the get_simulator_version method."
             )
             return False
+        
+    ####################################################################
+    # Transient Stability: Methods of this Fork
+    ####################################################################
+        
+    def TSTransferStateToPowerFlow(self):
+        '''
+        Description
+            Transfers TS solution to PF to be analysis via steady state
+        '''
+        self.RunScriptCommand("TSTransferStateToPowerFlow;")
+
+    def TSInitialize(self):
+        '''
+        Description
+            Initialize Transient Stability Parameters
+        '''
+        try:
+            self.RunScriptCommand("TSInitialize()")
+        except:
+            print("Failed to Initialize TS Values")
+
+
+    def TSResultStorageSetAll(self, object = 'ALL', value=True):
+        '''
+        NOTE: sometimes fails? Some weird super-zone.
+        Default is all objects set to true for storage when called. Not recommended
+        '''
+        yn    = "YES" if value else "NO"
+        self.RunScriptCommand(f"TSResultStorageSetAll({object}, {yn})")
+
+    def TSSolve(self, ctgname):
+        self.RunScriptCommand(f'TSSolve("{ctgname}")')
+
+    def TSSolveAll(self):
+        self.RunScriptCommand("TSSolveAll()")
+
+    ####################################################################
+    # Power Flow: Methods of this Fork
+    ####################################################################
+        
+
+    def ClearPowerFlowSolutionAidValues(self):
+        self.RunScriptCommand("ClearPowerFlowSolutionAidValues;")
+
+    
+    def ResetToFlatStart(self):
+        '''
+        Description:
+            Resets voltage vector to a flat start.
+        '''
+        self.RunScriptCommand("ResetToFlatStart();")
+
+
+    ####################################################################
+    # Case Information: Methods of this Fork
+    ####################################################################
+        
+
+    
+    def RenumberCase(self):
+        self.RunScriptCommand("RenumberCase;")
+
+
 
     ####################################################################
     # Private Methods

@@ -2,6 +2,7 @@ from typing import Type
 from pandas import DataFrame
 from os import path
 from numpy import unique
+import numpy as np
 
 from ..grid.components import *
 from ..utils.decorators import timing
@@ -27,7 +28,7 @@ class PowerWorldIO(IModelIO):
         self.esa = SAW(self.fname, CreateIfNotFound=True, early_bind=True)
 
         # Attempt and Initialize TS so we get initial values
-        self.TSInit()
+        self.esa.TSInitialize()
     
     def __getitem__(self, index) -> DataFrame | None:
         '''Retrieve Data frome Power world with Indexor Notation
@@ -40,17 +41,19 @@ class PowerWorldIO(IModelIO):
         wb.pw[Bus, :] # Get all fields
         '''
         
-        # Type checking is an anti-pattern but this is accepted within community as a necessary part of the magic function
+				        # Type checking is an anti-pattern but this is accepted within community as a necessary part of the magic function
         # >1 Argument - Objecet Type & Fields(s)
         if isinstance(index, tuple): 
             gtype, fields = index
-            if isinstance(fields, str): fields = fields,
-            elif isinstance(fields, slice): fields = gtype.fields
+            if isinstance(fields, str): 
+                fields = fields,
+            elif isinstance(fields, slice): 
+                fields = gtype.fields
         # 1 Argument - Object Type: retrieve only key fields
         else: 
             gtype, fields = index, ()
 
-        # Keys and then Fields
+        # Keys and then Fields # NOTE TODO don't need to look for fuplicates if only keys requested
         key_fields = gtype.keys
         data_fields = [f for f in fields if f not in key_fields]
         unique_fields = [*key_fields, *data_fields]
@@ -68,7 +71,6 @@ class PowerWorldIO(IModelIO):
         
         return df
     
-    # TODO remove the conditional index, too confusing.
     def __setitem__(self, args, value) -> None:
         '''Set grid data using indexors directly to Power World
         Must be atleast 2 args: Type & Field
@@ -81,8 +83,6 @@ class PowerWorldIO(IModelIO):
         # Type checking is an anti-pattern but this is accepted within community as a necessary part of the magic function
         # Extract Arguments depending on Index Method
 
-        # Ensure Edit Mode
-        self.edit_mode()
 
         # PARSE ARGUMENT FORMAT OPTIONS
 
@@ -98,16 +98,29 @@ class PowerWorldIO(IModelIO):
                 fields = fields,
             
             # Retrieve active power world records with keys only
-            base = self[gtype,:]
+            # NOTE we do not want to read all self[gtype, :] that is expensive
+            # BUG For some reason some things are not updating unless I pull all
+            base = self[gtype]#, :]
+
+            # Edge case for objects that don't have key fields (SimSolutionOptions)
+            if base is None:
+                base = self[gtype, :]
+
+            # TODO handle case where there truly are none of this type in case
 
             # Assign Values based on index
             base.loc[:,fields] = value
 
+
         # [Type] -> Try and Create New (Requires properly formatted df)
         else: 
             gtype, base = args, value
-            
+        
         # Send to Power World
+
+        # Ensure Edit Mode
+        self.edit_mode()
+        
         self.esa.change_parameters_multiple_element_df(gtype.TYPE, base)
 
         # Enter back into run mode
@@ -129,7 +142,7 @@ class PowerWorldIO(IModelIO):
         Description:
             Resets voltage vector to a flat start.
         '''
-        self.esa.RunScriptCommand("ResetToFlatStart()")
+        self.esa.ResetToFlatStart()
 
 
     def pflow(self, retry=True):
@@ -231,7 +244,7 @@ class PowerWorldIO(IModelIO):
         Returns:
             (P, Q) Tuple of pandas series for P and Q mismatch in MVA
         '''
-        mm = self[Bus,['BusMismatchP', 'BusMismatchQ']]
+        mm = self[Bus,['BusMismatchP', 'BusMismatchQ', 'BusMismatchS']]
         return mm['BusMismatchP'], mm['BusMismatchQ']
 
     def save_state(self, statename="GWB"):
@@ -259,7 +272,7 @@ class PowerWorldIO(IModelIO):
         Parameters:
             statename: The state name
         '''
-        self.esa.RunScriptCommand('EnterMode(RUN);')
+        self.run_mode()
         self.esa.RunScriptCommand(f'DeleteState(USER,{statename});')
 
     def edit_mode(self):
@@ -275,58 +288,6 @@ class PowerWorldIO(IModelIO):
             Enters PowerWorld into RUN mode.
         '''
         self.esa.RunScriptCommand("EnterMode(RUN);")
-        
-    '''
-    TODO Implement with setitem function
-    def __set_sol_opts(self, name, value):
-        settings = self[Sim_Solution_Options]
-        settings['name'] = value
-        self.upload({
-            Sim_Solution_Options: settings
-        })
-
-    def max_iterations(self, n: int):
-        self.__set_sol_opts('MaxItr', n)
-
-    def zbr_threshold(self, v: float):
-        self.__set_sol_opts('ZBRThreshold', v)
-
-    '''
-
-    ''' Power World Contingency Analysis '''
-
-    
-    '''
-    Depricated until .upload removed
-    def skipallbut(self, ctgs):
-        ctgset = self.get(TSContingency)
-
-        # Set Skip if not in ctg list
-        ctgset["CTGSkip"] = "YES"
-        ctgset.loc[ctgset["TSCTGName"].isin(ctgs), "CTGSkip"] = "NO"
-
-        self.upload({TSContingency: ctgset})
-    '''
-
-    def TSInit(self):
-        '''
-        Description
-            Initialize Transient Stability Parameters
-        '''
-        try:
-            self.esa.RunScriptCommand("TSInitialize()")
-        except:
-            print("Failed to Initialize TS Values")
-
-        
-    # Execute Dynamic Simulation for Non-Skipped Contingencies
-    def TSSolveAll(self):
-        self.esa.RunScriptCommand("TSSolveAll()")
-
-    def clearram(self):
-        # Disable RAM storage & Delete Existing Data in RAM
-        self.esa.RunScriptCommand("TSResultStorageSetAll(ALL, NO)")
-        self.esa.RunScriptCommand("TSClearResultsFromRAM(ALL,YES,YES,YES,YES,YES)")
 
 
     savemap = {
@@ -343,10 +304,21 @@ class PowerWorldIO(IModelIO):
         'TSBusRad': 'TSSaveBusDeg',
     }
 
+    
+
+    def clearram(self):
+        # Disable RAM storage & Delete Existing Data in RAM
+        self.esa.TSResultStorageSetAll()
+        self.TSClearResultsFromRAM()
+
+    # TODO IMPROVE THIS HERE, I NEED IT
     def saveinram(self, objdf, datafields):
         '''
         Save Specified Fields for TS
         '''
+        # RECONEMNDED
+        #wb.io.esa.RunScriptCommand('TSPlotSeriesAdd("Plot Name", 1, 1, Gen, TSRotorAngle)')
+        #must update pw first
 
         # Get Respective Data
         savefields = []
@@ -370,3 +342,59 @@ class PowerWorldIO(IModelIO):
             ObjectType=objdf.Name,
             command_df=objdf[np.concatenate([keys,savefields])].copy(),
         )
+
+    def tssolve(self, ctgname):
+        self.esa.TSSolve(ctgname)
+
+
+    # TODO MOVE to saw.py
+
+    def store_response(self, gtype: GObject = None, value=True):
+        '''
+        if gtype is None then All will be toggled
+        '''
+        self.esa.TSResultStorageSetAll(gtype.TYPE, value)
+
+        
+    # Delete Existing Data in RAM
+    def TSClearResultsFromRAM(self, scope=None, b1=True, b2=True, b3=True, b4=True, b5=True):
+        self.esa.RunScriptCommand("TSClearResultsFromRAM(ALL,YES,YES,YES,YES,YES)")
+
+
+    def RenumberBuses(self):
+        # Will renumber using the intger in Bus.CustomInteger:1, so must set that here too
+        idx = 1
+        self.esa.RunScriptCommand(f"RenumberBuses({idx})")
+
+    def SetCurrentDirectory(self, dir, createifnotfound):
+        return None
+        self.esa.RunScriptCommand(f"SetCurrentDirectory({dir})")
+
+        
+
+    # Completed List: Now in esa.saw
+    # - TSTransferStateToPowerFlow
+    # - TSInitialize
+    # - TSResultStorageSetAll
+    # - TSSolveAll
+    # - ClearPowerFlowSolutionAidValues #NOTE this could solve my issue from before with magnetic power flow!
+    # - RenumberCase
+    
+    # TODO New GIC Accessor Functions in ESA
+ 
+    
+    '''
+    def __set_sol_opts(self, name, value):
+        settings = self[Sim_Solution_Options]
+        settings['name'] = value
+        self.upload({
+            Sim_Solution_Options: settings
+        })
+
+    def max_iterations(self, n: int):
+        self.__set_sol_opts('MaxItr', n)
+
+    def zbr_threshold(self, v: float):
+        self.__set_sol_opts('ZBRThreshold', v)
+
+    '''

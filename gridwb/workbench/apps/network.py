@@ -15,8 +15,10 @@ from enum import Enum
 # Types of support branch weights
 class BranchType(Enum):
     LENGTH = 1
-    PHASE = 2
+    RES_DIST = 2 # Resistance Distance
     PROPAGATION = 3
+    
+    
 
 # Constructing Network Matricies and other metrics
 class Network(PWApp):
@@ -55,6 +57,8 @@ class Network(PWApp):
         # If already made, don't remake
         if self.A is not None and not remake:
             return self.A
+        
+
 
         # Retrieve
         branches = self.io[Branch,['BusNum', 'BusNum:1']]
@@ -64,13 +68,19 @@ class Network(PWApp):
         fromBus = branches['BusNum'].map(bmap).to_numpy()
         toBus   = branches['BusNum:1'].map(bmap).to_numpy()
 
-        # Sparse Arc-Incidence Matrix
+        # Lengths and indexers
         nbranches = len(branches)
+        branchIDs = np.arange(nbranches)
+
+        # Sparse Arc-Incidence Matrix
         A = lil_matrix((nbranches,len(bmap)))
-        A[np.arange(nbranches), fromBus] = -1
-        A[np.arange(nbranches), toBus] = 1
+        A[branchIDs, fromBus] = -1
+        A[branchIDs, toBus]   = 1
 
         self.A = A
+
+        # Don't use until a sparse operation
+        #A = self.io.esa.get_incidence_matrix()
 
         return A
 
@@ -88,8 +98,9 @@ class Network(PWApp):
         match weights:
             case BranchType.LENGTH:      #  m^-2
                 W = 1/self.lengths()**2
-            case BranchType.PHASE:       #  w^2
-                W = 1/self.delays()**2
+            case BranchType.RES_DIST:       #  ohms^-2
+                # NOTE squaring makes this very poor. May need Gramian
+                W = 1/self.zmag()#**2
             case BranchType.PROPAGATION: #  m^-2
                 ell = self.lengths()
                 GAM = self.gamma()
@@ -144,7 +155,7 @@ class Network(PWApp):
 
         return ell
     
-    def delays(self):
+    def zmag(self):
         '''
         Steady-state phase delays of the branches, approximated
         as the angle of the complex value.
@@ -153,11 +164,9 @@ class Network(PWApp):
         Min/Max
             -pi/2, 0
         '''
-        Y = self.ybranch()
+        Y = self.ybranch() 
 
-        D = np.pi/2 + np.angle(Y)/2 
-
-        return D
+        return 1/np.abs(Y)
       
     def ybranch(self, asZ=False):
         '''

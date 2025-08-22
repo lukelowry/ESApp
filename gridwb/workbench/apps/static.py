@@ -24,9 +24,10 @@ class Statics(PWApp):
     def __init__(self, context: Context) -> None:
         super().__init__(context)
 
-        gens = self.io[Gen, :]
-        buses = self.io[Bus, :]
-        loads = self.io[Load, :]
+
+        # TODO don't need to read ALL of this!
+        gens = self.io[Gen, ['GenMVRMin', 'GenMVRMax']]
+        buses = self.io[Bus]
 
         zipfields = ['LoadSMW', 'LoadSMVR','LoadIMW', 'LoadIMVR','LoadZMW', 'LoadZMVR']
         
@@ -488,3 +489,12 @@ class Statics(PWApp):
 
         self.io[Load] = self.DispatchPQ.loc[:,fields]
 
+    def clearloads(self):
+        '''
+        Clears the script-applied load of the context
+        '''
+
+        zipfields = ['LoadSMW', 'LoadSMVR','LoadIMW', 'LoadIMVR','LoadZMW', 'LoadZMVR']
+        self.DispatchPQ.loc[:, zipfields] = 0
+
+        self.io[Load] = self.DispatchPQ 

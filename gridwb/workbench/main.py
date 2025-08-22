@@ -24,9 +24,6 @@ class GridWorkBench:
         self.context = Context(fname)
         self.io = self.context.getIO()
 
-        # Temp disable - my IO getter is more reliable
-        # NOTE disable statics until it knowns to disable DM
-        #self.dm = self.context.getDataMaintainer()
 
         # Applications
         #self.dyn = Dynamics(self.context)
@@ -43,26 +40,34 @@ class GridWorkBench:
         '''Save Open the Power World File'''
         self.io.save()
 
-    def voltage(self, dtype=complex):
+    def voltage(self, asComplex=True):
         '''
         Description
             The vector of voltages in power world
         Parameters
             dtype: only returns compelx vector at this moment.
+        Returns
+            complex=True -> Series of complex values if complex=True
+            complex=False -> Tuple of Vmag and Angle (In Radians)
         '''
-        vpu = self.io[Bus, 'BusPUVolt']
-        rad = self.io[Bus, 'BusAngle']['BusAngle']*np.pi/180
+        v_df = self.io[Bus, ['BusPUVolt','BusAngle']] 
 
-        vpu['BusPUVolt'] *= np.exp(1j*rad)
-        vpu.columns = ['Bus Number', 'Voltage']
+        vmag = v_df['BusPUVolt']
+        rad = v_df['BusAngle']*np.pi/180
+
+        if asComplex:
+            return vmag * np.exp(1j * rad)
         
-        return vpu
+        return vmag, rad
     
     def write_voltage(self,V):
+        '''
+        Given Complex 1-D vector write to power world
+        '''
 
-        # Inefficient write
-        self.io[Bus,'BusPUVolt'] = np.abs(V)
-        self.io[Bus,'BusAngle']  = np.angle(V,deg=True)
+        V_df =  np.vstack([np.abs(V), np.angle(V,deg=True)]).T
+
+        self.io[Bus,['BusPUVolt', 'BusAngle']] = V_df
 
 
     def pflow(self, getvolts=True) -> DataFrame | None:
