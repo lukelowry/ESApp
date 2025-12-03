@@ -39,23 +39,39 @@ class PowerWorldIO(IModelIO):
         wb.pw[Bus, 'BusPUVolt'] # Get Voltage Magnitudes
         wb.pw[Bus, ['SubNum', 'BusPUVolt']] # Get Two Fields
         wb.pw[Bus, :] # Get all fields
+        wb.pw[Bus, Bus.BusAngle]
+        wb.pw[Bus, [Bus.BusAngle, Bus.BusPUVolt]]
         '''
         
-				        # Type checking is an anti-pattern but this is accepted within community as a necessary part of the magic function
+		# Type checking is an anti-pattern but this is accepted within community as a necessary part of the magic function
+
         # >1 Argument - Objecet Type & Fields(s)
         if isinstance(index, tuple): 
             gtype, fields = index
-            if isinstance(fields, str): 
+            if isinstance(fields, (str, GObject)): 
                 fields = fields,
             elif isinstance(fields, slice): 
                 fields = gtype.fields
+
         # 1 Argument - Object Type: retrieve only key fields
         else: 
             gtype, fields = index, ()
 
         # Keys and then Fields # NOTE TODO don't need to look for fuplicates if only keys requested
         key_fields = gtype.keys
-        data_fields = [f for f in fields if f not in key_fields]
+
+        # Convert to string, retain non-key fields, then retain only unique fields
+        data_fields = []
+        for f in fields:
+
+            # If GObject passed instead of string
+            if isinstance(f,GObject) and f.value[1] not in key_fields:
+                data_fields.append(f.value[1])
+
+            # If string
+            elif isinstance(f,str) and f not in key_fields:
+                data_fields.append(f)
+
         unique_fields = [*key_fields, *data_fields]
 
         # If no fields (I.e. there were no keys and no data field passed)

@@ -15,6 +15,13 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.colors import Normalize
 
+def get_shapeobj(shape='Texas'):
+    _DIRNAME = dirname(abspath(__file__))
+    shapepath = _DIRNAME + sep + 'shapes' + sep + shape + sep + 'Shape.shp'
+    shapeobj = gpd.read_file(shapepath)
+
+    return shapeobj
+
 def scatter_map(values, long, lat, shape='Texas', ax:Axes=None, title='Texas Contour', usecbar=True, interp=300, cmap='plasma', norm=None, highlight=None, hlMarker='go', radians=False, method='nearest', extrap=(0,0,0,0)):
     '''Plot Spatial data with a country or state border
     

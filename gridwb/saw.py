@@ -3672,6 +3672,8 @@ class SAW(object):
             merged[cols_in[str_cols]].to_numpy(), merged[cols_out[str_cols]].to_numpy()
         )
 
+    # NOTE BUG the main ESA fork uses errors='raise' but this causes issues.
+    # In Birchfields version of GWB, I fixed this by doing wb.esa.pw_order = True
     def _to_numeric(
         self, data: Union[pd.DataFrame, pd.Series], errors="ignore"
     ) -> Union[pd.DataFrame, pd.Series]:

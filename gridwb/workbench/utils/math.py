@@ -52,6 +52,27 @@ def periodiclap(N, periodic=True):
 
     return L
 
+def periodicincidence(N, periodic=True):
+    '''
+    Description:
+        Creates a branchless periodic discrete graph laplacian
+    Returns:
+        Dense nd-array
+    '''
+
+    O = np.ones(N)
+
+    L = sp.diags(
+        [O, -O[:1]],
+        offsets=[0, 1], 
+        shape=(N,N)
+    ).toarray()
+
+    if periodic:
+        L[-1, 0] = -1
+
+    return L
+
 # Matrix Helper Functions
 def normlap(L, retD=False):
     '''Given a square Laplacian matrix, this function will return the normalized
