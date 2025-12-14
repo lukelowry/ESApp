@@ -2,14 +2,14 @@
 
 # WorkBench Imports
 from ..io import Context, PowerWorldIO
-from ..grid.components import Branch, Bus, DCTransmissionLine
+from ..grid.components import Branch, Bus, DCTransmissionLine, Gen
 from .app import PWApp
 
 from scipy.sparse import diags, lil_matrix
 import numpy as np
 from pandas import Series, concat
-
 from enum import Enum
+
 
 # Types of support branch weights
 class BranchType(Enum):
@@ -17,7 +17,7 @@ class BranchType(Enum):
     RES_DIST = 2 # Resistance Distance
     DELAY = 3
     
-    
+
 
 # Constructing Network Matricies and other metrics
 class Network(PWApp):
@@ -29,6 +29,7 @@ class Network(PWApp):
 
         # Incidence
         self.A = None
+
 
     def busmap(self):
         '''
@@ -280,3 +281,5 @@ class Network(PWApp):
 
         # Propagation Parameter
         return tau
+    
+

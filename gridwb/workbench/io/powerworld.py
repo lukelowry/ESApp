@@ -116,6 +116,8 @@ class PowerWorldIO(IModelIO):
             # Retrieve active power world records with keys only
             # NOTE we do not want to read all self[gtype, :] that is expensive
             # BUG For some reason some things are not updating unless I pull all
+            # BUG 12/3/2025 Reading these keys (or maybe going into edit mode)
+            # is messing up the GSP power flow alg I am working on.
             base = self[gtype]#, :]
 
             # Edge case for objects that don't have key fields (SimSolutionOptions)
