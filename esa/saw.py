@@ -2015,7 +2015,7 @@ class SAW(object):
         ChangeParameters calls.
 
         `PowerWorld documentation
-        <https://www.powerworld.com/WebHelp/Content/MainDocumentation_HTML/CloseCase_Function.htm>`__
+        <https://www.powerworld.com/WebHelp/Content/MainDocumentation_HTML/ChangeParametersSingleElement_Function.htm>`__
 
         :param ObjectType: The type of object you are changing
             parameters for.
