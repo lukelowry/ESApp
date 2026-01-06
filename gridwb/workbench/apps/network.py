@@ -250,7 +250,7 @@ class Network(PWApp):
         return  np.sqrt(Y*Z)
     
     
-    def delay(self, min_delay=10e-6):
+    def delay(self, min_delay=10e-4):
         '''
         Return Effective delay of branches
         The minimum delay permitted is 10 us
@@ -273,8 +273,17 @@ class Network(PWApp):
         gam = np.sqrt(Z*Y)
         beta = np.imag(gam)
 
-        # EFFECTIVE DELAY (SQUARED)
-        tau = beta/w
+
+
+        # NOTE The issue I am seeing is that this value tau
+        # is very very small in most cases. Dividing it by w
+        # makes it even smaller.
+        # So when it 1/t^2 is calculated, there is an overflow of precision.
+        # Therefore here (for now) we will actually just use beta
+        # for stability purposes
+
+        # EFFECTIVE DELAY
+        tau = beta#/w
 
         # Enforce lower bound
         tau[tau<min_delay] = min_delay
