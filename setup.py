@@ -99,8 +99,7 @@ setuptools.setup(
         "toolz",
         "networkx",
         "tqdm",
-        "matplotlib",
-        "pywt"
+        "matplotlib"
     ],
     python_requires=">=3.7",
     # There are a couple tests that use networkx, and we use the magic

@@ -17,4 +17,4 @@
 from .saw import SAW, PowerWorldError, COMError, CommandNotRespectedError,\
     Error
 
-__version__ = "1.3.5"
+__version__ = "1.0.0"
