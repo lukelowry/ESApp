@@ -100,17 +100,16 @@ class Network(PWApp):
             Sparse Laplacian
         '''
 
-        match weights:
-            case BranchType.LENGTH:    #  m^-2
-                W = 1/self.lengths(longer_xfmr_lens, len_thresh, hvdc)**2
-            case BranchType.RES_DIST:  #  ohms^-2
-                W = 1/self.zmag(hvdc) 
-            case BranchType.DELAY:
-                W = 1/self.delay()**2  # 1/s^2
-            case _:
-                W = weights
+        if weights == BranchType.LENGTH:    #  m^-2
+            W = 1/self.lengths(longer_xfmr_lens, len_thresh, hvdc)**2
+        elif weights == BranchType.RES_DIST:  #  ohms^-2
+            W = 1/self.zmag(hvdc) 
+        elif weights == BranchType.DELAY:
+            W = 1/self.delay()**2  # 1/s^2
+        else:
+            W = weights
 
-        A = self.incidence(hvdc=hvdc) 
+        A = self.incidence(hvdc=hvdc)
 
         LAP =  A.T@diags(W)@A
 
@@ -291,4 +290,3 @@ class Network(PWApp):
         # Propagation Parameter
         return tau
     
-
