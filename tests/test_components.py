@@ -48,20 +48,12 @@ def test_gobject_fields_are_collected(test_gobject_class):
     expected_fields = ['id', 'name', 'value', 'duplicate_key']
     assert test_gobject_class.fields == expected_fields
 
-def test_gobject_keys_are_collected_and_contain_duplicates(test_gobject_class):
+def test_gobject_keys_are_collected(test_gobject_class):
     """
-    Tests that PRIMARY and SECONDARY fields are collected in the .keys property.
-    NOTE: This test highlights that the current implementation creates duplicate keys.
+    Tests that PRIMARY fields are collected in the .keys property.
     """
-    expected_keys_with_duplicates = ['id', 'name', 'duplicate_key', 'duplicate_key']
-    assert test_gobject_class.keys == expected_keys_with_duplicates
-    
-    # To fix this, you could change the GObject.__new__ method to check for existence
-    # before appending to cls._KEYS, or use a set for initial collection.
-    # For example:
-    # if field_priority & (FieldPriority.PRIMARY | FieldPriority.SECONDARY):
-    #     if field_name_str not in cls._KEYS:
-    #         cls._KEYS.append(field_name_str)
+    expected_keys = ['id', 'duplicate_key']
+    assert test_gobject_class.keys == expected_keys
 
 @pytest.mark.parametrize("member, expected_value", [
     ("ID", (1, 'id', int, components.FieldPriority.PRIMARY)),

@@ -1,3 +1,4 @@
+
 from enum import Enum, Flag, auto
 
 class FieldPriority(Flag):
@@ -10,42 +11,40 @@ class FieldPriority(Flag):
 
 class GObject(Enum):
 
-    # Called when each field of subclass is parsed by python
+    # Called when each field of a subclass is parsed by python
     def __new__(cls, *args):
+        # Initialize _FIELDS and _KEYS lists if they don't exist on the class itself
+        if '_FIELDS' not in cls.__dict__:
+            cls._FIELDS = []
+        if '_KEYS' not in cls.__dict__:
+            cls._KEYS = []
         
-        # The object type string name 
+        # The object type string name is the only argument for this member
         if len(args) == 1:
-
             cls._TYPE = args[0]
             
-             # Set intgeer and name as member value
+            # Set integer and name as member value
             value = len(cls.__members__) + 1
             obj = object.__new__(cls)
             obj._value_ = value
 
             return obj
         
-        # Everything else is field
+        # Everything else is a field with (name, dtype, priority)
         else:
-            # Look at raw field name and priority
             field_name_str, field_dtype, field_priority = args 
 
-            # Check if fields class function has been initialized
-            if not hasattr(cls, '_FIELDS'):
-                cls._FIELDS = []
-            if not hasattr(cls, '_KEYS'):
-                cls._KEYS = []
-
-            # Add to appropriate Lists
-            cls._FIELDS.append(field_name_str)
-            if field_priority & FieldPriority.PRIMARY == FieldPriority.PRIMARY:
-                cls._KEYS.append(field_name_str)
-
-
-            # Set intgeer and name as member value
+            # Set integer and name as member value
             value = len(cls.__members__) + 1
             obj = object.__new__(cls)
             obj._value_ = (value,  field_name_str, field_dtype, field_priority)
+
+            # Add to appropriate Lists
+            cls._FIELDS.append(field_name_str)
+            
+            # A field is a key if it's PRIMARY.
+            if field_priority & FieldPriority.PRIMARY == FieldPriority.PRIMARY:
+                cls._KEYS.append(field_name_str)
 
             return obj
     
@@ -58,26 +57,14 @@ class GObject(Enum):
     @classmethod
     @property
     def keys(cls):
-        '''
-        Get the properly formatted string names of all fields
-        '''
-        if not hasattr(cls, '_KEYS'):
-            return []
-        return cls._KEYS
+        return getattr(cls, '_KEYS', [])
     
     @classmethod
     @property
     def fields(cls):
-        '''
-        Get the properly formatted string names of all fields
-        '''
-        if not hasattr(cls, '_FIELDS'):
-            return []
-        return cls._FIELDS 
+        return getattr(cls, '_FIELDS', [])
     
     @classmethod
     @property
     def TYPE(cls):
-        if not hasattr(cls, '_TYPE'):
-            return 'NO_OBJECT_NAME'
-        return cls._TYPE
+        return getattr(cls, '_TYPE', 'NO_OBJECT_NAME')

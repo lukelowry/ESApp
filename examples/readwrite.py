@@ -6,15 +6,7 @@ CASE_PATH = r"C:\Users\wyattluke.lowery\OneDrive - Texas A&M University\Research
 wb = GridWorkBench(CASE_PATH)
 
 # Get Data
-DATA = wb[Bus]
-
-# Change Data
-DATA.loc[2, "AreaNum"] = 2
-
-# Write Data
-wb.io[Bus] = DATA
-
-DATA = wb[Bus]
+DATA = wb[Substation]
 
 # Confirm
 print(DATA)

@@ -1129,15 +1129,5 @@ class TestOnlineSAW:
 
 
 if __name__ == "__main__":
-    # Default case path if not provided
-    default_case = r"C:\Users\wyattluke.lowery\OneDrive - Texas A&M University\Research\Cases\Hawaii 37\Hawaii40_20231026.pwb"
-
-    if len(sys.argv) > 1:
-        case_arg = sys.argv[1]
-    else:
-        case_arg = default_case
-
-    os.environ["SAW_TEST_CASE"] = case_arg
-
     # Run pytest on this file
     sys.exit(pytest.main(["-v", __file__]))

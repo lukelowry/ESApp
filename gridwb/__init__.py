@@ -18,4 +18,3 @@ from .apps import BranchType
 # Utilities
 from .utils import InjectionVector, ybus_with_loads
 
-__version__ = "1.0.0"

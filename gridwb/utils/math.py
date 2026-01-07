@@ -5,8 +5,24 @@ import scipy.sparse as sp
 from typing import Any
 from scipy.sparse.linalg import eigsh
 
+
+from numpy import block, diag, real, imag
+from scipy.linalg import schur
+
 # Constants
 MU0 = 1.256637e-6
+
+
+def takagi(M):
+   n = M.shape[0]
+   D, P = schur(block([[-real(M),imag(M)],[imag(M),real(M)]]))
+   pos = diag(D) > 0
+   Sigma = diag(D[pos,pos])
+   # Note: The arithmetic below is technically not necessary
+   U = P[n:,pos] + 1j*P[:n,pos]
+   return U, Sigma.diagonal()
+
+
 
 def eigmax(L):
     '''

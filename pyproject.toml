@@ -1,0 +1,82 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ESA++"
+dynamic = ["version"]
+description = "ESA++ is an open-source power-grid toolkit."
+readme = "README.rst"
+requires-python = ">=3.7"
+license = {text = "Apache License 2.0"}
+authors = [
+    {name = "Adam Birchfield", email = "abirchfield@tamu.edu"},
+    {name = "Luke Lowery", email = "wyattluke.lowery@tamu.edu"}
+]
+keywords = [
+    "Python",
+    "PowerWorld",
+    "PowerWorld Simulator",
+    "Simulator",
+    "PowerWorld Simulation Automation Server",
+    "SimAuto",
+    "Automation",
+    "Power Systems",
+    "Electric Power",
+    "Power",
+    "Easy SimAuto",
+    "ESA",
+    "ESAplus",
+    "Smart Grid",
+]
+classifiers = [
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: Microsoft :: Windows",
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Win32 (MS Windows)",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Education",
+    "Intended Audience :: Science/Research",
+    "Natural Language :: English",
+    "Topic :: Education",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Software Development",
+]
+dependencies = [
+    "pandas >= 0.25",
+    "numpy >= 1.19.5",
+    "scipy",
+    "geopandas",
+    "pywin32",
+    "pypiwin32",
+    "toolz",
+]
+
+[project.optional-dependencies]
+test = ["pytest"]
+dev = ["matplotlib"]
+docs = [
+    "sphinx",
+    "numpydoc",
+    "sphinxcontrib-bibtex",
+    "sphinx-gallery",
+    "memory_profiler",
+    "sphinx-rtd-theme",
+    "sphinx-copybutton",
+]
+
+[project.urls]
+Homepage = "https://github.com/lukelowry/ESApp"
+
+[tool.setuptools]
+packages = {find = {}}
+include-package-data = true
+zip-safe = false
+
+[tool.setuptools.dynamic]
+version = {file = "VERSION"}

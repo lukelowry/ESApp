@@ -7,7 +7,6 @@ from numpy.random import random
 # WorkBench Imports
 from ..indextool import IndexTool
 from ..grid.components import Contingency, Gen, Load, Bus,Shunt, PWCaseInformation, Branch
-from ..utils.metric import Metric
 from ..utils.exceptions import *
 from .app import PWApp
 

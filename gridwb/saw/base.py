@@ -658,9 +658,9 @@ class SAWBase(object):
                 data = self._replace_decimal_delimiter(data)
 
         if df_flag:
-            return data.apply(lambda x: pd.to_numeric(x, errors=errors))
+            return data.apply(lambda x: pd.to_numeric(x, errors='coerce')).fillna(data)
         else:
-            return data.apply(pd.to_numeric, errors=errors)
+            return pd.to_numeric(data, errors='coerce').fillna(data)
 
     def _replace_decimal_delimiter(self, data: pd.Series):
         try:

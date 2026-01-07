@@ -24,7 +24,7 @@ try:
     from gridwb.indextool import IndexTool
     from gridwb.grid import components
     from gridwb.grid.components import GObject
-    from gridwb.saw import PowerWorldError
+    from gridwb.saw import PowerWorldError, COMError
 except ImportError:
     print("Error: Could not import gridwb packages. Please ensure the package is in your Python path.")
     sys.exit(1)
@@ -63,7 +63,7 @@ class TestOnlineComponents:
         """
         try:
             df = io_instance[component_class]
-        except PowerWorldError as e:
+        except (PowerWorldError, COMError) as e:
             self._check_if_supported(io_instance, component_class, e)
         except Exception as e:
             pytest.fail(f"Failed to read keys for {component_class.__name__} ({component_class.TYPE}): {e}")
@@ -83,7 +83,7 @@ class TestOnlineComponents:
         try:
             # Request all fields using the slice syntax
             df = io_instance[component_class, :]
-        except PowerWorldError as e:
+        except (PowerWorldError, COMError) as e:
             self._check_if_supported(io_instance, component_class, e)
         except Exception as e:
             pytest.fail(f"Failed to read all fields for {component_class.__name__} ({component_class.TYPE}): {e}")
@@ -114,21 +114,19 @@ class TestOnlineComponents:
                     pass
 
         if is_supported:
+            err_msg = str(original_error)
+            if hasattr(original_error, '__cause__') and original_error.__cause__:
+                err_msg += " " + str(original_error.__cause__)
+
+            if "cannot be retrieved through SimAuto" in err_msg:
+                pytest.skip(f"Object type {component_class.TYPE} is supported by PowerWorld but not accessible via SimAuto.")
+            if "memory resources" in err_msg:
+                pytest.skip(f"Object type {component_class.TYPE} has too many fields to retrieve via SimAuto (Memory Error).")
             pytest.fail(f"Object type {component_class.TYPE} is supported (SaveObjectFields worked) but failed to read data: {original_error}")
         else:
             pytest.skip(f"Object type {component_class.TYPE} not recognized by PowerWorld version.")
 
 
 if __name__ == "__main__":
-    # Default case path if not provided
-    default_case = r"C:\Users\wyattluke.lowery\OneDrive - Texas A&M University\Research\Cases\Hawaii 37\Hawaii40_20231026.pwb"
-
-    if len(sys.argv) > 1:
-        case_arg = sys.argv[1]
-    else:
-        case_arg = default_case
-
-    os.environ["SAW_TEST_CASE"] = case_arg
-
     # Run pytest on this file
     sys.exit(pytest.main(["-v", __file__]))

@@ -1,6 +1,3 @@
-
-
-# WorkBench Imports
 from ..indextool import IndexTool
 from ..grid.components import Branch, Bus, DCTransmissionLine
 from .app import PWApp

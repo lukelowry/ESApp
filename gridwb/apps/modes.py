@@ -1,6 +1,3 @@
-
-
-# WorkBench Imports
 from ..indextool import IndexTool
 from .app import PWApp
 

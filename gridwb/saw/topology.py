@@ -52,7 +52,7 @@ class TopologyMixin:
             statement = f'DetermineShortestPath({start}, {end}, {BranchDistanceMeasure}, {BranchFilter}, "{filename}");'
             self.RunScriptCommand(statement)
             df = pd.read_csv(
-                filename, header=None, delim_whitespace=True, names=["BusNum", BranchDistanceMeasure, "BusName"]
+                filename, header=None, sep=r'\s+', names=["BusNum", BranchDistanceMeasure, "BusName"]
             )
             df["BusNum"] = df["BusNum"].astype(int)
             return df
