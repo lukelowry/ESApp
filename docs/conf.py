@@ -5,7 +5,8 @@ extensions = [
     "sphinx.ext.viewcode",
     "sphinx.ext.autosummary",
     "sphinx.ext.mathjax",
-    "sphinx.ext.inheritance_diagram"
+    "sphinx.ext.inheritance_diagram",
+    "sphinx_gallery.gen_gallery"
 ]
 
 extensions.append("sphinx.ext.autodoc")
@@ -51,6 +52,11 @@ napoleon_type_aliases = {
     "bool": "bool",
     "int": "int",
     "float": "float",
+}
+
+sphinx_gallery_conf = {
+    "examples_dirs": "../examples",   # path to your example scripts
+    "gallery_dirs": "auto_examples",  # path to where to save gallery generated output
 }
 
 

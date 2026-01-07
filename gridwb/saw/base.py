@@ -100,7 +100,26 @@ class SAWBase(object):
         UseDefinedNamesInVariables: bool = False,
         pw_order=False,
     ):
-        """Initialize SimAuto wrapper."""
+        """
+        Initialize SimAuto wrapper.
+
+        Parameters
+        ----------
+        FileName : str
+            Path to the PowerWorld case file (.pwb).
+        early_bind : bool, optional
+            Whether to use early binding for COM.
+        UIVisible : bool, optional
+            Whether to make the PowerWorld UI visible.
+        object_field_lookup : tuple, optional
+            Object types to pre-fetch field lists for.
+        CreateIfNotFound : bool, optional
+            Whether to create objects if they are not found.
+        UseDefinedNamesInVariables : bool, optional
+            Whether to use defined names in variables.
+        pw_order : bool, optional
+            Whether to preserve PowerWorld's internal ordering.
+        """
         self.log = logging.getLogger(self.__class__.__name__)
         locale_db = locale.localeconv()
         self.decimal_delimiter = locale_db["decimal_point"]

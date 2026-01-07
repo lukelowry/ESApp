@@ -1,45 +1,101 @@
 ESA++
-==================
-.. image:: https://img.shields.io/pypi/v/esa.svg
-   :target: https://pypi.org/project/esa/
-.. image:: https://img.shields.io/pypi/pyversions/esa.svg
-   :target: https://pypi.org/project/esa/
-.. image:: https://joss.theoj.org/papers/10.21105/joss.02289/status.svg
-   :target: https://doi.org/10.21105/joss.02289
-.. image:: https://img.shields.io/pypi/l/esa.svg
-   :target: https://github.com/mzy2240/ESA/blob/master/LICENSE
+====================================
 
-ESA++ is a syntax-sugar fork to make data access as easy as possible.
+.. image:: https://img.shields.io/badge/License-Apache%202.0-blue.svg
+   :target: https://opensource.org/licenses/Apache-2.0
+   :alt: License
 
-Easy SimAuto (ESA) is an easy-to-use Power System Analysis Automation
-Platform atop PowerWorld's Simulator Automation Server (SimAuto).
-ESA wraps all PowerWorld SimAuto functions, supports Auxiliary scripts,
-provides helper functions to further simplify working with SimAuto and
-also turbocharges with native implementation of SOTA algorithms. Wherever
-possible, data is returned as Pandas DataFrames, making analysis a breeze.
-ESA is well tested and fully `documented`_.
+An open-source Python toolkit for power system automation, providing a high-performance "syntax-sugar" fork of Easy SimAuto (ESA). This library streamlines interaction with PowerWorld's Simulator Automation Server (SimAuto), transforming complex COM calls into intuitive, Pythonic operations.
 
-`Documentation`_
-----------------
+Key Features
+------------
 
-For quick-start directions, installation instructions, API reference,
-examples, and more, please check read `documentation`_.
-
+- **Intuitive Indexing Syntax**: Access and modify grid components using a unique indexing system (e.g., ``wb[Bus, 'BusPUVolt']``) that feels like native Python.
+- **Comprehensive SimAuto Wrapper**: Full coverage of PowerWorld's API through the ``SAW`` class, organized into modular mixins for power flow, contingencies, transients, and more.
+- **High-Level Adapter Interface**: A collection of simplified "one-liner" functions for common tasks like GIC calculation, fault analysis, and voltage violation detection.
+- **Native Pandas Integration**: Every data retrieval operation returns a Pandas DataFrame or Series, enabling immediate analysis, filtering, and visualization.
+- **Advanced Analysis Apps**: Built-in specialized modules for Network topology analysis, Geomagnetically Induced Currents (GIC), and Forced Oscillation detection.
 
 Installation
 ------------
 
-For local releases you must install in edit mode. Enter the working directory and execute the following.
+For local development and the latest features, install the package in editable mode from the root directory:
 
-.. code:: bat
+.. code-block:: bash
 
     python -m pip install gridwb -e .
 
-    
-License
+
+Documentation
+-------------
+
+For a comprehensive tutorial, usage guides, and the full API reference, please visit our `documentation website <https://wyattlaundry.github.io/GridWorkBenchESA/>`_.
+
+Usage Example
+-------------
+
+Here is a quick example of how ESA++ simplifies data access and power flow analysis.
+
+.. code-block:: python
+
+    from gridwb import GridWorkBench
+    from gridwb.grid.components import Bus, Gen
+
+    # 1. Initialize the workbench with your PowerWorld case
+    wb = GridWorkBench("my_grid_model.pwb")
+
+    # 2. Retrieve data using intuitive indexing
+    #    Returns a DataFrame with BusNum, BusName, and BusPUVolt
+    bus_data = wb[Bus, ['BusName', 'BusPUVolt']]
+
+    # 3. Solve power flow and get complex voltages in one line
+    V = wb.pflow()
+
+    # 4. Perform high-level operations via the adapter
+    #    Find all voltage violations below 0.95 pu
+    violations = wb.func.find_violations(v_min=0.95)
+
+    # 5. Modify data and save
+    wb[Gen, 'GenMW'] = 100.0
+    wb.save()
+
+More Examples
+-------------
+
+The `examples/ <https://github.com/lukelowry/ESApp/tree/main/examples>`_ directory contains a gallery of demonstrations, including:
+
+- **Basic Data I/O**: Efficiently reading and writing large sets of grid parameters.
+- **Contingency Analysis**: Automating N-1 studies and processing violation matrices.
+- **Matrix Extraction**: Retrieving Y-Bus and Jacobian matrices for external mathematical modeling.
+
+Testing
 -------
 
-`Apache License 2.0 <https://www.apache.org/licenses/LICENSE-2.0>`__
+ESA++ includes an extensive test suite covering both offline mocks and live PowerWorld connections. To run the tests, install the test dependencies and execute pytest:
 
-.. _documentation: https://wyattlaundry.github.io/GridWorkBenchESA/
-.. _documented: https://wyattlaundry.github.io/GridWorkBenchESA/
+.. code-block:: bash
+
+    pip install .[test]
+    pytest tests/test_saw.py
+
+Citation
+--------
+
+If you use this toolkit in your research or industrial projects, please cite the original ESA work and this fork:
+
+.. code-block:: bibtex
+
+    @article{esa2020,
+      title={Easy SimAuto (ESA): A Python Package for PowerWorld Simulator Automation},
+      author={Mao, Zeyu and Thayer, Brandon and Liu, Yijing and Birchfield, Adam},
+      year={2020}
+    }
+
+Authors
+-------
+
+ESA++ is maintained by **Luke Lowery** and **Adam Birchfield** at Texas A&M University. You can explore more of our research at the `Birchfield Research Group <https://birchfield.engr.tamu.edu/>`_.
+
+License
+-------
+Distributed under the `Apache License 2.0 <https://www.apache.org/licenses/LICENSE-2.0>`_.

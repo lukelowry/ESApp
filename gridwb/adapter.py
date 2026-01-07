@@ -9,54 +9,125 @@ class Adapter:
     interface to the underlying SAW functionality.
     """
     def __init__(self, io: IndexTool):
+        """
+        Initialize the Adapter.
+
+        Parameters
+        ----------
+        io : IndexTool
+            The IndexTool instance to use for I/O.
+        """
         self.io = io
         self.esa = io.esa
 
     # --- Simulation Control ---
 
     def solve(self):
-        """Solves the AC Power Flow."""
+        """
+        Solves the AC Power Flow.
+        """
         self.io.pflow()
 
     def reset(self):
-        """Resets the case to a flat start (1.0 pu voltage, 0.0 angle)."""
+        """
+        Resets the case to a flat start (1.0 pu voltage, 0.0 angle).
+        """
         self.esa.ResetToFlatStart()
 
     def save(self, filename=None):
-        """Saves the case to the specified filename, or overwrites current if None."""
+        """
+        Saves the case to the specified filename, or overwrites current if None.
+
+        Parameters
+        ----------
+        filename : str, optional
+            The path to save the case to.
+        """
         self.esa.SaveCase(filename)
 
     def command(self, script: str):
-        """Executes a raw script command string."""
+        """
+        Executes a raw script command string.
+
+        Parameters
+        ----------
+        script : str
+            The PowerWorld script command.
+
+        Returns
+        -------
+        str
+            The result of the command.
+        """
         return self.esa.RunScriptCommand(script)
 
     def log(self, message: str):
-        """Adds a message to the PowerWorld log."""
+        """
+        Adds a message to the PowerWorld log.
+
+        Parameters
+        ----------
+        message : str
+            The message to log.
+        """
         self.esa.LogAdd(message)
 
     def close(self):
-        """Closes the current case."""
+        """
+        Closes the current case.
+        """
         self.esa.CloseCase()
 
     def mode(self, mode: str):
-        """Enters RUN or EDIT mode."""
+        """
+        Enters RUN or EDIT mode.
+
+        Parameters
+        ----------
+        mode : str
+            The mode to enter ('RUN' or 'EDIT').
+        """
         self.esa.EnterMode(mode)
 
     # --- File Operations ---
 
     def load_aux(self, filename: str):
-        """Loads an auxiliary file."""
+        """
+        Loads an auxiliary file.
+
+        Parameters
+        ----------
+        filename : str
+            The path to the .aux file.
+        """
         self.esa.LoadAux(filename)
     
     def load_script(self, filename: str):
-        """Loads and runs a script file."""
+        """
+        Loads and runs a script file.
+
+        Parameters
+        ----------
+        filename : str
+            The path to the script file.
+        """
         self.esa.LoadScript(filename)
 
     def voltages(self, pu=True, complex=True):
         """
         Retrieves bus voltages.
-        :param pu: If True, returns per-unit voltages. Else kV.
-        :param complex: If True, returns complex numbers. Else tuple of (mag, angle_rad).
+
+        Parameters
+        ----------
+        pu : bool, optional
+            If True, returns per-unit voltages. Else kV. Defaults to True.
+        complex : bool, optional
+            If True, returns complex numbers. Else tuple of (mag, angle_rad). Defaults to True.
+
+        Returns
+        -------
+        Union[pd.Series, Tuple[pd.Series, pd.Series]]
+            The voltage data.
         """
         fields = ['BusPUVolt', 'BusAngle'] if pu else ['BusKVVolt', 'BusAngle']
         df = self.io[Bus, fields]
@@ -69,56 +140,161 @@ class Adapter:
         return mag, ang
 
     def generations(self):
-        """Returns a DataFrame of generator outputs (MW, Mvar) and status."""
+        """
+        Returns a DataFrame of generator outputs (MW, Mvar) and status.
+
+        Returns
+        -------
+        pd.DataFrame
+            Generator data.
+        """
         return self.io[Gen, ['GenMW', 'GenMVR', 'GenStatus']]
 
     def loads(self):
-        """Returns a DataFrame of load demands (MW, Mvar) and status."""
+        """
+        Returns a DataFrame of load demands (MW, Mvar) and status.
+
+        Returns
+        -------
+        pd.DataFrame
+            Load data.
+        """
         return self.io[Load, ['LoadMW', 'LoadMVR', 'LoadStatus']]
 
     def shunts(self):
-        """Returns a DataFrame of switched shunt outputs (MW, Mvar) and status."""
+        """
+        Returns a DataFrame of switched shunt outputs (MW, Mvar) and status.
+
+        Returns
+        -------
+        pd.DataFrame
+            Shunt data.
+        """
         return self.io[Shunt, ['ShuntMW', 'ShuntMVR', 'ShuntStatus']]
 
     def lines(self):
-        """Returns all transmission lines."""
+        """
+        Returns all transmission lines.
+
+        Returns
+        -------
+        pd.DataFrame
+            Line data.
+        """
         branches = self.io[Branch, :]
         return branches[branches['BranchDeviceType'] == 'Line']
 
     def transformers(self):
-        """Returns all transformers."""
+        """
+        Returns all transformers.
+
+        Returns
+        -------
+        pd.DataFrame
+            Transformer data.
+        """
         branches = self.io[Branch, :]
         return branches[branches['BranchDeviceType'] == 'Transformer']
 
     def areas(self):
-        """Returns all areas."""
+        """
+        Returns all areas.
+
+        Returns
+        -------
+        pd.DataFrame
+            Area data.
+        """
         return self.io[Area, :]
 
     def zones(self):
-        """Returns all zones."""
+        """
+        Returns all zones.
+
+        Returns
+        -------
+        pd.DataFrame
+            Zone data.
+        """
         return self.io[Zone, :]
 
     def get_fields(self, obj_type):
-        """Returns a DataFrame describing the fields for a given object type."""
+        """
+        Returns a DataFrame describing the fields for a given object type.
+
+        Parameters
+        ----------
+        obj_type : str
+            The PowerWorld object type.
+
+        Returns
+        -------
+        pd.DataFrame
+            Field information.
+        """
         return self.esa.GetFieldList(obj_type)
 
     # --- Modification ---
 
     def set_voltages(self, V):
-        """Sets bus voltages from a complex vector."""
+        """
+        Sets bus voltages from a complex vector.
+
+        Parameters
+        ----------
+        V : np.ndarray
+            Complex voltage vector.
+        """
         V_df = np.vstack([np.abs(V), np.angle(V, deg=True)]).T
         self.io[Bus, ['BusPUVolt', 'BusAngle']] = V_df
 
     def open_branch(self, bus1, bus2, ckt='1'):
-        """Opens a branch."""
+        """
+        Opens a branch.
+
+        Parameters
+        ----------
+        bus1 : int
+            From bus number.
+        bus2 : int
+            To bus number.
+        ckt : str, optional
+            Circuit ID. Defaults to '1'.
+        """
         self.esa.ChangeParametersSingleElement("Branch", ["BusNum", "BusNum:1", "LineCircuit", "LineStatus"], [bus1, bus2, ckt, "Open"])
 
     def close_branch(self, bus1, bus2, ckt='1'):
-        """Closes a branch."""
+        """
+        Closes a branch.
+
+        Parameters
+        ----------
+        bus1 : int
+            From bus number.
+        bus2 : int
+            To bus number.
+        ckt : str, optional
+            Circuit ID. Defaults to '1'.
+        """
         self.esa.ChangeParametersSingleElement("Branch", ["BusNum", "BusNum:1", "LineCircuit", "LineStatus"], [bus1, bus2, ckt, "Closed"])
 
     def set_gen(self, bus, id, mw=None, mvar=None, status=None):
-        """Sets generator parameters."""
+        """
+        Sets generator parameters.
+
+        Parameters
+        ----------
+        bus : int
+            Bus number.
+        id : str
+            Generator ID.
+        mw : float, optional
+            MW output.
+        mvar : float, optional
+            Mvar output.
+        status : str, optional
+            Status ('Closed' or 'Open').
+        """
         params = []
         values = []
         if mw is not None:
@@ -135,7 +311,22 @@ class Adapter:
             self.esa.ChangeParametersSingleElement("Gen", ["BusNum", "GenID"] + params, [bus, id] + values)
 
     def set_load(self, bus, id, mw=None, mvar=None, status=None):
-        """Sets load parameters."""
+        """
+        Sets load parameters.
+
+        Parameters
+        ----------
+        bus : int
+            Bus number.
+        id : str
+            Load ID.
+        mw : float, optional
+            MW demand.
+        mvar : float, optional
+            Mvar demand.
+        status : str, optional
+            Status ('Closed' or 'Open').
+        """
         params = []
         values = []
         if mw is not None:
@@ -152,32 +343,80 @@ class Adapter:
             self.esa.ChangeParametersSingleElement("Load", ["BusNum", "LoadID"] + params, [bus, id] + values)
 
     def scale_load(self, factor):
-        """Scales system load by a factor."""
+        """
+        Scales system load by a factor.
+
+        Parameters
+        ----------
+        factor : float
+            Scaling factor.
+        """
         self.esa.Scale("LOAD", "FACTOR", [factor], "SYSTEM")
 
     def scale_gen(self, factor):
-        """Scales system generation by a factor."""
+        """
+        Scales system generation by a factor.
+
+        Parameters
+        ----------
+        factor : float
+            Scaling factor.
+        """
         self.esa.Scale("GEN", "FACTOR", [factor], "SYSTEM")
 
     def create(self, obj_type, **kwargs):
         """
         Creates an object with specified parameters.
         Example: adapter.create('Load', BusNum=1, LoadID='1', LoadMW=10)
+
+        Parameters
+        ----------
+        obj_type : str
+            The PowerWorld object type.
+        **kwargs
+            Field names and values.
         """
         fields = list(kwargs.keys())
         values = list(kwargs.values())
         self.esa.CreateData(obj_type, fields, values)
 
     def delete(self, obj_type, filter_name=""):
-        """Deletes objects of a given type, optionally matching a filter."""
+        """
+        Deletes objects of a given type, optionally matching a filter.
+
+        Parameters
+        ----------
+        obj_type : str
+            The PowerWorld object type.
+        filter_name : str, optional
+            The filter to apply.
+        """
         self.esa.Delete(obj_type, filter_name)
 
     def select(self, obj_type, filter_name=""):
-        """Sets the Selected field to YES for objects matching the filter."""
+        """
+        Sets the Selected field to YES for objects matching the filter.
+
+        Parameters
+        ----------
+        obj_type : str
+            The PowerWorld object type.
+        filter_name : str, optional
+            The filter to apply.
+        """
         self.esa.SelectAll(obj_type, filter_name)
 
     def unselect(self, obj_type, filter_name=""):
-        """Sets the Selected field to NO for objects matching the filter."""
+        """
+        Sets the Selected field to NO for objects matching the filter.
+
+        Parameters
+        ----------
+        obj_type : str
+            The PowerWorld object type.
+        filter_name : str, optional
+            The filter to apply.
+        """
         self.esa.UnSelectAll(obj_type, filter_name)
 
     # --- Advanced Topology & Switching ---
@@ -185,42 +424,74 @@ class Adapter:
     def energize(self, obj_type, identifier, close_breakers=True):
         """
         Energizes a specific object by closing breakers.
-        :param obj_type: Object type (e.g. 'Bus', 'Gen', 'Load').
-        :param identifier: Identifier string (e.g. '[1]', '[1 "1"]').
+
+        Parameters
+        ----------
+        obj_type : str
+            Object type (e.g. 'Bus', 'Gen', 'Load').
+        identifier : str
+            Identifier string (e.g. '[1]', '[1 "1"]').
+        close_breakers : bool, optional
+            Whether to close breakers. Defaults to True.
         """
         self.esa.CloseWithBreakers(obj_type, identifier, only_specified=False, close_normally_closed=True)
 
     def deenergize(self, obj_type, identifier):
         """
         De-energizes a specific object by opening breakers.
-        :param obj_type: Object type (e.g. 'Bus', 'Gen', 'Load').
-        :param identifier: Identifier string (e.g. '[1]', '[1 "1"]').
+
+        Parameters
+        ----------
+        obj_type : str
+            Object type (e.g. 'Bus', 'Gen', 'Load').
+        identifier : str
+            Identifier string (e.g. '[1]', '[1 "1"]').
         """
         self.esa.OpenWithBreakers(obj_type, identifier)
 
     def radial_paths(self):
-        """Identifies radial paths in the network."""
+        """
+        Identifies radial paths in the network.
+        """
         self.esa.FindRadialBusPaths()
 
     def path_distance(self, start_element_str):
         """
         Calculates distance from a starting element to all buses.
-        :param start_element_str: e.g. '[BUS 1]' or '[AREA "Top"]'.
+
+        Parameters
+        ----------
+        start_element_str : str
+            e.g. '[BUS 1]' or '[AREA "Top"]'.
+
+        Returns
+        -------
+        pd.DataFrame
+            Distance data.
         """
         return self.esa.DeterminePathDistance(start_element_str)
 
     def network_cut(self, bus_on_side, branch_filter="SELECTED"):
         """
         Selects objects on one side of a network cut defined by selected branches.
-        :param bus_on_side: Bus identifier string (e.g. '[BUS 1]') on the desired side.
-        :param branch_filter: Filter for branches defining the cut.
+
+        Parameters
+        ----------
+        bus_on_side : str
+            Bus identifier string (e.g. '[BUS 1]') on the desired side.
+        branch_filter : str, optional
+            Filter for branches defining the cut. Defaults to "SELECTED".
         """
         self.esa.SetSelectedFromNetworkCut(True, bus_on_side, branch_filter=branch_filter, objects_to_select=["Bus", "Gen", "Load"])
 
     def isolate_zone(self, zone_num):
         """
         Opens all tie-lines connecting the specified zone to other zones.
-        :param zone_num: The zone number to isolate.
+
+        Parameters
+        ----------
+        zone_num : int
+            The zone number to isolate.
         """
         # Retrieve branch connectivity and zone information
         # Note: 'BusZone' refers to From Bus Zone, 'BusZone:1' refers to To Bus Zone in PowerWorld
@@ -240,10 +511,20 @@ class Adapter:
     def find_violations(self, v_min=0.95, v_max=1.05, branch_max_pct=100.0):
         """
         Finds bus voltage and branch flow violations.
-        :param v_min: Minimum per-unit voltage threshold.
-        :param v_max: Maximum per-unit voltage threshold.
-        :param branch_max_pct: Branch loading percentage threshold.
-        :return: Dictionary with 'bus_low', 'bus_high', 'branch_overload' DataFrames.
+
+        Parameters
+        ----------
+        v_min : float, optional
+            Minimum per-unit voltage threshold. Defaults to 0.95.
+        v_max : float, optional
+            Maximum per-unit voltage threshold. Defaults to 1.05.
+        branch_max_pct : float, optional
+            Branch loading percentage threshold. Defaults to 100.0.
+
+        Returns
+        -------
+        dict
+            Dictionary with 'bus_low', 'bus_high', 'branch_overload' DataFrames.
         """
         # Bus Violations
         buses = self.io[Bus, ['BusNum', 'BusName', 'BusPUVolt']]
@@ -261,17 +542,33 @@ class Adapter:
     # --- Difference Flows ---
 
     def set_as_base_case(self):
-        """Sets the currently open case as the base case for difference flows."""
+        """
+        Sets the currently open case as the base case for difference flows.
+        """
         self.esa.DiffCaseSetAsBase()
 
     def diff_mode(self, mode="DIFFERENCE"):
-        """Sets the difference mode (PRESENT, BASE, DIFFERENCE, CHANGE)."""
+        """
+        Sets the difference mode (PRESENT, BASE, DIFFERENCE, CHANGE).
+
+        Parameters
+        ----------
+        mode : str, optional
+            The mode to set. Defaults to "DIFFERENCE".
+        """
         self.esa.DiffCaseMode(mode)
 
     def compare_case(self, other_case_path, output_aux):
         """
         Compares the current case (set as base) with another case file.
         Generates an AUX file with the differences.
+
+        Parameters
+        ----------
+        other_case_path : str
+            Path to the case to compare against.
+        output_aux : str
+            Path to the output .aux file.
         """
         self.esa.DiffCaseSetAsBase()
         self.esa.OpenCase(other_case_path)

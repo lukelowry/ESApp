@@ -14,6 +14,19 @@ MU0 = 1.256637e-6
 
 
 def takagi(M):
+   """
+   Performs the Takagi factorization of a complex symmetric matrix.
+
+   Parameters
+   ----------
+   M : np.ndarray
+       Complex symmetric matrix.
+
+   Returns
+   -------
+   tuple
+       (U, Sigma) where M = U * diag(Sigma) * U^T.
+   """
    n = M.shape[0]
    D, P = schur(block([[-real(M),imag(M)],[imag(M),real(M)]]))
    pos = diag(D) > 0
@@ -25,31 +38,58 @@ def takagi(M):
 
 
 def eigmax(L):
-    '''
-    Description
-        Finds Largest Eigenvalue (intended for Sparse Laplacians)
-    '''
+    """
+    Finds the largest eigenvalue of a matrix (intended for sparse Laplacians).
+
+    Parameters
+    ----------
+    L : Union[np.ndarray, sp.spmatrix]
+        The input matrix.
+
+    Returns
+    -------
+    float
+        The largest eigenvalue.
+    """
     return eigsh(L, k=1, which='LA', return_eigenvectors=False)[0]
 
 
 def sorteig(Lam, U):
-    '''
-    Description:
-        Sorts eigen decomp by eigenvalue magnitude (least to greatest)
-    Returns:
-        Eigenvalues, Eigenvectors
-    '''
+    """
+    Sorts eigenvalue decomposition by eigenvalue magnitude (least to greatest).
+
+    Parameters
+    ----------
+    Lam : np.ndarray
+        Eigenvalues.
+    U : np.ndarray
+        Eigenvectors.
+
+    Returns
+    -------
+    tuple
+        (Sorted Lam, Sorted U).
+    """
     idx = np.argsort(np.abs(Lam))
     return Lam[idx], U[:,idx]
 
 # TODO rename to 'pathlap' so periodicity is an option
 def periodiclap(N, periodic=True):
-    '''
-    Description:
-        Creates a branchless periodic discrete graph laplacian
-    Returns:
-        Dense nd-array
-    '''
+    """
+    Creates a branchless periodic discrete graph Laplacian.
+
+    Parameters
+    ----------
+    N : int
+        Number of nodes.
+    periodic : bool, optional
+        Whether the graph is periodic. Defaults to True.
+
+    Returns
+    -------
+    np.ndarray
+        The Laplacian matrix.
+    """
 
     O = np.ones(N)
 
@@ -69,12 +109,21 @@ def periodiclap(N, periodic=True):
     return L
 
 def periodicincidence(N, periodic=True):
-    '''
-    Description:
-        Creates a branchless periodic discrete graph laplacian
-    Returns:
-        Dense nd-array
-    '''
+    """
+    Creates a branchless periodic discrete graph incidence matrix.
+
+    Parameters
+    ----------
+    N : int
+        Number of nodes.
+    periodic : bool, optional
+        Whether the graph is periodic. Defaults to True.
+
+    Returns
+    -------
+    np.ndarray
+        The incidence matrix.
+    """
 
     O = np.ones(N)
 
@@ -91,16 +140,21 @@ def periodicincidence(N, periodic=True):
 
 # Matrix Helper Functions
 def normlap(L, retD=False):
-    '''Given a square Laplacian matrix, this function will return the normalized
-    Laplacian. If retD is True, the diagonal square root scaling matrix will be returned
-    aswell
-    Example Return:
-    
-    Y, D, Di = normlap(Y, True)
+    """
+    Returns the normalized Laplacian of a square matrix.
 
-    Y = normLap(Y)
-    
-    '''
+    Parameters
+    ----------
+    L : Union[np.ndarray, sp.spmatrix]
+        Input square Laplacian matrix.
+    retD : bool, optional
+        Whether to return the diagonal scaling matrices. Defaults to False.
+
+    Returns
+    -------
+    Union[np.ndarray, tuple]
+        Normalized Laplacian, or (NormL, D, Di) if retD is True.
+    """
 
     # Get Diagonal and Invert for convenience
     Yd = np.sqrt(L.diagonal())
@@ -115,8 +169,19 @@ def normlap(L, retD=False):
 
 
 def hermitify(A):
-    '''Given a (numpy) complex valued symmetric matrix (but not hermitian)
-    this function will return the hermitian version of the matrix.'''
+    """
+    Converts a complex symmetric matrix to a Hermitian matrix.
+
+    Parameters
+    ----------
+    A : Union[np.ndarray, sp.spmatrix]
+        Input complex symmetric matrix.
+
+    Returns
+    -------
+    np.ndarray
+        The Hermitian version of the matrix.
+    """
 
     if isinstance(A, np.ndarray):
         return (np.triu(A).conjugate() + np.tril(A))/2
@@ -125,16 +190,29 @@ def hermitify(A):
 
 
 class Operator(ABC):
-    '''Abstract Mathematical Operator Object'''
+    """Abstract Mathematical Operator Object."""
 
     def __init__(self) -> None:
         pass
     
 
 class DifferentialOperator(Operator):
-    '''Only Supports 2D Fortan Style Ordering'''
+    """
+    Finite difference operator generator for 2D grids.
+    Only Supports 2D Fortran Style Ordering.
+    """
 
     def __init__(self, shape, order='F') -> None:
+        """
+        Initialize the DifferentialOperator.
+
+        Parameters
+        ----------
+        shape : tuple
+            (nx, ny) dimensions of the grid.
+        order : str, optional
+            Memory ordering. Defaults to 'F'.
+        """
         self.shape = shape
         self.nx, self.ny = shape
         self.nElement = self.nx*self.ny
@@ -142,12 +220,24 @@ class DifferentialOperator(Operator):
         self.D = [-1, 1] 
 
     def newop(self):
+        """Create empty operator matrices."""
         return np.zeros((self.nElement, self.nElement)), np.zeros((self.nElement, self.nElement))
     
     def aslil(self, Dx, Dy):
+        """Convert to LIL sparse format."""
         return sp.lil_matrix(Dx), sp.lil_matrix(Dy)
 
     def flatidx(self, x, y):
+        """
+        Convert 2D coordinates to flat index.
+
+        Parameters
+        ----------
+        x : int
+            X coordinate.
+        y : int
+            Y coordinate.
+        """
         return y*self.nx + x
     
     def flattoloc(self, idx):
@@ -166,14 +256,21 @@ class DifferentialOperator(Operator):
         return idx - 1
     
     def elementiter(self):
-        '''Iterate through each tensor element to get index and position'''
+        """Iterate through each tensor element to get index and position."""
 
         for yi in np.arange(self.ny):
             for xi in np.arange(self.nx):
                 yield xi, yi, self.flatidx(xi, yi)
         
     def central_diffs(self) -> None:
-        '''Produces central difference gradient operators for a vector field in Fortran ordering'''
+        """
+        Produces central difference gradient operators for a vector field.
+
+        Returns
+        -------
+        tuple
+            (Dx, Dy) sparse matrices.
+        """
 
         Dx, Dy = self.newop()
 
@@ -193,7 +290,14 @@ class DifferentialOperator(Operator):
 
 
     def forward_diffs(self) -> None:
-        '''Produces forward difference gradient operators for a vector field in Fortran ordering'''
+        """
+        Produces forward difference gradient operators for a vector field.
+
+        Returns
+        -------
+        tuple
+            (Dx, Dy) sparse matrices.
+        """
 
         Dx, Dy = self.newop()
 
@@ -214,7 +318,14 @@ class DifferentialOperator(Operator):
         return self.aslil(Dx, Dy)
     
     def backward_diffs(self) -> None:
-        '''Produces backward difference gradient operators for a vector field in Fortran ordering'''
+        """
+        Produces backward difference gradient operators for a vector field.
+
+        Returns
+        -------
+        tuple
+            (Dx, Dy) sparse matrices.
+        """
 
         Dx, Dy = self.newop()
 
@@ -233,7 +344,14 @@ class DifferentialOperator(Operator):
         return self.aslil(Dx, Dy)
     
     def partial(self):
-        ''' Return centered partial operators for a 2D vector field tensor'''
+        """
+        Return centered partial operators for a 2D vector field tensor.
+
+        Returns
+        -------
+        tuple
+            (Dx, Dy) sparse matrices.
+        """
 
         Dxf, Dyf = self.forward_diffs()
         Dxb, Dyb = self.backward_diffs()
@@ -241,25 +359,46 @@ class DifferentialOperator(Operator):
         return Dxb - Dxf, Dyb - Dyf
     
     def divergence(self):
-        '''Central Difference Based Finite Divergence'''
+        """
+        Central Difference Based Finite Divergence.
+
+        Returns
+        -------
+        sp.spmatrix
+            Divergence operator.
+        """
 
         Dx, Dy = self.partial()
         return sp.hstack([Dx, Dy])
     
     def curl(self):
-        '''Central Difference Based Finite Curl'''
+        """
+        Central Difference Based Finite Curl.
+
+        Returns
+        -------
+        sp.spmatrix
+            Curl operator.
+        """
     
         Dx, Dy = self.partial()
         return sp.hstack([Dy, -Dx])
     
     def laplacian(self):
-        '''Central Difference Based Discrete Laplacian'''
+        """
+        Central Difference Based Discrete Laplacian.
+
+        Returns
+        -------
+        sp.spmatrix
+            Laplacian operator.
+        """
 
         Dxf, Dyf = self.forward_diffs()
         return Dxf.T@Dxf + Dyf.T@Dyf
     
     def J(self):
-        '''  Complex Unit Equivilent and/or hodge star, Assume 2D Array is flattened'''
+        """Complex Unit Equivilent and/or hodge star."""
 
         n = self.nElement
         I = sp.eye(n)
@@ -269,7 +408,7 @@ class DifferentialOperator(Operator):
         ])
     
     def ext_der(self):
-        '''Calculate exterior derivative of linear function/operator'''
+        """Calculate exterior derivative of linear function/operator."""
         # Used outside class up top
         pass
 
@@ -277,9 +416,17 @@ class DifferentialOperator(Operator):
 
 
 class MeshSelector:
+    """Helper for selecting regions of a 2D mesh."""
 
     def __init__(self, dop: DifferentialOperator) -> None:
+        """
+        Initialize the MeshSelector.
 
+        Parameters
+        ----------
+        dop : DifferentialOperator
+            The operator defining the mesh dimensions.
+        """
 
         self.SELECTOR = np.full(dop.nElement, False)
 
@@ -304,5 +451,3 @@ class MeshSelector:
 
 
         # TODO Generic versions of above
-
-

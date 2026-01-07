@@ -14,17 +14,38 @@ fexcept = lambda t: "3" + t[5:] if t[:5] == "Three" else t
 
 # Power World Read/Write
 class IndexTool:
+    """
+    PowerWorld Read/Write tool providing indexer-based access to grid components.
+    """
     esa: SAW
 
     def __init__(self, fname: str = None):
+        """
+        Initialize the IndexTool.
+
+        Parameters
+        ----------
+        fname : str, optional
+            Path to the PowerWorld case file.
+        """
         self.fname = fname
 
     def getIO(self):
-        """Compatibility method for apps expecting a Context object."""
+        """
+        Compatibility method for apps expecting a Context object.
+
+        Returns
+        -------
+        IndexTool
+            The current instance.
+        """
         return self
 
     @timing
     def open(self):
+        """
+        Open the PowerWorld case and initialize transient stability.
+        """
         # Validate Path Name
         if not path.isabs(self.fname):
             self.fname = path.abspath(self.fname)

@@ -5,28 +5,60 @@ class SensitivityMixin:
     """Mixin for sensitivity analysis functions."""
 
     def CalculateFlowSense(self, flow_element: str, flow_type: str):
-        """Calculates the sensitivity of the flow of a line or interface.
+        """
+        Calculates the sensitivity of the flow of a line or interface.
 
-        :param flow_element: The flow element (e.g. '[BRANCH 1 2 1]' or '[INTERFACE "name"]').
-        :param flow_type: The type of flow (MW, MVAR, MVA).
+        Parameters
+        ----------
+        flow_element : str
+            The flow element (e.g. '[BRANCH 1 2 1]' or '[INTERFACE "name"]').
+        flow_type : str
+            The type of flow (MW, MVAR, MVA).
+
+        Returns
+        -------
+        str
+            The result of the script command.
         """
         return self.RunScriptCommand(f'CalculateFlowSense({flow_element}, {flow_type});')
 
     def CalculatePTDF(self, seller: str, buyer: str, method: str = "DC"):
-        """Calculates the PTDF values between a seller and a buyer.
+        """
+        Calculates the PTDF values between a seller and a buyer.
 
-        :param seller: The seller (source) (e.g. '[AREA "Top"]').
-        :param buyer: The buyer (sink) (e.g. '[BUS 7]').
-        :param method: Linear method (AC, DC, DCPS). Defaults to DC.
+        Parameters
+        ----------
+        seller : str
+            The seller (source) (e.g. '[AREA "Top"]').
+        buyer : str
+            The buyer (sink) (e.g. '[BUS 7]').
+        method : str, optional
+            Linear method (AC, DC, DCPS). Defaults to DC.
+
+        Returns
+        -------
+        str
+            The result of the script command.
         """
         return self.RunScriptCommand(f'CalculatePTDF({seller}, {buyer}, {method});')
 
     def CalculateLODF(self, branch: str, method: str = "DC", post_closure_lcdf: str = ""):
-        """Calculates Line Outage Distribution Factors.
+        """
+        Calculates Line Outage Distribution Factors.
 
-        :param branch: The branch to outage/close (e.g. '[BRANCH 1 2 1]').
-        :param method: Linear method (DC, DCPS). Defaults to DC.
-        :param post_closure_lcdf: Optional YES/NO for LCDF calculation.
+        Parameters
+        ----------
+        branch : str
+            The branch to outage/close (e.g. '[BRANCH 1 2 1]').
+        method : str, optional
+            Linear method (DC, DCPS). Defaults to DC.
+        post_closure_lcdf : str, optional
+            Optional YES/NO for LCDF calculation.
+
+        Returns
+        -------
+        str
+            The result of the script command.
         """
         args = f'{branch}, {method}'
         if post_closure_lcdf:
