@@ -108,7 +108,7 @@ class GridWorkBench:
 
         self.io[Bus,['BusPUVolt', 'BusAngle']] = V_df
 
-    def pflow(self, getvolts=True) -> DataFrame | None:
+    def pflow(self, getvolts=True) -> DataFrame:
         """
         Solve Power Flow in external system.
         By default bus voltages will be returned.
