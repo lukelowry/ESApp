@@ -13,19 +13,19 @@ case_path = os.environ.get("SAW_TEST_CASE", "case.pwb")
 if os.path.exists(case_path):
     wb = GridWorkBench(case_path)
 
-    wb.func.calculate_gic(max_field=1.0, direction=90.0)
+    wb.io.esa.CalculateGIC(max_field=1.0, direction=90.0)
     
-    xfmr_gic = wb.gic.gictool().gicxfmrs[['BusNum', 'BusNum:1', 'GICAmps']]
+    xfmr_gic = wb.io.esa.GetParametersMultipleElement("GICWinding", ["BusNum", "BusNum:1", "GICAmps"])
     print("\nTransformer GIC Currents:")
     print(xfmr_gic.head())
 
     max_gic_row = xfmr_gic.loc[xfmr_gic['GICAmps'].idxmax()]
-    print(f"\nMax GIC: {max_gic_row['GICAmps']:.2f} A on transformer {max_gic_row['BusNum']}-{max_gic_row['BusNum:1']}")
+    print(f"\nMax GIC: {max_gic_row['GICAmps']:.2f} A at Bus {max_gic_row['BusNum']}")
 
     max_amps = []
     for angle in range(0, 360, 45):
-        wb.func.calculate_gic(max_field=1.0, direction=angle)
-        currents = wb.gic.gictool().gicxfmrs['GICAmps']
+        wb.io.esa.CalculateGIC(max_field=1.0, direction=angle)
+        currents = wb.io.esa.GetParametersMultipleElement("GICWinding", ["GICAmps"])['GICAmps']
         max_amps.append({'Angle': angle, 'MaxGIC': currents.max()})
     
     import pandas as pd

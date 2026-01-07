@@ -17,27 +17,27 @@ if os.path.exists(case_path):
     wb = GridWorkBench(case_path)
 
     report_path = os.path.abspath("system_health_report.csv")
-    wb.esa.SaveDataWithExtra(
+    wb.io.esa.SaveDataWithExtra(
         report_path, 
         "CSVCOLHEADER", 
         "Bus", 
         ["BusNum", "BusName", "BusPUVolt", "BusAngle"], 
         subdatalist=[],
         filter_name="", 
-        sort_field_list=[],
+        sortfieldlist=[],
         header_list=["Report_Generated_By", "Project_ID"],
         header_value_list=["ESA++_Automator", "TAMU_RESEARCH_2026"]
     )
     print(f"Report saved to: {report_path}")
 
     try:
-        wb.esa.SendToExcel(
+        wb.io.esa.SendToExcel(
             "Branch", 
             ["BusNum", "BusNum:1", "LineCircuit", "LineMVA", "LineLimit", "LinePercent"],
             filter_name="",
             use_column_headers=True,
-            workbookname="GridAnalysis.xlsx",
-            worksheetname="BranchLoading"
+            workbook="GridAnalysis.xlsx",
+            worksheet="BranchLoading"
         )
         print("Excel export successful. File 'GridAnalysis.xlsx' created.")
     except Exception as e:
