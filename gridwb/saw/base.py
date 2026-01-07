@@ -9,8 +9,8 @@ from typing import List, Tuple, Union
 
 import numpy as np
 import pandas as pd
-import pythoncom
 import win32com
+import pythoncom
 
 from ._exceptions import COMError, CommandNotRespectedError, Error, PowerWorldError
 from ._helpers import (
