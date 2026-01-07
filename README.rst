@@ -1,4 +1,4 @@
-Gridworkbench (ESA Fork)
+ESA++
 ==================
 .. image:: https://img.shields.io/pypi/v/esa.svg
    :target: https://pypi.org/project/esa/
@@ -9,7 +9,7 @@ Gridworkbench (ESA Fork)
 .. image:: https://img.shields.io/pypi/l/esa.svg
    :target: https://github.com/mzy2240/ESA/blob/master/LICENSE
 
-GridWorkbench is a syntax-sugar fork to make data access as easy as possible.
+ESA++ is a syntax-sugar fork to make data access as easy as possible.
 
 Easy SimAuto (ESA) is an easy-to-use Power System Analysis Automation
 Platform atop PowerWorld's Simulator Automation Server (SimAuto).

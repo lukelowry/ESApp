@@ -85,9 +85,8 @@ setuptools.setup(
         "Power",
         "Easy SimAuto",
         "ESA",
+        "ESAplus"
         "Smart Grid",
-        "Numpy",
-        "Pandas",
     ],
     install_requires=[
         "pandas >= 0.25",

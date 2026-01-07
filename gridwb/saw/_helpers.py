@@ -1,0 +1,70 @@
+"""Helper functions for data conversion for SimAuto COM interface."""
+
+import json
+from pathlib import PureWindowsPath
+from typing import List
+
+import pythoncom
+import win32com
+from win32com.client import VARIANT
+
+
+def df_to_aux(fp, df, object_name: str):
+    """Convert a dataframe to PW aux/axd data section.
+
+    :param fp: file handler
+    :param df: dataframe
+    :param object_name: object type
+    """
+    # write the header
+    fields = ",".join(df.columns.tolist())
+    header = f"DATA ({object_name}, [{fields}])"
+    header_chunks = header.split(",")
+    i = 0
+    line_width = 0
+    max_width = 86
+    working_line = []
+    container = []
+    while True:
+        if line_width + len(header_chunks[i]) <= max_width:
+            working_line.append(header_chunks[i])
+            line_width += len(header_chunks[i])
+            i += 1
+        else:
+            container.append(",".join(working_line))
+            working_line = []
+            line_width = 0
+        if i == len(header_chunks):
+            if len(working_line):
+                container.append(",".join(working_line))
+            break
+    container = [ls + "," for ls in container[:-1]] + [container[-1]]
+    container = [container[0]] + ["    " + ls for ls in container[1:]]  # add tab to each line
+
+    # write the remaining part
+    container.append("{")
+    container.extend(json.dumps(row, separators=(" ", ": "))[1:-1] for row in df.values.tolist())
+    container.append("}\r\n")
+    fp.write("\n".join(container))
+
+
+def convert_to_windows_path(p):
+    """Given a path, p, convert it to a Windows path."""
+    return str(PureWindowsPath(p))
+
+
+def convert_list_to_variant(list_in: list) -> VARIANT:
+    """Given a list, convert to a variant array."""
+    # noinspection PyUnresolvedReferences
+    return VARIANT(pythoncom.VT_VARIANT | pythoncom.VT_ARRAY, list_in)
+
+
+def convert_df_to_variant(df):
+    """Given a DataFrame, convert to a variant array for Rect functions."""
+    data_as_list = df.values.tolist()
+    return win32com.client.VARIANT(pythoncom.VT_ARRAY | pythoncom.VT_VARIANT, data_as_list)
+
+
+def convert_nested_list_to_variant(list_in: list) -> List[VARIANT]:
+    """Given a list of lists, convert to a variant array."""
+    return [convert_list_to_variant(sub_array) for sub_array in list_in]
