@@ -13,7 +13,7 @@ extensions = [
     "sphinx.ext.mathjax",
     "sphinx.ext.inheritance_diagram",
     "sphinx.ext.autosectionlabel",
-    "sphinx_gallery.gen_gallery"
+    "nbsphinx"
 ]
 
 extensions.append("sphinx.ext.autodoc")
@@ -62,12 +62,6 @@ napoleon_type_aliases = {
     "int": "int",
     "float": "float",
 }
-
-sphinx_gallery_conf = {
-    "examples_dirs": "../examples",   # path to your example scripts
-    "gallery_dirs": "auto_examples",  # path to where to save gallery generated output
-}
-
 
 exclude_patterns = ["_build"]
 source_suffix = ".rst"
