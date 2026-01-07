@@ -18,6 +18,8 @@ class ATCMixin:
         :param buyer: The buyer (sink) (e.g. '[BUS 7]').
         :param distributed: Use distributed ATC solution method.
         :param multiple_scenarios: Process each defined scenario.
+        :return: None or error string.
+        :return: None or error string.
         """
         dist = "YES" if distributed else "NO"
         mult = "YES" if multiple_scenarios else "NO"

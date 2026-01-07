@@ -3,13 +3,14 @@ from pandas import DataFrame
 from ..grid.components import Gen, Load, Bus
 
 class InjectionVector:
+    """Represents a normalized injection vector for power system sensitivity studies."""
 
     def __init__(self, loaddf: DataFrame, losscomp=0.05) -> None:
-        '''An Instance Representing an Injection Vector
-        params:
-        - loaddf: Poor Naming but should just be df with 'BusNum' Column for all buses
-        - losscomp: For an increased injection, generation will be increased to compensate losses
-        '''
+        """Initializes the InjectionVector.
+
+        :param loaddf: A DataFrame containing at least a 'BusNum' column for all buses.
+        :param losscomp: Loss compensation factor (generation increase per unit of load increase).
+        """
         self.loaddf = loaddf.copy()
 
         self.loaddf['Alpha'] = 0
@@ -19,18 +20,27 @@ class InjectionVector:
     
     @property
     def vec(self):
+        """Returns the current injection vector as a numpy array."""
         return self.loaddf['Alpha'].to_numpy()
     
     def supply(self, *busids):
+        """Sets the specified buses as supply points (positive injection).
+
+        :param busids: Variable number of bus IDs.
+        """
         self.loaddf.loc[busids, 'Alpha'] = 1
         self.norm()
 
     def demand(self, *busids):
+        """Sets the specified buses as demand points (negative injection).
+
+        :param busids: Variable number of bus IDs.
+        """
         self.loaddf.loc[busids, 'Alpha'] = -1
         self.norm()
     
     def norm(self):
-
+        """Normalizes the vector so that total supply equals total demand plus losses."""
         # Normalize Positive
         isPos = self.vec>0
         posSum = sum(self.vec[isPos])
@@ -40,12 +50,21 @@ class InjectionVector:
         self.loaddf.loc[~isPos,'Alpha'] /= negSum if negSum>0 else 1
 
 
-
 def ybus_with_loads(Y, buses: list[Bus], loads: list[Load], gens=None):
-    '''
-    If a list of Generators are passed it will add
-    the generation as negative impedence for gens without GENROU models
-    '''
+    """
+    Modifies a Y-Bus matrix to include constant impedance load and generation models.
+
+    This function converts P/Q injections into equivalent shunt admittances based on 
+    the current bus voltages and adds them to the diagonal of the Y-Bus matrix.
+
+    :param Y: The original sparse Y-Bus matrix (scipy.sparse).
+    :param buses: List of Bus component objects.
+    :param loads: List of Load component objects.
+    :param gens: Optional list of Gen component objects. Generators without dynamic 
+        models (e.g., GENROU) are treated as negative constant impedance loads.
+    :return: The modified sparse Y-Bus matrix.
+    :rtype: scipy.sparse.base.spmatrix
+    """
 
     # Copy so don't modify
     Y = Y.copy()
@@ -104,6 +123,3 @@ def ybus_with_loads(Y, buses: list[Bus], loads: list[Load], gens=None):
                 Y[busidx][busidx] -= constAdmit
 
     return Y
-
-
-

@@ -20,32 +20,22 @@ class IndexTool:
     esa: SAW
 
     def __init__(self, fname: str = None):
-        """
-        Initialize the IndexTool.
+        """Initializes the IndexTool.
 
-        Parameters
-        ----------
-        fname : str, optional
-            Path to the PowerWorld case file.
+        :param fname: Optional path to the PowerWorld case file.
         """
         self.fname = fname
 
     def getIO(self):
-        """
-        Compatibility method for apps expecting a Context object.
+        """Compatibility method for apps expecting a Context object.
 
-        Returns
-        -------
-        IndexTool
-            The current instance.
+        :return: The current IndexTool instance.
         """
         return self
 
     @timing
     def open(self):
-        """
-        Open the PowerWorld case and initialize transient stability.
-        """
+        """Opens the PowerWorld case and initializes transient stability to fetch initial states."""
         # Validate Path Name
         if not path.isabs(self.fname):
             self.fname = path.abspath(self.fname)
@@ -57,38 +47,26 @@ class IndexTool:
         self.esa.TSInitialize()
     
     def __getitem__(self, index) -> DataFrame | None:
-        """Retrieve data from PowerWorld using indexer notation.
+        """
+        Retrieve data from PowerWorld using indexer notation.
 
-        This method allows for flexible querying of grid component data directly
-        from the PowerWorld simulation instance.
+        :param index: A GObject type or a tuple of (GObject, fields).
+            Fields can be a string, list of strings, or slice(None) for all fields.
+        :type index: Union[Type[GObject], Tuple[Type[GObject], Any]]
+        :return: A DataFrame containing the requested data.
+        :rtype: pandas.DataFrame
+        :raises ValueError: If an invalid slice is provided.
 
-        Args:
-            index: Can be a `GObject` type to get key fields, or a tuple of
-                (GObject type, fields) to specify fields. `fields` can be a
-                single field name (str), a list of names, or `slice(None)` (:)
-                to retrieve all available fields. Fields can also be specified
-                using `GObject` attributes.
+        **Examples:**
 
-        Returns:
-            A pandas DataFrame containing the requested data, or None if no
-            data could be retrieved.
+        .. code-block:: python
 
-        Raises:
-            ValueError: If an unsupported slice is used for field selection.
-
-        Examples:
-            >>> # Get Primary Keys of all Buses
-            >>> wb.pw[Bus]
-            >>> # Get Voltage Magnitudes for all Buses
-            >>> wb.pw[Bus, 'BusPUVolt']
-            >>> # Get two specific fields
-            >>> wb.pw[Bus, ['SubNum', 'BusPUVolt']]
-            >>> # Get all available fields for Buses
-            >>> wb.pw[Bus, :]
-            >>> # Get a field using a GObject attribute
-            >>> wb.pw[Bus, Bus.BusAngle]
-            >>> # Get multiple fields using GObject attributes
-            >>> wb.pw[Bus, [Bus.BusAngle, Bus.BusPUVolt]]
+            # Get Primary Keys of all Buses
+            df = wb[Bus]
+            # Get specific fields
+            df = wb[Bus, ['BusName', 'BusPUVolt']]
+            # Get all fields
+            df = wb[Bus, :]
         """
         # 1. Parse index to get gtype and what fields are requested.
         if isinstance(index, tuple):
@@ -129,7 +107,17 @@ class IndexTool:
         return self.esa.GetParamsRectTyped(gtype.TYPE, sorted(list(fields_to_get)))
     
     def __setitem__(self, args, value) -> None:
-        """Set grid data in PowerWorld using indexer notation."""
+        """
+        Sets grid data in PowerWorld using indexer notation.
+
+        :param args: The target object type and optional fields.
+        :type args: Union[Type[GObject], Tuple[Type[GObject], Union[str, List[str]]]]
+        :param value: The data to write. If args is just a GObject, value must be a DataFrame 
+            containing primary keys. If args includes fields, value can be a scalar (broadcast) 
+            or a list/array matching the number of objects.
+        :type value: Union[pandas.DataFrame, Any]
+        :raises TypeError: If the index or value types are mismatched.
+        """
         # Case 1: Bulk update from a DataFrame. e.g., wb.pw[Bus] = df
         if isinstance(args, type) and issubclass(args, GObject):
             self._bulk_update_from_df(args, value)
@@ -154,18 +142,26 @@ class IndexTool:
         raise TypeError(f"Unsupported index for __setitem__: {args}")
 
     def _bulk_update_from_df(self, gtype: Type[GObject], df: DataFrame):
-        """Handles creating or overwriting objects from a complete DataFrame.
+        """Internal: Handles creating or overwriting objects from a complete DataFrame.
 
-        This corresponds to the use case: `wb.pw[ObjectType] = dataframe`.
+        Corresponds to: `wb.pw[ObjectType] = dataframe`.
+
+        :param gtype: The GObject subclass.
+        :param df: The DataFrame containing object data.
         """
         if not isinstance(df, DataFrame):
             raise TypeError("A DataFrame is required for bulk updates.")
         self.esa.ChangeParametersMultipleElementRect(gtype.TYPE, df.columns.tolist(), df)
 
     def _broadcast_update_to_fields(self, gtype: Type[GObject], fields: list[str], value):
-        """Handles modifying specific fields for existing objects by broadcasting a value.
+        """Internal: Modifies specific fields for existing objects by broadcasting a value.
 
-        This corresponds to the use case: `wb.pw[ObjectType, 'FieldName'] = value`.
+        Corresponds to: `wb.pw[ObjectType, 'FieldName'] = value`.
+
+        :param gtype: The GObject subclass.
+        :param fields: List of field names to update.
+        :param value: The value to broadcast.
+        :raises ValueError: If value length doesn't match field length for keyless objects.
         """
         # For objects without keys (e.g., Sim_Solution_Options), we construct
         # the change DataFrame directly without reading from PowerWorld first.

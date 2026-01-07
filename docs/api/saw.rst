@@ -7,7 +7,16 @@ functional area of the PowerWorld API, such as power flow, contingencies, transi
 
 .. currentmodule:: gridwb.saw
 
-.. automodule:: gridwb.saw
+.. autoclass:: gridwb.saw.SAW
    :members:
    :undoc-members:
    :show-inheritance:
+
+Mixins
+------
+
+.. automodule:: gridwb.saw.atc
+   :members:
+
+.. automodule:: gridwb.saw.case_actions
+   :members:

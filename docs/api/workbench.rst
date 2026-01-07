@@ -7,8 +7,12 @@ data access (via ``IndexTool``) and analysis (via ``Adapter`` and ``Apps``).
 
 .. currentmodule:: gridwb.workbench
 
-.. automodule:: gridwb.workbench
+.. autoclass:: gridwb.workbench.GridWorkBench
    :members:
    :undoc-members:
    :show-inheritance:
+   :special-members: __getitem__, __setitem__
+
+.. automodule:: gridwb.indextool
+   :members:
    :special-members: __getitem__, __setitem__

@@ -100,25 +100,16 @@ class SAWBase(object):
         UseDefinedNamesInVariables: bool = False,
         pw_order=False,
     ):
-        """
-        Initialize SimAuto wrapper.
+        """Initializes the SimAuto Wrapper (SAW) and establishes a COM connection.
 
-        Parameters
-        ----------
-        FileName : str
-            Path to the PowerWorld case file (.pwb).
-        early_bind : bool, optional
-            Whether to use early binding for COM.
-        UIVisible : bool, optional
-            Whether to make the PowerWorld UI visible.
-        object_field_lookup : tuple, optional
-            Object types to pre-fetch field lists for.
-        CreateIfNotFound : bool, optional
-            Whether to create objects if they are not found.
-        UseDefinedNamesInVariables : bool, optional
-            Whether to use defined names in variables.
-        pw_order : bool, optional
-            Whether to preserve PowerWorld's internal ordering.
+        :param FileName: Absolute or relative path to the PowerWorld case file (.pwb or .pwx).
+        :param early_bind: If True, uses `gencache` for faster COM calls (requires admin/write access to site-packages).
+        :param UIVisible: If True, makes the PowerWorld Simulator application window visible.
+        :param object_field_lookup: A collection of object types to pre-cache field metadata for.
+        :param CreateIfNotFound: Sets the SimAuto property to create new objects during `ChangeParameters` calls.
+        :param UseDefinedNamesInVariables: If True, configures the case to use defined names instead of internal IDs.
+        :param pw_order: If True, disables automatic sorting of DataFrames to match PowerWorld's internal memory order.
+        :raises Exception: If SimAuto COM server cannot be initialized.
         """
         self.log = logging.getLogger(self.__class__.__name__)
         locale_db = locale.localeconv()
@@ -171,6 +162,13 @@ class SAWBase(object):
             self.get_key_fields_for_object_type(ObjectType=o)
 
     def change_and_confirm_params_multiple_element(self, ObjectType: str, command_df: pd.DataFrame) -> None:
+        """Modifies parameters for multiple elements and verifies the change was accepted.
+
+        :param ObjectType: The PowerWorld object type (e.g., 'Bus', 'Gen').
+        :param command_df: A DataFrame where columns are field names and rows are object data.
+        :raises CommandNotRespectedError: If the values in PowerWorld after the call do not match `command_df`.
+        :raises PowerWorldError: If the SimAuto call fails.
+        """
         cleaned_df = self._change_parameters_multiple_element_df(
             ObjectType=ObjectType, command_df=command_df
         )
@@ -186,11 +184,22 @@ class SAWBase(object):
             raise CommandNotRespectedError(m)
 
     def change_parameters_multiple_element_df(self, ObjectType: str, command_df: pd.DataFrame) -> None:
+        """Modifies parameters for multiple elements using a DataFrame without verification.
+
+        :param ObjectType: The PowerWorld object type.
+        :param command_df: A DataFrame containing the data to update.
+        """
         self._change_parameters_multiple_element_df(ObjectType=ObjectType, command_df=command_df)
 
     def clean_df_or_series(
         self, obj: Union[pd.DataFrame, pd.Series], ObjectType: str
     ) -> Union[pd.DataFrame, pd.Series]:
+        """Standardizes types and formatting for data retrieved from PowerWorld.
+
+        :param obj: The DataFrame or Series to clean.
+        :param ObjectType: The PowerWorld object type associated with the data.
+        :return: The cleaned object with proper numeric types and stripped strings.
+        """
         if isinstance(obj, pd.DataFrame):
             df_flag = True
             fields = obj.columns.to_numpy()
@@ -224,6 +233,7 @@ class SAWBase(object):
                 obj.index = np.arange(start=0, stop=obj.shape[0])
 
     def exit(self):
+        """Closes the case, deletes temporary files, and releases the COM object."""
         os.unlink(self.ntf.name)
         self.CloseCase()
         del self._pwcom
@@ -232,6 +242,11 @@ class SAWBase(object):
         return None
 
     def get_key_fields_for_object_type(self, ObjectType: str) -> pd.DataFrame:
+        """Retrieves metadata about the primary key fields for a specific object type.
+
+        :param ObjectType: The PowerWorld object type.
+        :return: A DataFrame containing key field names and their indices.
+        """
         obj_type = ObjectType.lower()
         try:
             return self._object_key_fields[obj_type]
@@ -257,6 +272,11 @@ class SAWBase(object):
         return key_field_df
 
     def get_key_field_list(self, ObjectType: str) -> List[str]:
+        """Returns a list of internal field names that serve as primary keys.
+
+        :param ObjectType: The PowerWorld object type.
+        :return: List of strings representing key fields.
+        """
         obj_type = ObjectType.lower()
         try:
             key_field_df = self._object_key_fields[obj_type]
@@ -265,6 +285,10 @@ class SAWBase(object):
         return key_field_df["internal_field_name"].tolist()
 
     def get_version_and_builddate(self) -> tuple:
+        """Retrieves the PowerWorld Simulator version and executable build date.
+
+        :return: A tuple of (VersionString, BuildDate).
+        """
         return self._call_simauto(
             "GetParametersSingleElement",
             "PowerWorldSession",
@@ -273,6 +297,13 @@ class SAWBase(object):
         )
 
     def identify_numeric_fields(self, ObjectType: str, fields: Union[List, np.ndarray]) -> np.ndarray:
+        """Determines which fields in a list are numeric based on PowerWorld metadata.
+
+        :param ObjectType: The PowerWorld object type.
+        :param fields: A list or array of internal field names.
+        :return: A boolean array where True indicates a numeric field (Integer or Real).
+        :raises ValueError: If a field name is not recognized for the object type.
+        """
         field_list = self.GetFieldList(ObjectType=ObjectType, copy=False)
         idx = field_list["internal_field_name"].to_numpy().searchsorted(fields)
 
@@ -325,6 +356,12 @@ class SAWBase(object):
         setattr(self._pwcom, property_name, property_value)
 
     def ChangeParameters(self, ObjectType: str, ParamList: list, Values: list) -> None:
+        """Alias for ChangeParametersSingleElement.
+
+        :param ObjectType: PowerWorld object type.
+        :param ParamList: List of field names.
+        :param Values: List of values.
+        """
         return self.ChangeParametersSingleElement(ObjectType, ParamList, Values)
 
     def ChangeParametersSingleElement(self, ObjectType: str, ParamList: list, Values: list) -> None:
@@ -356,11 +393,17 @@ class SAWBase(object):
         )
 
     def ChangeParametersMultipleElementRect(self, ObjectType: str, ParamList: list, df: pd.DataFrame) -> None:
-        """Modifies parameters for multiple objects using a pandas DataFrame.
+        """
+        Modifies parameters for multiple objects using a rectangular data structure (DataFrame).
+
+        This is the most efficient way to update many objects at once. The DataFrame must 
+        include the primary key fields for the object type.
 
         :param ObjectType: The PowerWorld object type.
-        :param ParamList: A list of internal field names to modify.
-        :param df: A DataFrame containing the new values. Columns must match ParamList.
+        :param ParamList: A list of internal field names being updated.
+        :param df: A DataFrame containing the data. Columns must match ParamList.
+        :type df: pandas.DataFrame
+        :return: None
         """
         return self._call_simauto(
             "ChangeParametersMultipleElementRect",
@@ -372,6 +415,13 @@ class SAWBase(object):
     def ChangeParametersMultipleElementFlatInput(
         self, ObjectType: str, ParamList: list, NoOfObjects: int, ValueList: list
     ) -> None:
+        """Modifies parameters using a flat 1-D list of values.
+
+        :param ObjectType: PowerWorld object type.
+        :param ParamList: List of field names.
+        :param NoOfObjects: Number of objects being updated.
+        :param ValueList: A flat list of values (length = NoOfObjects * len(ParamList)).
+        """
         if isinstance(ValueList[0], list):
             raise Error("The value list has to be a 1-D array")
         return self._call_simauto(
@@ -397,6 +447,12 @@ class SAWBase(object):
         return self._call_simauto("GetCaseHeader", filename)
 
     def GetFieldList(self, ObjectType: str, copy=False) -> pd.DataFrame:
+        """Retrieves the complete list of available fields for an object type.
+
+        :param ObjectType: The PowerWorld object type.
+        :param copy: If True, returns a deep copy of the cached field list.
+        :return: A DataFrame containing field names, types, and descriptions.
+        """
         object_type = ObjectType.lower()
         try:
             output = self._object_fields[object_type]
@@ -452,12 +508,15 @@ class SAWBase(object):
     def GetParametersMultipleElement(
         self, ObjectType: str, ParamList: list, FilterName: str = ""
     ) -> Union[pd.DataFrame, None]:
-        """Retrieves parameters for all objects of a type, optionally filtered.
+        """
+        Retrieves parameters for all objects of a specific type.
 
-        :param ObjectType: The PowerWorld object type.
+        :param ObjectType: The PowerWorld object type (e.g., 'Bus', 'Gen').
         :param ParamList: A list of internal field names to retrieve.
-        :param FilterName: Optional name of a PowerWorld filter to apply.
-        :return: A pandas DataFrame containing the requested data.
+        :param FilterName: Optional name of a PowerWorld filter to restrict the result set.
+        :return: A DataFrame where columns correspond to ParamList. Returns None if no objects found.
+        :rtype: Union[pandas.DataFrame, None]
+        :raises PowerWorldError: If the object type or fields are invalid.
         """
         output = self._call_simauto(
             "GetParametersMultipleElement",
@@ -474,6 +533,13 @@ class SAWBase(object):
     def GetParamsRectTyped(
         self, ObjectType: str, ParamList: list, FilterName: str = ""
     ) -> Union[pd.DataFrame, None]:
+        """Retrieves data in a rectangular format with variant typing preserved.
+
+        :param ObjectType: PowerWorld object type.
+        :param ParamList: List of field names.
+        :param FilterName: Optional PowerWorld filter name.
+        :return: A DataFrame containing the requested data.
+        """
         output = self._call_simauto(
             "GetParamsRectTyped",
             ObjectType,
@@ -489,6 +555,13 @@ class SAWBase(object):
     def GetParametersMultipleElementFlatOutput(
         self, ObjectType: str, ParamList: list, FilterName: str = ""
     ) -> Union[None, Tuple[str]]:
+        """Retrieves data in a flat 1-D output format.
+
+        :param ObjectType: PowerWorld object type.
+        :param ParamList: List of field names.
+        :param FilterName: Optional PowerWorld filter name.
+        :return: A tuple of strings containing the data.
+        """
         result = self._call_simauto(
             "GetParametersMultipleElementFlatOutput",
             ObjectType,
@@ -502,9 +575,21 @@ class SAWBase(object):
             return result
 
     def GetParameters(self, ObjectType: str, ParamList: list, Values: list) -> pd.Series:
+        """Alias for GetParametersSingleElement.
+
+        :param ObjectType: PowerWorld object type.
+        :param ParamList: List of field names.
+        :param Values: List of primary key values.
+        """
         return self.GetParametersSingleElement(ObjectType, ParamList, Values)
 
     def GetSpecificFieldList(self, ObjectType: str, FieldList: List[str]) -> pd.DataFrame:
+        """Retrieves detailed metadata for a specific subset of fields.
+
+        :param ObjectType: PowerWorld object type.
+        :param FieldList: List of internal field names to query.
+        :return: A DataFrame with field descriptions and headers.
+        """
         try:
             df = (
                 pd.DataFrame(
@@ -526,6 +611,12 @@ class SAWBase(object):
         return df
 
     def GetSpecificFieldMaxNum(self, ObjectType: str, Field: str) -> int:
+        """Retrieves the maximum index for a field that supports multiple entries (e.g., CustomFloat).
+
+        :param ObjectType: PowerWorld object type.
+        :param Field: The base field name.
+        :return: The maximum integer index available.
+        """
         return self._call_simauto("GetSpecificFieldMaxNum", ObjectType, Field)
 
     def ListOfDevices(self, ObjType: str, FilterName="") -> Union[None, pd.DataFrame]:
@@ -549,9 +640,21 @@ class SAWBase(object):
         return df
 
     def ListOfDevicesAsVariantStrings(self, ObjType: str, FilterName="") -> tuple:
+        """Retrieves a list of devices where primary keys are returned as variant strings.
+
+        :param ObjType: PowerWorld object type.
+        :param FilterName: Optional PowerWorld filter name.
+        :return: A tuple of strings.
+        """
         return self._call_simauto("ListOfDevicesAsVariantStrings", ObjType, FilterName)
 
     def ListOfDevicesFlatOutput(self, ObjType: str, FilterName="") -> tuple:
+        """Retrieves a list of devices in a flat 1-D output format.
+
+        :param ObjType: PowerWorld object type.
+        :param FilterName: Optional PowerWorld filter name.
+        :return: A tuple of strings.
+        """
         return self._call_simauto("ListOfDevicesFlatOutput", ObjType, FilterName)
 
     def LoadState(self) -> None:
@@ -570,6 +673,12 @@ class SAWBase(object):
         return self._call_simauto("OpenCase", self.pwb_file_path)
 
     def OpenCaseType(self, FileName: str, FileType: str, Options: Union[list, str, None] = None) -> None:
+        """Opens a case file of a specific type (e.g., PTI, GE) with options.
+
+        :param FileName: Path to the file.
+        :param FileType: The file format (e.g., 'PTI', 'GE', 'EPC').
+        :param Options: A list or string of format-specific options.
+        """
         self.pwb_file_path = FileName
         if isinstance(Options, list):
             options = convert_list_to_variant(Options)
@@ -602,6 +711,13 @@ class SAWBase(object):
         return self._pwcom.RunScriptCommand2(Statements, StatusMessage)
 
     def SaveCase(self, FileName=None, FileType="PWB", Overwrite=True):
+        """Saves the currently open case to a file.
+
+        :param FileName: Path to save the file. If None, overwrites the current case.
+        :param FileType: The file format (default 'PWB').
+        :param Overwrite: If True, overwrites existing files.
+        :return: None or error string.
+        """
         if FileName is not None:
             f = convert_to_windows_path(FileName)
         elif self.pwb_file_path is None:
@@ -615,6 +731,12 @@ class SAWBase(object):
         return self._call_simauto("SaveState")
 
     def SendToExcel(self, ObjectType: str, FilterName: str, FieldList) -> None:
+        """Exports data for the specified objects directly to Microsoft Excel.
+
+        :param ObjectType: PowerWorld object type.
+        :param FilterName: Optional PowerWorld filter name.
+        :param FieldList: List of field names to export.
+        """
         return self._call_simauto("SendToExcel", ObjectType, FilterName, FieldList)
 
 
@@ -647,6 +769,7 @@ class SAWBase(object):
 
     @property
     def ProgramInformation(self) -> Union[tuple, bool]:
+        """Tuple property: Detailed information about the Simulator version and license."""
         try:
             result = self._pwcom.ProgramInformation
             result = [list(x) for x in result]
@@ -661,6 +784,13 @@ class SAWBase(object):
             return False
 
     def _call_simauto(self, func: str, *args):
+        """Internal helper to execute SimAuto methods and handle error codes.
+
+        :param func: The name of the SimAuto method to call.
+        :param args: Arguments to pass to the method.
+        :return: The data returned by SimAuto (unwrapped from the error tuple).
+        :raises PowerWorldError: If SimAuto returns an error message.
+        """
         try:
             f = getattr(self._pwcom, func)
         except AttributeError:
