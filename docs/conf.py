@@ -13,13 +13,15 @@ extensions = [
     "sphinx.ext.mathjax",
     "sphinx.ext.inheritance_diagram",
     "sphinx.ext.autosectionlabel",
-    "nbsphinx"
+    "nbsphinx",
+    "sphinx_gallery.load_notebook_vbz"
 ]
 
 extensions.append("sphinx.ext.autodoc")
 autodoc_default_options = {
     "members": True,
     "undoc-members": True,
+    "imported-members": True,
     "member-order": "groupwise",
 }
 autodoc_preserve_defaults = True
@@ -68,10 +70,7 @@ exclude_patterns = ["_build", "**.ipynb_checkpoints"]
 # Critical: RTD cannot run PowerWorld. Preserving local outputs.
 nbsphinx_execute = 'never'
 
-source_suffix = {
-    '.rst': 'restructuredtext',
-    '.ipynb': 'nbsphinx',
-}
+source_suffix = ['.rst', '.ipynb']
 master_doc = "index"
 
 project = "ESA++"
