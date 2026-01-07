@@ -14,7 +14,7 @@ ESA++ Documentation
 
    guide/tutorial
    guide/usage
-   auto_examples/index
+   examples
 
 .. toctree::
    :maxdepth: 2

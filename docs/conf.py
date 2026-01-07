@@ -63,7 +63,11 @@ napoleon_type_aliases = {
     "float": "float",
 }
 
-exclude_patterns = ["_build"]
+exclude_patterns = ["_build", "**.ipynb_checkpoints"]
+
+# Critical: RTD cannot run PowerWorld. Preserving local outputs.
+nbsphinx_execute = 'never'
+
 source_suffix = ".rst"
 master_doc = "index"
 
