@@ -86,7 +86,7 @@ class Network(PWApp):
 
         return A
 
-    def laplacian(self, weights: BranchType | np.ndarray, longer_xfmr_lens=True, len_thresh=0.01, hvdc=False):
+    def laplacian(self, weights: BranchType, longer_xfmr_lens=True, len_thresh=0.01, hvdc=False):
         '''
         Description:
             Uses the systems incident matrix and creates

@@ -1125,14 +1125,15 @@ class GICTool:
         # Take line segments and determine tile assignemnt
         allpnts = concatenate([[pntsX],[pntsY]],axis=0)
         mdpnts = (allpnts[:,:,1:] +allpnts[:,:,:-1])/2 # Midpoints of each segment
-        isData = argwhere(~isnan(mdpnts)).T # Data Cleaning
+        isData = argwhere(~isnan(mdpnts)) # Data Cleaning
         refpnt = array([X.min(),Y.min()]).reshape(2,1,1) # Grid ref point
         tile_ids = (mdpnts-refpnt)//W # Tile Index Floor Divide
         self.tile_ids = tile_ids
         seg_lens = coord_to_km*abs(diff(allpnts,axis=2)) # Length in Tile
         
-        # Final Data Format
-        R[*isData[:-1],*tile_ids[:,*isData[1:]].astype(int)] = seg_lens[*isData]
+        # Final Data Format (Unpack operator in subscript requires Python 3.11 or newer)
+        tile_idx = tile_ids[:,isData[1][:],isData[2][:]].astype(int)
+        R[isData[0], isData[1], tile_idx[0], tile_idx[1]] = seg_lens[isData[0], isData[1], isData[2]]
         R = R.reshape((2, R.shape[1], R.shape[2]*R.shape[3]), order='F')
 
         # Ex and Ey Flattened Tile -> Xfmr Matrix

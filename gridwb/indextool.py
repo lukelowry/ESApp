@@ -64,7 +64,7 @@ class IndexTool:
         # Attempt and Initialize TS so we get initial values
         self.esa.TSInitialize()
     
-    def __getitem__(self, index) -> DataFrame | None:
+    def __getitem__(self, index) -> DataFrame:
         """Retrieve data from PowerWorld using indexer notation.
 
         This method allows for flexible querying of grid component data directly
