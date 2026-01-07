@@ -1,5 +1,10 @@
-import gridwb
-import importlib.metadata as importlib_metadata
+import os
+import sys
+import importlib.metadata
+
+# Ensure the project root is in the path so sphinx can find the package
+# if it's not already installed in the environment.
+sys.path.insert(0, os.path.abspath(".."))
 
 extensions = [
     "sphinx.ext.viewcode",
@@ -67,7 +72,10 @@ master_doc = "index"
 project = "ESA++"
 copyright = "2026, Luke Lowery"
 author = "Luke Lowery"
-version = importlib_metadata.version("ESApp")
+try:
+    version = importlib.metadata.version("ESApp")
+except importlib.metadata.PackageNotFoundError:
+    version = "unknown"
 release = version
 
 html_theme = "sphinx_rtd_theme"
@@ -75,4 +83,4 @@ html_theme_options = {
     "navigation_depth": 2,
 }
 
-autodoc_mock_imports = ["ctypes", "win32com", "pythoncom"]
+autodoc_mock_imports = ["ctypes", "win32com", "win32com.client", "pythoncom"]
