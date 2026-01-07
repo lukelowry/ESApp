@@ -9,6 +9,7 @@ sys.path.insert(0, os.path.abspath(".."))
 extensions = [
     "sphinx.ext.viewcode",
     "sphinx.ext.autosummary",
+    "sphinx.ext.todo",
     "sphinx.ext.mathjax",
     "sphinx.ext.inheritance_diagram",
     "sphinx_gallery.gen_gallery"
@@ -21,6 +22,7 @@ autodoc_default_options = {
     "member-order": "groupwise",
 }
 autodoc_preserve_defaults = True
+todo_include_todos = True
 
 # Better API formatting
 autoclass_content = "both"        # Include __init__ docstring in class description

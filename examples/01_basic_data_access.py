@@ -21,7 +21,18 @@ if os.path.exists(case_path):
     print("Buses in system:")
     print(buses.head())
 
-    # Retrieve generator MW output
-    gens = wb[Gen, 'GenMW']
-    print("\nGenerators:")
+    # Retrieve generator MW output and status
+    gens = wb[Gen, ['GenMW', 'GenStatus']]
+    print("\nAll Generators:")
     print(gens.head())
+
+    # Filter for online generators only
+    online_gens = gens[gens['GenStatus'] == 'Closed']
+    print(f"\nOnline Generators ({len(online_gens)} total):")
+    print(online_gens.head())
+
+    # Accessing data for a specific bus (e.g., Bus 1)
+    bus_1_volt = wb[Bus, 1, 'BusPUVolt']
+    print(f"\nBus 1 Voltage: {bus_1_volt} pu")
+else:
+    print(f"Case file not found at {case_path}. Please set SAW_TEST_CASE environment variable.")

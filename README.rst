@@ -29,7 +29,7 @@ For local development and the latest features, install the package in editable m
 Documentation
 -------------
 
-For a comprehensive tutorial, usage guides, and the full API reference, please visit our `documentation website <https://wyattlaundry.github.io/GridWorkBenchESA/>`_.
+For a comprehensive tutorial, usage guides, and the full API reference, please visit our `documentation website <https://esapp.readthedocs.io/>`_.
 
 Usage Example
 -------------
@@ -58,6 +58,16 @@ Here is a quick example of how ESA++ simplifies data access and power flow analy
     # 5. Modify data and save
     wb[Gen, 'GenMW'] = 100.0
     wb.save()
+
+Why ESA++?
+----------
+
+Traditional automation of PowerWorld Simulator often involves verbose COM calls and manual data parsing. ESA++ abstracts these complexities:
+
+*   **Speed**: Optimized data transfer between Python and SimAuto.
+*   **Clarity**: Code that reads like the engineering operations it performs.
+*   **Ecosystem**: Built on top of the proven ESA library, adding modern Python features and better integration with the SciPy stack.
+
 
 More Examples
 -------------

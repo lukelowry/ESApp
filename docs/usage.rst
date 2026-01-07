@@ -13,6 +13,10 @@ The ``IndexTool`` (accessed via ``wb.io``) is the core engine for data I/O. It s
     # Set all bus voltages to 1.05 pu
     wb[Bus, 'BusPUVolt'] = 1.05
 
+    # Update multiple fields for a specific object
+    wb[Gen, (1, '1'), ['GenMW', 'GenMVAR']] = [100.0, 20.0]
+
+
 The Adapter
 -----------
 
@@ -25,6 +29,16 @@ The ``Adapter`` (accessed via ``wb.func``) provides a collection of high-level h
     
     # Calculate PTDF between two areas
     ptdf_df = wb.func.ptdf('[AREA 1]', '[AREA 2]')
+
+The App Ecosystem
+-----------------
+
+ESA++ includes specialized "Apps" for complex analysis. For example, the GIC tool:
+
+.. code-block:: python
+
+    # Access the GIC application
+    gic_results = wb.app.gic.run_uniform_field(field_mag=1.0, angle=0)
 
 Working with Matrices
 ---------------------

@@ -22,13 +22,30 @@ ESA++ uses a unique indexing system to make data retrieval intuitive. You can ac
 
 .. code-block:: python
 
-    from gridwb.grid.components import Bus, Gen
+    from gridwb.grid.components import Bus, Gen, Line
     
     # Get all bus numbers and names
     buses = wb[Bus, ['BusNum', 'BusName']]
     
-    # Get all generator data
+    # Get all generator data as a DataFrame
     generators = wb[Gen, :]
+    
+    # Access specific fields for a subset of components
+    line_flows = wb[Line, ['BusNum', 'BusNum:1', 'LineMW']]
+
+Filtering and Selection
+-----------------------
+
+ESA++ allows you to filter data easily using standard Pandas operations on the returned DataFrames:
+
+.. code-block:: python
+
+    # Get only buses in Area 1
+    area_1_buses = wb[Bus, :][wb[Bus, :]['AreaNum'] == 1]
+    
+    # Find lines with loading above 90%
+    heavy_lines = wb[Line, ['BusNum', 'BusNum:1', 'LinePercent']]
+    heavy_lines = heavy_lines[heavy_lines['LinePercent'] > 90]
 
 Running Analysis
 ----------------
@@ -41,6 +58,16 @@ You can solve power flow and retrieve results in one line:
     voltages = wb.pflow()
     
     print(voltages)
+
+Modifying Data
+--------------
+
+You can update grid parameters using the same indexing syntax:
+
+.. code-block:: python
+
+    # Set the setpoint for Generator at Bus 5 to 150 MW
+    wb[Gen, 5, 'GenMW'] = 150.0
 
 Saving Changes
 --------------
