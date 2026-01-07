@@ -39,20 +39,18 @@ Here is a quick example of how ESA++ simplifies data access and power flow analy
 .. code-block:: python
 
     from gridwb import GridWorkBench
-    from gridwb.grid.components import Bus, Gen
+    from gridwb.grid.components import *
 
-    # 1. Initialize the workbench with your PowerWorld case
+    # Open Case
     wb = GridWorkBench("my_grid_model.pwb")
 
-    # 2. Retrieve data using intuitive indexing
-    #    Returns a DataFrame with BusNum, BusName, and BusPUVolt
+    # 2. Retrieve data 
     bus_data = wb[Bus, ['BusName', 'BusPUVolt']]
 
-    # 3. Solve power flow and get complex voltages in one line
+    # 3. Solve power flow and get complex voltages
     V = wb.pflow()
 
-    # 4. Perform high-level operations via the adapter
-    #    Find all voltage violations below 0.95 pu
+    # 4. Perform high-level operations 
     violations = wb.func.find_violations(v_min=0.95)
 
     # 5. Modify data and save
