@@ -12,7 +12,7 @@ class ATCMixin:
         distributed: bool = False,
         multiple_scenarios: bool = False,
     ):
-        """Calculates ATC between a seller and a buyer.
+        """Calculates Available Transfer Capability (ATC) between a seller and a buyer.
 
         :param seller: The seller (source) (e.g. '[AREA "Top"]').
         :param buyer: The buyer (sink) (e.g. '[BUS 7]').

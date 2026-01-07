@@ -15,24 +15,14 @@ case_path = os.environ.get("SAW_TEST_CASE", "case.pwb")
 if os.path.exists(case_path):
     wb = GridWorkBench(case_path)
 
-    # 1. Identify Seller and Buyer
     areas = wb[Area, ['AreaNum', 'AreaName']]
     if len(areas) >= 2:
         seller = f"[AREA {areas.iloc[0]['AreaNum']}]"
         buyer = f"[AREA {areas.iloc[1]['AreaNum']}]"
         
-        print(f"Calculating ATC from {areas.iloc[0]['AreaName']} to {areas.iloc[1]['AreaName']}...")
-
-        # 2. Configure ATC Options (optional, uses defaults if not set)
-        # We can set the solution method to 'Iterated Linear then Full' for accuracy
         wb.esa.SetData("ATC_Options", ["Method"], ["IteratedLinearThenFull"])
-
-        # 3. Run the ATC Determination
-        # This will ramp the transfer until a limit is hit in base case or any contingency
         wb.esa.DetermineATC(seller, buyer, do_distributed=False, do_multiple_scenarios=False)
 
-        # 4. Retrieve and Display Results
-        # The results are stored in the 'TransferLimiter' object type
         results = wb.esa.GetATCResults(["MaxFlow", "LimitingContingency", "LimitingElement"])
         
         print("\nATC Results:")

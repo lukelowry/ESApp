@@ -287,6 +287,13 @@ class SAWBase(object):
         return np.isin(data_types, NUMERIC_TYPES)
 
     def set_simauto_property(self, property_name: str, property_value: Union[str, bool]):
+        """Sets a property on the underlying SimAuto COM object.
+
+        :param property_name: The name of the property (e.g., 'UIVisible', 'CurrentDir').
+        :param property_value: The value to assign to the property.
+        :raises ValueError: If the property name is unsupported or the value type is incorrect.
+        :raises AttributeError: If the property does not exist on the current SimAuto version.
+        """
         if property_name not in self.SIMAUTO_PROPERTIES:
             raise ValueError(
                 f"The given property_name, {property_name}, is not currently supported. "
@@ -321,6 +328,12 @@ class SAWBase(object):
         return self.ChangeParametersSingleElement(ObjectType, ParamList, Values)
 
     def ChangeParametersSingleElement(self, ObjectType: str, ParamList: list, Values: list) -> None:
+        """Modifies parameters for a single object in PowerWorld.
+
+        :param ObjectType: The PowerWorld object type (e.g., 'Bus', 'Gen').
+        :param ParamList: A list of internal field names to modify.
+        :param Values: A list of values corresponding to the parameters.
+        """
         return self._call_simauto(
             "ChangeParametersSingleElement",
             ObjectType,
@@ -329,6 +342,12 @@ class SAWBase(object):
         )
 
     def ChangeParametersMultipleElement(self, ObjectType: str, ParamList: list, ValueList: list) -> None:
+        """Modifies parameters for multiple objects using a nested list of values.
+
+        :param ObjectType: The PowerWorld object type.
+        :param ParamList: A list of internal field names to modify.
+        :param ValueList: A list of lists, where each inner list contains values for one object.
+        """
         return self._call_simauto(
             "ChangeParametersMultipleElement",
             ObjectType,
@@ -337,6 +356,12 @@ class SAWBase(object):
         )
 
     def ChangeParametersMultipleElementRect(self, ObjectType: str, ParamList: list, df: pd.DataFrame) -> None:
+        """Modifies parameters for multiple objects using a pandas DataFrame.
+
+        :param ObjectType: The PowerWorld object type.
+        :param ParamList: A list of internal field names to modify.
+        :param df: A DataFrame containing the new values. Columns must match ParamList.
+        """
         return self._call_simauto(
             "ChangeParametersMultipleElementRect",
             ObjectType,
@@ -358,9 +383,15 @@ class SAWBase(object):
         )
 
     def CloseCase(self):
+        """Closes the currently open PowerWorld case without exiting the application."""
         return self._call_simauto("CloseCase")
 
     def GetCaseHeader(self, filename: str = None) -> Tuple[str]:
+        """Retrieves the header information from a PowerWorld case file.
+
+        :param filename: Path to the .pwb file. Defaults to the currently open case.
+        :return: A tuple containing header strings.
+        """
         if filename is None:
             filename = self.pwb_file_path
         return self._call_simauto("GetCaseHeader", filename)
@@ -399,6 +430,13 @@ class SAWBase(object):
         return output.copy(deep=True) if copy else output
 
     def GetParametersSingleElement(self, ObjectType: str, ParamList: list, Values: list) -> pd.Series:
+        """Retrieves parameters for a single object identified by its primary keys.
+
+        :param ObjectType: The PowerWorld object type.
+        :param ParamList: A list of internal field names to retrieve.
+        :param Values: A list containing the primary key values for the object.
+        :return: A pandas Series containing the requested data.
+        """
         assert len(ParamList) == len(Values), "The given ParamList and Values must have the same length."
 
         output = self._call_simauto(
@@ -414,6 +452,13 @@ class SAWBase(object):
     def GetParametersMultipleElement(
         self, ObjectType: str, ParamList: list, FilterName: str = ""
     ) -> Union[pd.DataFrame, None]:
+        """Retrieves parameters for all objects of a type, optionally filtered.
+
+        :param ObjectType: The PowerWorld object type.
+        :param ParamList: A list of internal field names to retrieve.
+        :param FilterName: Optional name of a PowerWorld filter to apply.
+        :return: A pandas DataFrame containing the requested data.
+        """
         output = self._call_simauto(
             "GetParametersMultipleElement",
             ObjectType,
@@ -484,6 +529,12 @@ class SAWBase(object):
         return self._call_simauto("GetSpecificFieldMaxNum", ObjectType, Field)
 
     def ListOfDevices(self, ObjType: str, FilterName="") -> Union[None, pd.DataFrame]:
+        """Retrieves a list of all objects of a specific type and their primary keys.
+
+        :param ObjType: The PowerWorld object type.
+        :param FilterName: Optional name of a PowerWorld filter to apply.
+        :return: A pandas DataFrame containing the primary key fields for the objects.
+        """
         kf = self.get_key_fields_for_object_type(ObjType)
         output = self._call_simauto("ListOfDevices", ObjType, FilterName)
 
@@ -507,6 +558,10 @@ class SAWBase(object):
         return self._call_simauto("LoadState")
 
     def OpenCase(self, FileName: Union[str, None] = None) -> None:
+        """Opens a PowerWorld case file.
+
+        :param FileName: Path to the .pwb or .pwx file.
+        """
         if FileName is None:
             if self.pwb_file_path is None:
                 raise TypeError("When OpenCase is called for the first time, a FileName is required.")
@@ -525,12 +580,25 @@ class SAWBase(object):
         return self._call_simauto("OpenCaseType", self.pwb_file_path, FileType, options)
 
     def ProcessAuxFile(self, FileName):
+        """Executes a PowerWorld auxiliary (.aux) file.
+
+        :param FileName: Path to the auxiliary file.
+        """
         return self._call_simauto("ProcessAuxFile", FileName)
 
     def RunScriptCommand(self, Statements):
+        """Executes one or more PowerWorld script statements.
+
+        :param Statements: A string containing the script commands.
+        """
         return self._call_simauto("RunScriptCommand", Statements)
 
     def RunScriptCommand2(self, Statements: str, StatusMessage: str):
+        """Executes script statements and provides a status message for the PowerWorld UI.
+
+        :param Statements: A string containing the script commands.
+        :param StatusMessage: A message to display in the PowerWorld status bar.
+        """
         return self._pwcom.RunScriptCommand2(Statements, StatusMessage)
 
     def SaveCase(self, FileName=None, FileType="PWB", Overwrite=True):

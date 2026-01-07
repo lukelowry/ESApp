@@ -16,16 +16,10 @@ case_path = os.environ.get("SAW_TEST_CASE", "case.pwb")
 if os.path.exists(case_path):
     wb = GridWorkBench(case_path)
 
-    # 1. Tap an existing transmission line
-    # We'll find a line and tap it at 50% distance to insert a new bus
     branches = wb[Branch, ['BusNum', 'BusNum:1', 'LineCircuit']]
     if not branches.empty:
         b = branches.iloc[0]
-        # Find a unique bus number
         new_bus_num = int(wb[Bus, 'BusNum'].max() + 100)
-        
-        print(f"Tapping line {b['BusNum']}-{b['BusNum:1']} at 50%...")
-        print(f"Creating new Bus {new_bus_num} ('Tapped_Substation')...")
         
         wb.esa.TapTransmissionLine(
             [b['BusNum'], b['BusNum:1'], b['LineCircuit']],
@@ -34,12 +28,9 @@ if os.path.exists(case_path):
             new_bus_name="Tapped_Substation"
         )
 
-    # 2. Split a bus into two
-    # Useful for modeling substation reconfiguration or bus-tie operations
     target_bus = 1
     split_bus_num = int(wb[Bus, 'BusNum'].max() + 1)
     
-    print(f"\nSplitting Bus {target_bus} to create Bus {split_bus_num}...")
     wb.esa.SplitBus(
         target_bus, 
         new_bus_number=split_bus_num,
@@ -47,8 +38,6 @@ if os.path.exists(case_path):
         branch_device_type="Breaker"
     )
 
-    # 3. Solve power flow to validate the new topology
-    print("\nSolving power flow with modified topology...")
     wb.pflow()
     
     if wb.io.esa.is_converged():

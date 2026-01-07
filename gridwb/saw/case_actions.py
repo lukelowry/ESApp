@@ -15,7 +15,7 @@ class CaseActionsMixin:
         var_lim_dead: float = 2.0,
         post_ctg_agc: bool = False,
     ):
-        """Appends a case to the currently open case.
+        """Merges another case file into the currently open PowerWorld case.
 
         :param filename: File name of the case to be appended.
         :param filetype: PWB, GE, PTI, CF.
