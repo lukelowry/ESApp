@@ -1,4 +1,4 @@
-High-Level Adapter
+Sugar Functions
 ==================
 
 The ``Adapter`` (accessed via ``wb.func``) provides a high-level, Pythonic interface to complex PowerWorld operations. 

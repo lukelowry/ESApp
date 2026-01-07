@@ -11,4 +11,3 @@ This section provides a detailed reference for the ESA++ API, partitioned by fun
    api/adapter
    api/apps
    api/utils
-   api/tests

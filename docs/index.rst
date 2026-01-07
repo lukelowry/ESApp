@@ -9,8 +9,8 @@ ESA++ Documentation
    :maxdepth: 2
    :caption: User Guide
 
-   tutorial
-   usage
+   guide/tutorial
+   guide/usage
    auto_examples/index
 
 .. toctree::
@@ -21,10 +21,10 @@ ESA++ Documentation
 
 .. toctree::
    :maxdepth: 1
-   :caption: Project Info
+   :caption: Development
 
-   README <https://github.com/lukelowry/ESApp>
-   Birchfield Research Group <https://birchfield.engr.tamu.edu/>
+   dev/components 
+   dev/tests
 
 Indices and tables
 ==================
