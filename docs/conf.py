@@ -67,7 +67,7 @@ master_doc = "index"
 project = "ESA++"
 copyright = "2026, Luke Lowery"
 author = "Luke Lowery"
-version = importlib_metadata.version("gridwb")
+version = importlib_metadata.version("ESApp")
 release = version
 
 html_theme = "sphinx_rtd_theme"
@@ -75,4 +75,4 @@ html_theme_options = {
     "navigation_depth": 2,
 }
 
-autodoc_mock_imports = ["ctypes", "win32com", "pythoncom", "pythoncom"]
+autodoc_mock_imports = ["ctypes", "win32com", "pythoncom"]

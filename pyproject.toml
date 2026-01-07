@@ -51,11 +51,9 @@ dependencies = [
     "pandas",
     "numpy",
     "scipy",
-    "geopandas",
     "pywin32; sys_platform == 'win32'",
-    "pypiwin32; sys_platform == 'win32'",
-    "pythoncom",
     "toolz",
+    "networkx",
 ]
 
 [project.optional-dependencies]
@@ -63,12 +61,11 @@ test = ["pytest"]
 dev = ["matplotlib"]
 docs = [
     "sphinx",
-    "numpydoc",
-    "sphinxcontrib-bibtex",
     "sphinx-gallery",
-    "memory_profiler",
     "sphinx-rtd-theme",
     "sphinx-copybutton",
+    "matplotlib",
+    "pillow",
 ]
 
 [project.urls]
