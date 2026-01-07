@@ -48,12 +48,12 @@ classifiers = [
     "Topic :: Software Development",
 ]
 dependencies = [
-    "pandas >= 0.25",
-    "numpy >= 1.19.5",
+    "pandas",
+    "numpy",
     "scipy",
     "geopandas",
-    "pywin32",
-    "pypiwin32",
+    "pywin32; sys_platform == 'win32'",
+    "pypiwin32; sys_platform == 'win32'",
     "toolz",
 ]
 
