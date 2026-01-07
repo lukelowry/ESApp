@@ -16,6 +16,10 @@ The ``IndexTool`` (accessed via ``wb.io``) is the core engine for data I/O. It s
     # Update multiple fields for a specific object
     wb[Gen, (1, '1'), ['GenMW', 'GenMVAR']] = [100.0, 20.0]
 
+    # You can also pass a DataFrame to update many objects at once
+    # (The DataFrame must have the appropriate primary key columns)
+    # wb[Gen, :] = my_updated_gen_df
+
 
 The Adapter
 -----------
@@ -30,6 +34,12 @@ The ``Adapter`` (accessed via ``wb.func``) provides a collection of high-level h
     # Calculate PTDF between two areas
     ptdf_df = wb.func.ptdf('[AREA 1]', '[AREA 2]')
 
+    # Run a full N-1 contingency analysis
+    wb.func.auto_insert_contingencies()
+    wb.func.solve_contingencies()
+    violations = wb.func.get_contingency_violations()
+
+
 The App Ecosystem
 -----------------
 
@@ -39,6 +49,11 @@ ESA++ includes specialized "Apps" for complex analysis. For example, the GIC too
 
     # Access the GIC application
     gic_results = wb.app.gic.run_uniform_field(field_mag=1.0, angle=0)
+
+    # Use the Network app for topology analysis
+    is_connected = wb.app.network.is_connected()
+    islands = wb.app.network.get_islands()
+
 
 Working with Matrices
 ---------------------
@@ -52,6 +67,10 @@ ESA++ makes it easy to extract system matrices for mathematical analysis:
     
     # Get the bus-branch incidence matrix
     incidence = wb.network.incidence()
+    
+    # Get the Power Flow Jacobian
+    jacobian = wb.io.esa.get_jacobian()
+
 
 Custom Scripts
 --------------

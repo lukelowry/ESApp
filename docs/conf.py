@@ -12,6 +12,7 @@ extensions = [
     "sphinx.ext.todo",
     "sphinx.ext.mathjax",
     "sphinx.ext.inheritance_diagram",
+    "sphinx.ext.autosectionlabel",
     "sphinx_gallery.gen_gallery"
 ]
 
@@ -23,6 +24,7 @@ autodoc_default_options = {
 }
 autodoc_preserve_defaults = True
 todo_include_todos = True
+autosectionlabel_prefix_document = True
 
 # Better API formatting
 autoclass_content = "both"        # Include __init__ docstring in class description

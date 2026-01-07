@@ -24,14 +24,16 @@ ESA++ uses a unique indexing system to make data retrieval intuitive. You can ac
 
     from gridwb.grid.components import Bus, Gen, Line
     
-    # Get all bus numbers and names
+    # Get all bus numbers and names as a DataFrame
     buses = wb[Bus, ['BusNum', 'BusName']]
     
-    # Get all generator data as a DataFrame
+    # Get all generator data (all fields)
     generators = wb[Gen, :]
     
-    # Access specific fields for a subset of components
+    # Access specific fields for a subset of components using a list of keys
     line_flows = wb[Line, ['BusNum', 'BusNum:1', 'LineMW']]
+
+The power of the indexing syntax is that it returns standard Pandas objects, allowing you to use all of Pandas' filtering and analysis tools immediately.
 
 Filtering and Selection
 -----------------------
@@ -46,6 +48,10 @@ ESA++ allows you to filter data easily using standard Pandas operations on the r
     # Find lines with loading above 90%
     heavy_lines = wb[Line, ['BusNum', 'BusNum:1', 'LinePercent']]
     heavy_lines = heavy_lines[heavy_lines['LinePercent'] > 90]
+    
+    # Get data for a specific object by its primary key
+    # For a Bus, the key is the Bus Number
+    bus_5_data = wb[Bus, 5, ['BusPUVolt', 'BusAngle']]
 
 Running Analysis
 ----------------
@@ -57,7 +63,11 @@ You can solve power flow and retrieve results in one line:
     # Solve power flow and get voltages
     voltages = wb.pflow()
     
-    print(voltages)
+    # Check if the power flow converged
+    if wb.io.esa.is_converged():
+        print("Power flow converged successfully!")
+    else:
+        print("Power flow failed to converge.")
 
 Modifying Data
 --------------
@@ -68,6 +78,10 @@ You can update grid parameters using the same indexing syntax:
 
     # Set the setpoint for Generator at Bus 5 to 150 MW
     wb[Gen, 5, 'GenMW'] = 150.0
+    
+    # You can also set values for multiple objects at once
+    # Set all bus voltage setpoints to 1.02 pu
+    wb[Bus, 'BusVoltSet'] = 1.02
 
 Saving Changes
 --------------
