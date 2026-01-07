@@ -8,7 +8,7 @@ This section provides a detailed reference for the ESA++ API, partitioned by fun
 
    api/workbench
    api/saw
-   api/indextool
    api/adapter
    api/apps
    api/utils
+   api/tests

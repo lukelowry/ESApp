@@ -1,7 +1,11 @@
 GridWorkBench
 =============
 
-The ``GridWorkBench`` is the primary entry point for ESA++. It manages the connection to PowerWorld and provides the high-level indexing interface.
+The ``GridWorkBench`` is the central orchestrator of the ESA++ toolkit. It manages the lifecycle of the 
+PowerWorld Simulator instance, handles case loading/saving, and provides the primary interface for 
+data access (via ``IndexTool``) and analysis (via ``Adapter`` and ``Apps``).
+
+.. currentmodule:: gridwb.workbench
 
 .. automodule:: gridwb.workbench
    :members:

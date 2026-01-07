@@ -3,22 +3,84 @@ Usage Guide
 
 This guide covers more advanced usage patterns of the ESA++ toolkit.
 
-The IndexTool
--------------
+Indexing with IndexTool
+-----------------------
 
-The ``IndexTool`` (accessed via ``wb.io``) is the core engine for data I/O. It supports broadcasting values to multiple objects:
+The ``IndexTool`` is the heart of ESA++, providing a powerful, Pythonic way to interact with PowerWorld data. Instead of calling verbose SimAuto functions, you use standard Python indexing syntax on the ``GridWorkBench`` object.
+
+Data Retrieval
+~~~~~~~~~~~~~~
+
+Retrieving data is as simple as indexing the workbench with a component class (like ``Bus``, ``Gen``, or ``Line``).
+
+**1. Get Primary Keys**
+
+To get just the primary keys for all objects of a type:
+
+.. code-block:: python
+
+    from gridwb.grid.components import Bus
+    bus_keys = wb[Bus]
+
+**2. Get Specific Fields**
+
+Pass a string or a list of strings to retrieve specific fields:
+
+.. code-block:: python
+
+    # Single field
+    voltages = wb[Bus, 'BusPUVolt']
+
+    # Multiple fields
+    bus_info = wb[Bus, ['BusName', 'BusPUVolt', 'BusAngle']]
+
+**3. Get All Fields**
+
+Use the slice operator ``:`` to retrieve all fields defined for that component:
+
+.. code-block:: python
+
+    all_gen_data = wb[Gen, :]
+
+**4. Using Component Attributes**
+
+For better IDE support and to avoid typos, you can use the attributes defined on the component classes:
+
+.. code-block:: python
+
+    data = wb[Bus, [Bus.BusName, Bus.BusPUVolt]]
+
+Data Modification
+~~~~~~~~~~~~~~~~~
+
+The same indexing syntax is used to update values in the PowerWorld case.
+
+**1. Broadcasting a Scalar**
+
+Set a single value for all objects of a type:
 
 .. code-block:: python
 
     # Set all bus voltages to 1.05 pu
     wb[Bus, 'BusPUVolt'] = 1.05
 
-    # Update multiple fields for a specific object
-    wb[Gen, (1, '1'), ['GenMW', 'GenMVAR']] = [100.0, 20.0]
+**2. Updating Multiple Fields**
 
-    # You can also pass a DataFrame to update many objects at once
-    # (The DataFrame must have the appropriate primary key columns)
-    # wb[Gen, :] = my_updated_gen_df
+You can update multiple fields at once by passing a list of values:
+
+.. code-block:: python
+
+    # Update MW and MVAR for all generators
+    wb[Gen, ['GenMW', 'GenMVR']] = [100.0, 20.0]
+
+**3. Bulk Update from DataFrame**
+
+If you have a DataFrame containing updated data (including the necessary primary keys), you can perform a bulk update:
+
+.. code-block:: python
+
+    # Assuming 'df' is a DataFrame with 'BusNum' and updated 'BusPUVolt'
+    wb[Bus] = df
 
 
 The Adapter

@@ -13,7 +13,8 @@ from .utils import *
 from .grid import *
 
 # Type
-from .apps import BranchType
+from .apps import *
+
 
 # Utilities
 from .utils import InjectionVector, ybus_with_loads
