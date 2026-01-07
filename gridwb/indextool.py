@@ -16,26 +16,44 @@ fexcept = lambda t: "3" + t[5:] if t[:5] == "Three" else t
 class IndexTool:
     """
     PowerWorld Read/Write tool providing indexer-based access to grid components.
+
+    This class enables DataFrame-like access to PowerWorld Simulator data,
+    allowing users to retrieve and modify component parameters using familiar
+    indexing syntax.
     """
     esa: SAW
 
     def __init__(self, fname: str = None):
-        """Initializes the IndexTool.
+        """
+        Initialize the IndexTool.
 
-        :param fname: Optional path to the PowerWorld case file.
+        Parameters
+        ----------
+        fname : str, optional
+            Path to the PowerWorld case file.
         """
         self.fname = fname
 
     def getIO(self):
-        """Compatibility method for apps expecting a Context object.
+        """
+        Compatibility method for apps expecting a Context object.
 
-        :return: The current IndexTool instance.
+        Returns
+        -------
+        IndexTool
+            The current instance.
         """
         return self
 
     @timing
     def open(self):
-        """Opens the PowerWorld case and initializes transient stability to fetch initial states."""
+        """
+        Open the PowerWorld case and initialize transient stability.
+
+        This method validates the case path, initializes the SimAuto COM object,
+        and attempts to initialize transient stability to ensure initial values
+        are available for dynamic models.
+        """
         # Validate Path Name
         if not path.isabs(self.fname):
             self.fname = path.abspath(self.fname)
@@ -47,26 +65,29 @@ class IndexTool:
         self.esa.TSInitialize()
     
     def __getitem__(self, index) -> DataFrame | None:
-        """
-        Retrieve data from PowerWorld using indexer notation.
+        """Retrieve data from PowerWorld using indexer notation.
 
-        :param index: A GObject type or a tuple of (GObject, fields).
-            Fields can be a string, list of strings, or slice(None) for all fields.
-        :type index: Union[Type[GObject], Tuple[Type[GObject], Any]]
-        :return: A DataFrame containing the requested data.
-        :rtype: pandas.DataFrame
-        :raises ValueError: If an invalid slice is provided.
+        This method allows for flexible querying of grid component data directly
+        from the PowerWorld simulation instance.
 
-        **Examples:**
+        Parameters
+        ----------
+        index : Union[Type[GObject], Tuple[Type[GObject], Any]]
+            Can be a `GObject` type to get key fields, or a tuple of
+            (GObject type, fields) to specify fields. `fields` can be a
+            single field name (str), a list of names, or `slice(None)` (:)
+            to retrieve all available fields.
 
-        .. code-block:: python
+        Returns
+        -------
+        pandas.DataFrame
+            A pandas DataFrame containing the requested data, or None if no
+            data could be retrieved.
 
-            # Get Primary Keys of all Buses
-            df = wb[Bus]
-            # Get specific fields
-            df = wb[Bus, ['BusName', 'BusPUVolt']]
-            # Get all fields
-            df = wb[Bus, :]
+        Raises
+        ------
+        ValueError
+            If an unsupported slice is used for field selection.
         """
         # 1. Parse index to get gtype and what fields are requested.
         if isinstance(index, tuple):
@@ -142,26 +163,41 @@ class IndexTool:
         raise TypeError(f"Unsupported index for __setitem__: {args}")
 
     def _bulk_update_from_df(self, gtype: Type[GObject], df: DataFrame):
-        """Internal: Handles creating or overwriting objects from a complete DataFrame.
+        """Handles creating or overwriting objects from a complete DataFrame.
 
-        Corresponds to: `wb.pw[ObjectType] = dataframe`.
+        This corresponds to the use case: `wb.pw[ObjectType] = dataframe`.
 
-        :param gtype: The GObject subclass.
-        :param df: The DataFrame containing object data.
+        Parameters
+        ----------
+        gtype : Type[GObject]
+            The GObject subclass representing the type of objects to update.
+        df : pandas.DataFrame
+            The DataFrame containing object data. Columns must match PowerWorld
+            field names, including primary keys.
         """
         if not isinstance(df, DataFrame):
             raise TypeError("A DataFrame is required for bulk updates.")
         self.esa.ChangeParametersMultipleElementRect(gtype.TYPE, df.columns.tolist(), df)
 
     def _broadcast_update_to_fields(self, gtype: Type[GObject], fields: list[str], value):
-        """Internal: Modifies specific fields for existing objects by broadcasting a value.
+        """Modifies specific fields for existing objects by broadcasting a value.
 
-        Corresponds to: `wb.pw[ObjectType, 'FieldName'] = value`.
+        This corresponds to the use case: `wb.pw[ObjectType, 'FieldName'] = value`.
 
-        :param gtype: The GObject subclass.
-        :param fields: List of field names to update.
-        :param value: The value to broadcast.
-        :raises ValueError: If value length doesn't match field length for keyless objects.
+        Parameters
+        ----------
+        gtype : Type[GObject]
+            The GObject subclass representing the type of objects to update.
+        fields : List[str]
+            A list of field names to update.
+        value : Any
+            The value to broadcast to the specified fields. Can be a scalar or
+            a list/array if updating multiple fields on a keyless object.
+
+        Raises
+        ------
+        ValueError
+            If value length doesn't match field length for keyless objects.
         """
         # For objects without keys (e.g., Sim_Solution_Options), we construct
         # the change DataFrame directly without reading from PowerWorld first.

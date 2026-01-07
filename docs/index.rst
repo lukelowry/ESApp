@@ -5,6 +5,9 @@ ESA++ Documentation
    :start-after: ESA++
    :end-before: Documentation
 
+.. include:: ../README.rst
+   :start-before: Citation
+
 .. toctree::
    :maxdepth: 2
    :caption: User Guide

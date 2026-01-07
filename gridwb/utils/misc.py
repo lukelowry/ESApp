@@ -2,14 +2,20 @@ from numpy import sum
 from pandas import DataFrame
 from ..grid.components import Gen, Load, Bus
 
+
 class InjectionVector:
     """Represents a normalized injection vector for power system sensitivity studies."""
 
     def __init__(self, loaddf: DataFrame, losscomp=0.05) -> None:
         """Initializes the InjectionVector.
 
-        :param loaddf: A DataFrame containing at least a 'BusNum' column for all buses.
-        :param losscomp: Loss compensation factor (generation increase per unit of load increase).
+        Parameters
+        ----------
+        loaddf : pandas.DataFrame
+            A DataFrame containing at least a 'BusNum' column for all buses in the system.
+        losscomp : float, optional
+            Loss compensation factor. For an increased injection, generation will be
+            increased to compensate for losses. Defaults to 0.05.
         """
         self.loaddf = loaddf.copy()
 
@@ -20,13 +26,19 @@ class InjectionVector:
     
     @property
     def vec(self):
-        """Returns the current injection vector as a numpy array."""
+        """Returns the current injection vector as a NumPy array.
+
+        Returns
+        -------
+        numpy.ndarray
+            The injection vector.
+        """
         return self.loaddf['Alpha'].to_numpy()
     
     def supply(self, *busids):
         """Sets the specified buses as supply points (positive injection).
 
-        :param busids: Variable number of bus IDs.
+        The 'Alpha' value for these buses will
         """
         self.loaddf.loc[busids, 'Alpha'] = 1
         self.norm()

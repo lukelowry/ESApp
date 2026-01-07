@@ -12,14 +12,30 @@ class ATCMixin:
         distributed: bool = False,
         multiple_scenarios: bool = False,
     ):
-        """Calculates Available Transfer Capability (ATC) between a seller and a buyer.
+        """Calculates Available Transfer Capability (ATC) between a specified seller and buyer.
 
-        :param seller: The seller (source) (e.g. '[AREA "Top"]').
-        :param buyer: The buyer (sink) (e.g. '[BUS 7]').
-        :param distributed: Use distributed ATC solution method.
-        :param multiple_scenarios: Process each defined scenario.
-        :return: None or error string.
-        :return: None or error string.
+        This method initiates an ATC calculation, ramping transfer between the
+        seller and buyer until a system limit is reached.
+
+        Parameters
+        ----------
+        seller : str
+            The source object string (e.g., '[AREA "Top"]', '[BUS 1]').
+        buyer : str
+            The sink object string (e.g., '[AREA "Bottom"]', '[BUS 2]').
+        distributed : bool, optional
+            If True, uses the distributed ATC solution method. Defaults to False.
+        multiple_scenarios : bool, optional
+            If True, processes each defined scenario in the case. Defaults to False.
+
+        Returns
+        -------
+        None
+
+        Raises
+        ------
+        PowerWorldError
+            If the SimAuto call fails (e.g., invalid seller/buyer, calculation error).
         """
         dist = "YES" if distributed else "NO"
         mult = "YES" if multiple_scenarios else "NO"
@@ -30,10 +46,26 @@ class ATCMixin:
     def DetermineATCMultipleDirections(
         self, distributed: bool = False, multiple_scenarios: bool = False
     ):
-        """Calculates ATC for all defined directions.
+        """Calculates ATC for all directions defined within the PowerWorld case.
 
-        :param distributed: Use distributed ATC solution method.
-        :param multiple_scenarios: Process each defined scenario.
+        This method is used when multiple transfer directions have been pre-configured
+        in the Simulator.
+
+        Parameters
+        ----------
+        distributed : bool, optional
+            If True, uses the distributed ATC solution method. Defaults to False.
+        multiple_scenarios : bool, optional
+            If True, processes each defined scenario in the case. Defaults to False.
+
+        Returns
+        -------
+        None
+
+        Raises
+        ------
+        PowerWorldError
+            If the SimAuto call fails (e.g., no directions defined, calculation error).
         """
         dist = "YES" if distributed else "NO"
         mult = "YES" if multiple_scenarios else "NO"
@@ -42,10 +74,26 @@ class ATCMixin:
         )
 
     def GetATCResults(self, fields: list = None) -> pd.DataFrame:
-        """Retrieves Transfer Limiter results from the case.
+        """Retrieves Transfer Limiter results from the case after an ATC calculation.
 
-        :param fields: List of fields to retrieve. Defaults to common fields.
-        :return: DataFrame containing TransferLimiter objects.
+        This method fetches the detailed results of the ATC analysis, including
+        the maximum flow, limiting contingency, and limiting element.
+
+        Parameters
+        ----------
+        fields : List[str], optional
+            A list of internal field names to retrieve for the 'TransferLimiter' object type.
+            If None, a default set of common fields is retrieved.
+
+        Returns
+        -------
+        pandas.DataFrame
+            A DataFrame containing the requested data for 'TransferLimiter' objects.
+
+        Raises
+        ------
+        PowerWorldError
+            If the SimAuto call fails.
         """
         if fields is None:
             fields = [

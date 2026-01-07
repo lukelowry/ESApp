@@ -13,17 +13,29 @@ class MatrixMixin:
     def get_ybus(self, full: bool = False, file: Union[str, None] = None) -> Union[np.ndarray, csr_matrix]:
         """Obtain the YBus matrix from PowerWorld.
 
-        This method calls the ``SaveYbusInMatlabFormat`` script command
-        to write the YBus to a temporary file, then parses that file
-        to construct the matrix.
+        This method calls the `SaveYbusInMatlabFormat` script command to write
+        the YBus matrix to a temporary file, then parses that file to construct
+        the matrix in Python.
 
-        :param full: If True, returns a dense NumPy array. If False
-            (default), returns a SciPy CSR sparse matrix.
-        :param file: Optional path to a pre-existing ``.mat`` file. If
-            provided, the file will be parsed directly instead of
-            calling SimAuto to generate a new one.
-        :return: The YBus matrix as either a dense NumPy array or a
+        Parameters
+        ----------
+        full : bool, optional
+            If True, returns a dense NumPy array. If False (default), returns a
             SciPy CSR sparse matrix.
+        file : Union[str, None], optional
+            Optional path to a pre-existing `.mat` file containing the YBus matrix.
+            If provided, the file will be parsed directly instead of calling SimAuto
+            to generate a new one. Defaults to None.
+
+        Returns
+        -------
+        Union[numpy.ndarray, scipy.sparse.csr_matrix]
+            The YBus matrix as either a dense NumPy array or a SciPy CSR sparse matrix.
+
+        Raises
+        ------
+        PowerWorldError
+            If the SimAuto call fails or the generated file cannot be parsed.
         """
         if file:
             _tempfile_path = file
@@ -65,11 +77,22 @@ class MatrixMixin:
     def get_branch_admittance(self):
         """Calculate the branch admittance matrices, Yf and Yt.
 
-        These matrices describe the relationship between branch currents
-        and bus voltages. This method calculates them based on branch
-        parameters retrieved from the current case.
+        These matrices describe the relationship between branch currents and bus voltages.
+        `Yf` relates the current flowing *from* the 'from' bus of a branch to the 'to' bus,
+        and `Yt` relates the current flowing *from* the 'to' bus of a branch to the 'from' bus.
+        This method calculates them based on branch parameters retrieved from the current case.
 
-        :return: A tuple containing two SciPy CSR sparse matrices: (Yf, Yt).
+        Returns
+        -------
+        Tuple[scipy.sparse.csr_matrix, scipy.sparse.csr_matrix]
+            A tuple containing two SciPy CSR sparse matrices: (Yf, Yt).
+
+        Raises
+        ------
+        PowerWorldError
+            If data retrieval from SimAuto fails.
+        ValueError
+            If bus numbers cannot be mapped to matrix indices.
         """
         key = self.get_key_field_list("bus")
         df = self.GetParametersMultipleElement("bus", key)
@@ -113,10 +136,19 @@ class MatrixMixin:
     def get_shunt_admittance(self):
         """Calculate the shunt admittance vector, Ysh.
 
-        This vector represents the admittance to ground for each bus
-        from shunt elements.
+        This vector represents the equivalent admittance to ground for each bus,
+        derived from fixed bus shunts and constant impedance loads.
 
-        :return: A NumPy array representing the shunt admittance for each bus.
+        Returns
+        -------
+        numpy.ndarray
+            A NumPy array (complex-valued) representing the shunt admittance for each bus.
+            The order of elements corresponds to the bus order in `self.ListOfDevices("bus")`.
+
+        Raises
+        ------
+        PowerWorldError
+            If data retrieval from SimAuto fails.
         """
         base = self.GetParametersMultipleElement("Sim_Solution_Options", ["SBase"]).to_numpy(float).ravel()
         key = self.get_key_field_list("bus")
@@ -129,14 +161,27 @@ class MatrixMixin:
     def get_gmatrix(self, full: bool = False) -> Union[np.ndarray, csr_matrix]:
         """Get the GIC conductance matrix (G).
 
-        This method calls the ``GICSaveGMatrix`` script command to
-        write the G-matrix to a temporary file, then parses that file
-        to construct the matrix.
+        This method calls the `GICSaveGMatrix` script command to write the G-matrix
+        to a temporary file, then parses that file to construct the matrix in Python.
+        The G-matrix relates GIC currents to earth potentials.
 
-        :param full: If True, returns a dense NumPy array. If False
-            (default), returns a SciPy CSR sparse matrix.
-        :return: The G-matrix as either a dense NumPy array or a
+        Parameters
+        ----------
+        full : bool, optional
+            If True, returns a dense NumPy array. If False (default), returns a
             SciPy CSR sparse matrix.
+
+        Returns
+        -------
+        Union[numpy.ndarray, scipy.sparse.csr_matrix]
+            The G-matrix as either a dense NumPy array or a SciPy CSR sparse matrix.
+
+        Raises
+        ------
+        PowerWorldError
+            If the SimAuto call fails or the generated file cannot be parsed.
+        FileNotFoundError
+            If the temporary matrix file is not created.
         """
         g_matrix_path, id_file_path = self._make_temp_matrix_files()
         try:
@@ -154,14 +199,28 @@ class MatrixMixin:
     def get_jacobian(self, full: bool = False) -> Union[np.ndarray, csr_matrix]:
         """Get the power flow Jacobian matrix.
 
-        This method calls the ``SaveJacobian`` script command to write
-        the Jacobian to a temporary file, then parses that file to
-        construct the matrix.
+        This method calls the `SaveJacobian` script command to write the Jacobian
+        matrix to a temporary file, then parses that file to construct the matrix
+        in Python. The Jacobian is crucial for Newton-Raphson power flow solutions
+        and sensitivity analysis.
 
-        :param full: If True, returns a dense NumPy array. If False
-            (default), returns a SciPy CSR sparse matrix.
-        :return: The Jacobian matrix as either a dense NumPy array or a
+        Parameters
+        ----------
+        full : bool, optional
+            If True, returns a dense NumPy array. If False (default), returns a
             SciPy CSR sparse matrix.
+
+        Returns
+        -------
+        Union[numpy.ndarray, scipy.sparse.csr_matrix]
+            The Jacobian matrix as either a dense NumPy array or a SciPy CSR sparse matrix.
+
+        Raises
+        ------
+        PowerWorldError
+            If the SimAuto call fails or the generated file cannot be parsed.
+        FileNotFoundError
+            If the temporary matrix file is not created.
         """
         jac_file_path, id_file_path = self._make_temp_matrix_files()
         try:
@@ -178,11 +237,20 @@ class MatrixMixin:
     def get_incidence_matrix(self):
         """Calculate the bus-branch incidence matrix.
 
-        The incidence matrix (A) describes the topology of the network,
-        with entries A[i, j] = 1 if branch i starts at bus j, -1 if
-        branch i ends at bus j, and 0 otherwise.
+        The incidence matrix (A) describes the topology of the network.
+        For a system with `N` buses and `L` branches, it is an `L x N` matrix
+        where `A[i, j] = 1` if branch `i` starts at bus `j`, `-1` if branch `i`
+        ends at bus `j`, and `0` otherwise.
 
-        :return: A NumPy array representing the incidence matrix.
+        Returns
+        -------
+        numpy.ndarray
+            A NumPy array representing the incidence matrix.
+
+        Raises
+        ------
+        PowerWorldError
+            If data retrieval from SimAuto fails.
         """
         branch = self.ListOfDevices("branch")
         bus = self.ListOfDevices("bus")
@@ -193,6 +261,16 @@ class MatrixMixin:
         return incidence
 
     def _make_temp_matrix_files(self):
+        """Internal helper to create temporary files for matrix export.
+
+        These files are used by SimAuto to write matrix data, which is then
+        read back into Python.
+
+        Returns
+        -------
+        Tuple[str, str]
+            A tuple containing the paths to the temporary matrix file and ID file.
+        """
         mat_file = tempfile.NamedTemporaryFile(mode="w", suffix=".m", delete=False)
         mat_file_path = Path(mat_file.name).as_posix()
         mat_file.close()
@@ -202,7 +280,24 @@ class MatrixMixin:
         return mat_file_path, id_file_path
 
     def _parse_real_matrix(self, mat_str, matrix_name="Jac"):
-        """Helper to parse a real-valued sparse matrix from '.m' PowerWorld output."""
+        """Internal helper to parse a real-valued sparse matrix from PowerWorld's '.m' output format.
+
+        This function extracts matrix dimensions and non-zero elements from the
+        MATLAB-like string output by SimAuto's matrix export functions.
+
+        Parameters
+        ----------
+        mat_str : str
+            The string content of the `.m` file containing the sparse matrix definition.
+        matrix_name : str, optional
+            The name of the matrix variable in the `.m` file (e.g., "Jac", "GMatrix").
+            Defaults to "Jac".
+
+        Returns
+        -------
+        scipy.sparse.csr_matrix
+            The parsed sparse matrix in CSR format.
+        """
         mat_str = re.sub(r"\s", "", mat_str)
         lines = re.split(";", mat_str)
         ie = r"[0-9]+"
