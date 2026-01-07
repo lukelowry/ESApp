@@ -17,11 +17,11 @@ if os.path.exists(case_path):
     wb = GridWorkBench(case_path)
 
     # Retrieve all bus numbers and names
-    buses = wb[Bus, ['BusNum', 'BusName']]
+    buses = wb[Bus, 'BusName']
     print("Buses in system:")
     print(buses.head())
 
     # Retrieve generator MW output
-    gens = wb[Gen, ['BusNum', 'GenID', 'GenMW']]
+    gens = wb[Gen, 'GenMW']
     print("\nGenerators:")
     print(gens.head())
