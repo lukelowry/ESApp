@@ -1,4 +1,3 @@
-from .components import Bus
 from .apps.gic import GIC
 from .apps.network import Network
 from .apps.modes import ForcedOscillation

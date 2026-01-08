@@ -98,16 +98,14 @@ class GObject(Enum):
         if isinstance(self._value_, int):
             return f'<{self.__class__.__name__}.{self.name}: TYPE={self.__class__.TYPE}>'
         # For field members, show the field info.
-        else:
-            return f'<{self.__class__.__name__}.{self.name}: Field={self._value_[1]}>'
+        return f'<{self.__class__.__name__}.{self.name}: Field={self._value_[1]}>'
     
     def __str__(self) -> str:
         # For the type-defining member, it has no string field name.
         if isinstance(self._value_, int):
             return self.name
         # For field members, return the PowerWorld field name string.
-        else:
-            return str(self._value_[1])
+        return str(self._value_[1])
     
     @classmethod
     @property

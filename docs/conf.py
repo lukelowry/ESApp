@@ -104,5 +104,4 @@ autodoc_mock_imports = [
     "shapely",
     "fiona",
     "pyproj",
-    "gridwb.components"
 ]
