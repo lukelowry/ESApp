@@ -6,17 +6,20 @@ import importlib.metadata
 # if it's not already installed in the environment.
 sys.path.insert(0, os.path.abspath(".."))
 
-extensions = [
-    "sphinx.ext.viewcode",
+extensions = [    "sphinx.ext.autodoc",
     "sphinx.ext.autosummary",
+    "sphinx.ext.viewcode",
     "sphinx.ext.todo",
     "sphinx.ext.mathjax",
     "sphinx.ext.inheritance_diagram",
     "sphinx.ext.autosectionlabel",
-    "nbsphinx"
+    "sphinx.ext.intersphinx",
+    "sphinx.ext.napoleon",
+    "sphinx_copybutton",
+    "nbsphinx",
 ]
 
-extensions.append("sphinx.ext.autodoc")
+autosummary_generate = True  # Automatically generate API doc pages
 autodoc_default_options = {
     "members": True,
     "undoc-members": True,
@@ -30,18 +33,12 @@ autosectionlabel_prefix_document = True
 autoclass_content = "both"        # Include __init__ docstring in class description
 autodoc_typehints = "none"        # Let Napoleon handle types from the docstring
 add_module_names = False          # Don't show full module path (e.g. sgwt.static.Convolve -> Convolve)
-
-extensions.append("sphinx.ext.intersphinx")
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),
     "numpy": ("https://numpy.org/doc/stable", None),
     "scipy": ("https://docs.scipy.org/doc/scipy/reference", None),
 }
-
-extensions.append("sphinx_copybutton")
-
 # Use Napoleon to parse NumPy-style docstrings for a cleaner look
-extensions.append("sphinx.ext.napoleon")
 napoleon_google_docstring = False
 napoleon_numpy_docstring = True
 napoleon_include_init_with_doc = False

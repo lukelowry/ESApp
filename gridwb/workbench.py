@@ -890,12 +890,6 @@ class GridWorkBench(Indexable):
             return LL['Longitude'], LL['Latitude']
         return LL
     
-    def save(self):
-        """
-        Save the open PowerWorld file.
-        """
-        self.esa.SaveCase()
-
     def write_voltage(self,V):
         """
         Given Complex 1-D vector write to PowerWorld.
