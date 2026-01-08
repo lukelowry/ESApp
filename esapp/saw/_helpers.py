@@ -11,10 +11,15 @@ from win32com.client import VARIANT
 
 def df_to_aux(fp, df, object_name: str):
     """Convert a dataframe to PW aux/axd data section.
-
-    :param fp: file handler
-    :param df: dataframe
-    :param object_name: object type
+    
+    Parameters
+    ----------
+    fp : file
+        File handler.
+    df : pandas.DataFrame
+        DataFrame to convert.
+    object_name : str
+        PowerWorld object type.
     """
     # write the header
     fields = ",".join(df.columns.tolist())

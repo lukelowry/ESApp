@@ -22,8 +22,8 @@ class FaultMixin:
         element : str
             The fault element string (e.g., '[BUS 1]', '[BRANCH 1 2 1]').
         fault_type : str
-            The type of fault (e.g., "SLG" for single line-to-ground, "LL" for line-to-line,
-            "3PB" for three-phase balanced, "DLG" for double line-to-ground).
+            The type of fault: "SLG" (Single Line to Ground), "LL" (Line to Line),
+            "3PB" (Three Phase Balanced), or "DLG" (Double Line to Ground).
         r : float, optional
             Fault resistance in per unit. Defaults to 0.0.
         x : float, optional

@@ -1,11 +1,17 @@
 """
 SimAuto Wrapper (:mod:`esapp.saw`)
 ==================================
+This package provides a low-level, object-oriented interface for communicating
+with the PowerWorld Simulator Automation Server (SimAuto).
 
-This module provides the low-level interface for communicating with the
-PowerWorld Simulator Automation Server (SimAuto). The primary entry point
-is the :class:`~.SAW` class. It also defines custom exception classes
-for handling COM and PowerWorld-specific errors.
+The primary entry point is the :class:`~.SAW` class, which is a composite
+class built from numerous mixins. Each mixin corresponds to a specific
+functional area of the PowerWorld API, such as power flow, contingency
+analysis, or transient stability. This modular design keeps the codebase
+organized and makes the API easier to navigate.
+
+The package also defines custom exception classes for handling COM and
+PowerWorld-specific errors, along with helper functions for data conversion.
 """
 from .saw import SAW
 from ._exceptions import PowerWorldError, COMError, CommandNotRespectedError, Error

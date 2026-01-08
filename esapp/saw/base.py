@@ -214,9 +214,13 @@ class SAWBase(object):
 
     def change_parameters_multiple_element_df(self, ObjectType: str, command_df: pd.DataFrame) -> None:
         """Modifies parameters for multiple elements using a DataFrame without verification.
-
-        :param ObjectType: The PowerWorld object type.
-        :param command_df: A DataFrame containing the data to update.
+        
+        Parameters
+        ----------
+        ObjectType : str
+            The PowerWorld object type.
+        command_df : pandas.DataFrame
+            A DataFrame containing the data to update.
         """
         self._change_parameters_multiple_element_df(ObjectType=ObjectType, command_df=command_df)
 
@@ -1089,10 +1093,21 @@ class SAWBase(object):
 
     def OpenCaseType(self, FileName: str, FileType: str, Options: Union[list, str, None] = None) -> None:
         """Opens a case file of a specific type (e.g., PTI, GE) with options.
-
-        :param FileName: Path to the file.
-        :param FileType: The file format (e.g., 'PTI', 'GE', 'EPC').
-        :param Options: A list or string of format-specific options.
+        
+        Parameters
+        ----------
+        FileName : str
+            Path to the file.
+            Different sets of optional parameters apply for the PTI and GE file formats.
+            The LoadTransactions and Star bus parameters are available for writing to RAW files.
+            MSLine, VarLimDead, and PostCTGAGC are for writing EPC files.
+            See `OpenCase` in the Auxiliary File Format PDF for more details on options.
+        FileType : str
+            The file format (e.g., 'PTI', 'GE', 'EPC').
+            Valid options include: PWB, PTI (latest version), PTI23-PTI35, GE (latest version),
+            GE14-GE23, CF, AUX, UCTE, AREVAHDB, OPENNETEMS.
+        Options : Union[list, str, None], optional
+            A list or string of format-specific options. Defaults to None.
         """
         self.pwb_file_path = FileName
         if isinstance(Options, list):
@@ -1129,17 +1144,16 @@ class SAWBase(object):
     def RunScriptCommand(self, Statements):
         """Executes one or more PowerWorld script statements.
 
-        :param Statements: A string containing the script commands.
-
         Parameters
         ----------
         Statements : str
             A string containing one or more PowerWorld script commands, separated by semicolons.
-
+            See the "SCRIPT Section" in the Auxiliary File Format PDF for command syntax.
+        
         Returns
         -------
         None
-
+        
         Raises
         ------
         PowerWorldError
@@ -1157,6 +1171,8 @@ class SAWBase(object):
         ----------
         Statements : str
             A string containing one or more PowerWorld script commands.
+            See the "SCRIPT Section" in the Auxiliary File Format PDF for command syntax.
+
         StatusMessage : str
             A message to display in the PowerWorld Simulator status bar while the
             commands are being executed.

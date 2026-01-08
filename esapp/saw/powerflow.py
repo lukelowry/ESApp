@@ -7,7 +7,24 @@ from ._exceptions import PowerWorldError
 class PowerflowMixin:
 
     def SolvePowerFlow(self, SolMethod: str = "RECTNEWT") -> None:
-        """Run the SolvePowerFlow command."""
+        """Solves the power flow using the specified solution method.
+
+        Parameters
+        ----------
+        SolMethod : str, optional
+            The solution method to use. Valid options include "RECTNEWT" (Rectangular Newton-Raphson),
+            "POLARNEWT" (Polar Newton-Raphson), "GAUSSSEIDEL" (Gauss-Seidel), "FASTDEC" (Fast Decoupled),
+            "ROBUST", and "DC". Defaults to "RECTNEWT".
+        
+        Returns
+        -------
+        None
+        
+        Raises
+        ------
+        PowerWorldError
+            If the SimAuto call fails or the power flow does not converge.
+        """
         script_command = f"SolvePowerFlow({SolMethod.upper()})"
         return self.RunScriptCommand(script_command)
 
@@ -49,7 +66,10 @@ class PowerflowMixin:
         If the first attempt to solve the power flow fails, this method
         will reset the case to a flat start and try one additional time.
 
-        :param SolMethod: The solution method to use (e.g., "RECTNEWT").
+        Parameters
+        ----------
+        SolMethod : str, optional
+            The solution method to use (e.g., "RECTNEWT"). Defaults to "RECTNEWT".
         """
         try:
             self.SolvePowerFlow(SolMethod)
@@ -60,32 +80,44 @@ class PowerflowMixin:
 
     def SetMVATolerance(self, tol: float = 0.1) -> None:
         """Sets the MVA Tolerance for Newton-Raphson convergence.
-
-        :param tol: The MVA tolerance value.
+        
+        Parameters
+        ----------
+        tol : float, optional
+            The MVA tolerance value. Defaults to 0.1.
         """
         self.ChangeParametersSingleElement("Sim_Solution_Options", ["ConvergenceTol:2"], [str(tol)])
 
     def SetDoOneIteration(self, enable: bool = True) -> None:
         """Sets the 'Do One Iteration' power flow option.
-
-        :param enable: If True, power flow will only perform one iteration.
+        
+        Parameters
+        ----------
+        enable : bool, optional
+            If True, power flow will only perform one iteration. Defaults to True.
         """
         value = "YES" if enable else "NO"
         self.ChangeParametersSingleElement("Sim_Solution_Options", ["DoOneIteration"], [value])
 
     def SetInnerLoopCheckMVars(self, enable: bool = True) -> None:
         """Sets the 'Check Mvar Limits Immediately' power flow option.
-
-        :param enable: If True, the inner loop of the power flow will check
-            Mvar limits before proceeding to the outer loop.
+        
+        Parameters
+        ----------
+        enable : bool, optional
+            If True, the inner loop of the power flow will check Mvar limits
+            before proceeding to the outer loop. Defaults to True.
         """
         value = "YES" if enable else "NO"
         self.ChangeParametersSingleElement("Sim_Solution_Options", ["ChkVars"], [value])
 
     def GetMinPUVoltage(self) -> float:
         """Gets the minimum per-unit voltage magnitude in the case.
-
-        :return: The minimum p.u. voltage as a float.
+        
+        Returns
+        -------
+        float
+            The minimum p.u. voltage.
         """
         s = self.GetParametersSingleElement("PWCaseInformation", ["BusPUVolt:1"], [""])
         return float(s.iloc[0])
@@ -93,7 +125,10 @@ class PowerflowMixin:
     def GetBusMismatches(self) -> pd.DataFrame:
         """Gets the complex power bus mismatches.
 
-        :return: A DataFrame with bus identifiers and their P, Q, and S
+        Returns
+        -------
+        pandas.DataFrame
+            A DataFrame with bus identifiers and their P, Q, and S
             mismatches in MW, Mvar, and MVA.
         """
         key_fields = self.get_key_field_list("Bus")

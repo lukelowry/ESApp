@@ -24,18 +24,28 @@ class TransientMixin:
         `PowerWorld documentation:
         <https://www.powerworld.com/WebHelp/#MainDocumentation_HTML/TSGetContingencyResults%20Function.htm%3FTocPath%3DAutomation%2520Server%2520Add-On%2520(SimAuto)%7CAutomation%2520Server%2520Functions%7C_____49>`__
 
-        :param CtgName: The contingency to obtain results from. Only one
+        Parameters
+        ----------
+        CtgName : str
+            The contingency to obtain results from. Only one
             contingency be obtained at a time.
-        :param ObjFieldList: A list of strings which may contain plots,
+        ObjFieldList : List[str]
+            A list of strings which may contain plots,
             subplots, or individual object/field pairs specifying the
             result variables to obtain.
-        :param StartTime: The time in seconds in the simulation to begin
+        StartTime : Union[None, int, float], optional
+            The time in seconds in the simulation to begin
             retrieving results. If not specified (None), the start time
-            of the simulation is used.
-        :param StopTime: The time in seconds in the simulation to stop
+            of the simulation is used. Defaults to None.
+        StopTime : Union[None, int, float], optional
+            The time in seconds in the simulation to stop
             retrieving results. If not specified, the end time of the
-            simulation is used.
-        :returns: A tuple containing two DataFrames, "meta" and "data."
+            simulation is used. Defaults to None.
+        
+        Returns
+        -------
+        Tuple[pd.DataFrame, pd.DataFrame] or Tuple[None, None]
+            A tuple containing two DataFrames, "meta" and "data."
             Alternatively, if the given CtgName does not exist, a tuple
             of (None, None) will be returned.
         """
@@ -88,8 +98,12 @@ class TransientMixin:
         state of the system at the final time step to be loaded into the
         power flow solver for steady-state analysis.
 
-        :param calculate_mismatch: Set to True to calculate power mismatch when transferring.
         This is a wrapper for the ``TSTransferStateToPowerFlow`` script command.
+        
+        Parameters
+        ----------
+        calculate_mismatch : bool, optional
+            Set to True to calculate power mismatch when transferring. Defaults to False.
         """
         cm = "YES" if calculate_mismatch else "NO"
         self.RunScriptCommand(f"TSTransferStateToPowerFlow({cm});")
@@ -112,42 +126,52 @@ class TransientMixin:
 
         This is a wrapper for the ``TSResultStorageSetAll`` script command.
 
-        :param object: The PowerWorld object type (e.g., "GEN", "BUS", "BRANCH").
+        Parameters
+        ----------
+        object : str, optional
+            The PowerWorld object type (e.g., "GEN", "BUS", "BRANCH").
             Defaults to "ALL".
-        :param value: If True, results for this object type will be stored.
+        value : bool, optional
+            If True, results for this object type will be stored.
             If False, they will not. Defaults to True.
         """
         yn = "YES" if value else "NO"
         self.RunScriptCommand(f"TSResultStorageSetAll({object}, {yn})")
 
-    def TSSolve(self, ctgname):
+    def TSSolve(self, ctgname: str):
         """Solves a single transient stability contingency.
-
+        
         This is a wrapper for the ``TSSolve`` script command.
-
-        :param ctgname: The name of the contingency to solve.
+        
+        Parameters
+        ----------
+        ctgname : str
+            The name of the contingency to solve.
         """
         self.RunScriptCommand(f'TSSolve("{ctgname}")')
 
     def TSSolveAll(self):
         """Solves all defined transient stability contingencies.
-
+        
         This is a wrapper for the ``TSSolveAll`` script command.
         """
         self.RunScriptCommand("TSSolveAll()")
 
-    def TSStoreResponse(self, gtype: "GObject" = None, value=True):
+    def TSStoreResponse(self, object_type: str = "ALL", value: bool = True):
         """Convenience wrapper to toggle transient stability result storage.
 
         This is a high-level wrapper around ``TSResultStorageSetAll``.
-
-        :param gtype: A ``GObject`` class (e.g., ``components.GEN``). If None,
-            applies to all object types. Defaults to None.
-        :param value: If True, results will be stored. If False, they will not.
+        
+        Parameters
+        ----------
+        object_type : str, optional
+            The PowerWorld object type (e.g., "GEN", "BUS", "BRANCH").
+            Defaults to "ALL".
+        value : bool, optional
+            If True, results will be stored. If False, they will not.
             Defaults to True.
         """
-        obj_type_str = gtype.TYPE if gtype else "ALL"
-        self.TSResultStorageSetAll(object=obj_type_str, value=value)
+        self.TSResultStorageSetAll(object=object_type, value=value)
 
     def TSClearResultsFromRAM(
         self,

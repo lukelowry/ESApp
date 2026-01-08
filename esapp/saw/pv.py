@@ -10,9 +10,13 @@ class PVMixin:
 
     def RunPV(self, source: str, sink: str):
         """Starts a PV analysis.
-
-        :param source: The source of power (e.g. '[INJECTIONGROUP "Source"]').
-        :param sink: The sink of power (e.g. '[INJECTIONGROUP "Sink"]').
+        
+        Parameters
+        ----------
+        source : str
+            The source of power (e.g. '[INJECTIONGROUP "Source"]').
+        sink : str
+            The sink of power (e.g. '[INJECTIONGROUP "Sink"]').
         """
         return self.RunScriptCommand(f"PVRun({source}, {sink});")
 

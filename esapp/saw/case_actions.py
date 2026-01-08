@@ -25,20 +25,23 @@ class CaseActionsMixin:
         filename : str
             The file name of the case to be appended.
         filetype : str
-            The format of the file to append (e.g., "PWB", "GE", "PTI", "CF").
+            The format of the file to append (e.g., "PWB", "GE", "PTI", "CF", "AUX",
+            "UCTE", "AREVAHDB", "OPENNETEMS").
         star_bus : str, optional
-            For PTI files, specifies how to handle star buses ("NEAR", "MAX", or a numeric value).
+            For PTI RAW format, specifies how to handle star buses ("NEAR", "MAX", or a numeric value).
             Defaults to "NEAR".
         estimate_voltages : bool, optional
-            If True, estimates voltages and angles for new buses introduced by the append.
+            For GE EPC or PTI RAW format, if True, estimates voltages and angles for new buses
+            introduced by the append. Angle smoothing is done across new lines.
             Defaults to True.
         ms_line : str, optional
-            For GE files, specifies how to handle multisection lines ("MAINTAIN" or "EQUIVALENCE").
+            For GE EPC format, specifies how to handle multisection lines ("MAINTAIN" or "EQUIVALENCE").
             Defaults to "MAINTAIN".
         var_lim_dead : float, optional
-            For GE files, specifies the var limit deadband. Defaults to 2.0.
+            For GE EPC format, sets the var limit deadband. Defaults to 2.0.
         post_ctg_agc : bool, optional
-            For GE files, if True, populates Post-CTG Prevent Response. Defaults to False.
+            For GE EPC format, if True, populates the generator field 'Post-CTG Prevent Response'
+            based on the EPC file's generator base load flag. Defaults to False.
 
         Returns
         -------
@@ -101,7 +104,7 @@ class CaseActionsMixin:
         return self.RunScriptCommand(f'CaseDescriptionSet("{text}", {app});')
 
     def DeleteExternalSystem(self):
-        """Deletes buses where Equiv is true.
+        """Deletes the part of the power system where the 'Equiv' field on buses is set to true.
 
         Removes all buses from the case that have their 'Equiv' field set to True.
 
@@ -377,8 +380,13 @@ class CaseActionsMixin:
         based_on : str
             The scaling basis ("MW" for absolute MW/MVAR values, or "FACTOR" for a multiplier).
         parameters : List[float]
-            A list of values for scaling. If `based_on` is "MW", this should be `[MW, MVAR]`.
-            If `based_on` is "FACTOR", this should be `[Factor]`.
+            A list of values for scaling.
+            - If `based_on` is "MW":
+                - For LOAD/INJECTIONGROUP: `[MW, MVAR]` or `[MW]` (for constant power factor).
+                - For GEN: `[MW]`.
+                - For BUSSHUNT: `[GMW, BCAPMVAR, BREAMVAR]`.
+            - If `based_on` is "FACTOR": `[Factor]`.
+            - Can also be a field variable name to use values from another field.
         scale_marker : str
             The scope of the scaling ("BUS", "AREA", "ZONE", "OWNER", or "SYSTEM").
 

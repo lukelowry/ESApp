@@ -1,4 +1,5 @@
 """Geomagnetically Induced Current (GIC) specific functions."""
+from typing import List
 
 
 class GICMixin:
@@ -13,7 +14,7 @@ class GICMixin:
         Parameters
         ----------
         max_field : float
-            Maximum Electric Field magnitude in Volts/km.
+            Maximum Electric Field in Volts/km.
         direction : float
             Storm Direction in degrees, from 0 to 360 (0=North, 90=East, 180=South, 270=West).
         solve_pf : bool, optional
@@ -33,7 +34,14 @@ class GICMixin:
         return self.RunScriptCommand(f"GICCalculate({max_field}, {direction}, {spf});")
 
     def ClearGIC(self):
-        """Clear GIC Values."""
+        """Clears GIC (Geomagnetically Induced Current) values from the case.
+
+        This is a wrapper for the `GICClear` script command.
+
+        Returns
+        -------
+        None
+        """
         return self.RunScriptCommand("GICClear;")
 
     def GICLoad3DEfield(self, file_type: str, filename: str, setup_on_load: bool = True):
@@ -42,7 +50,7 @@ class GICMixin:
         Parameters
         ----------
         file_type : str
-            The type of file to be loaded (e.g., "CSV", "B3D", "JSON", "DAT").
+            The type of file to be loaded. Options are CSV, B3D, JSON, and DAT.
         filename : str
             The name (path) of the file to be loaded.
         setup_on_load : bool, optional
@@ -66,7 +74,7 @@ class GICMixin:
 
         Parameters
         ----------
-        filename : str
+        filename : str,
             The name (path) of the file to be loaded, typically with a .GMD extension.
 
         Returns
@@ -85,7 +93,7 @@ class GICMixin:
 
         Parameters
         ----------
-        filename : str
+        filename : str,
             The name (path) of the file to be loaded, typically with a .GIC extension.
 
         Returns
@@ -100,7 +108,7 @@ class GICMixin:
         return self.RunScriptCommand(f'GICReadFilePTI("{filename}");')
 
     def GICSaveGMatrix(self, gmatrix_filename: str, gmatrix_id_filename: str):
-        """Save the GMatrix used with the GIC calculations.
+        """Saves the GMatrix used with the GIC calculations in a file formatted for use with Matlab.
 
         The G-matrix represents the network's conductance properties relevant to GIC.
 
@@ -125,6 +133,9 @@ class GICMixin:
 
     def GICSetupTimeVaryingSeries(self, start: float = 0.0, end: float = 0.0, delta: float = 0.0):
         """Creates a set of Branch series DC input voltages for time-varying GIC analysis.
+
+        This is done from the Active Event(s) in the "Time-Varying Electric Field Inputs"
+        Calculation Mode.
 
         Parameters
         ----------
@@ -348,5 +359,22 @@ class GICMixin:
         ------
         PowerWorldError
             If the SimAuto call fails.
+        """
+        return self.RunScriptCommand(f'GICWriteOptions("{filename}", {key_field});')
+
+    def GICWriteOptions(self, filename: str, key_field: str = "PRIMARY"):
+        """Writes the current GIC solution options to an auxiliary file.
+
+        Parameters
+        ----------
+        filename : str
+            The name (path) of the auxiliary file to write the options to.
+        key_field : str, optional
+            The identifier to use for the data in the auxiliary file
+            ("PRIMARY", "SECONDARY", or "LABEL"). Defaults to "PRIMARY".
+
+        Returns
+        -------
+        None
         """
         return self.RunScriptCommand(f'GICWriteOptions("{filename}", {key_field});')

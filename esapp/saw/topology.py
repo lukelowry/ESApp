@@ -65,9 +65,13 @@ class TopologyMixin:
 
         This command assumes the user has set options in the Select Bus Dialog in the Simulator Tool dialog
         (or via other automation means) before calling this.
-
-        :param filename: The auxiliary file to which the results will be written.
-        :param set_selected: If True, sets the Selected field to YES for branches in the minimum cut.
+        
+        Parameters
+        ----------
+        filename : str
+            The auxiliary file to which the results will be written.
+        set_selected : bool, optional
+            If True, sets the Selected field to YES for branches in the minimum cut. Defaults to False.
         """
         yn = "YES" if set_selected else "NO"
         return self.RunScriptCommand(f'DoFacilityAnalysis("{filename}", {yn});')

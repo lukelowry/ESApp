@@ -316,3 +316,24 @@ class MatrixMixin:
             col.append(int(idx2))
             data.append(float(real))
         return csr_matrix((data, (np.asarray(row) - 1, np.asarray(col) - 1)), shape=(n, n))
+
+    def SaveJacobian(self, jac_filename: str, jid_filename: str, file_type: str = "M", jac_form: str = "R"):
+        """Saves the Jacobian Matrix to a text file or a file formatted for use with Matlab.
+
+        Parameters
+        ----------
+        jac_filename : str
+            File in which to save the Jacobian.
+        jid_filename : str
+            File to save a description of what each row and column of the Jacobian represents.
+        file_type : str, optional
+            "M" for Matlab form, "TXT" for text file, "EXPM" for Matlab exponential form. Defaults to "M".
+        jac_form : str, optional
+            "R" for AC Jacobian in Rectangular coordinates, "P" for Polar, "DC" for B' matrix. Defaults to "R".
+        """
+        return self.RunScriptCommand(f'SaveJacobian("{jac_filename}", "{jid_filename}", {file_type}, {jac_form});')
+
+    def SaveYbusInMatlabFormat(self, filename: str, include_voltages: bool = False):
+        """Saves the YBus to a file formatted for use with Matlab."""
+        iv = "YES" if include_voltages else "NO"
+        return self.RunScriptCommand(f'SaveYbusInMatlabFormat("{filename}", {iv});')
