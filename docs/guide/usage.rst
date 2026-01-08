@@ -14,7 +14,7 @@ To get just the primary keys for all objects of a type:
 
 .. code-block:: python
 
-    from gridwb.grid.components import Bus
+    from gridwb.components import Bus
     bus_keys = wb[Bus]
 
 **Get Specific Fields**

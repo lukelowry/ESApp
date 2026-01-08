@@ -20,7 +20,7 @@ extensions.append("sphinx.ext.autodoc")
 autodoc_default_options = {
     "members": True,
     "undoc-members": True,
-    "imported-members": True,
+    #"imported-members": True,
     "member-order": "groupwise",
 }
 autodoc_preserve_defaults = True
@@ -78,7 +78,7 @@ project = "ESA++"
 copyright = "2026, Luke Lowery"
 author = "Luke Lowery"
 try:
-    version = importlib.metadata.version("ESApp")
+    version = importlib.metadata.version("esapp")
 except importlib.metadata.PackageNotFoundError:
     version = "unknown"
 release = version

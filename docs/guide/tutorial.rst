@@ -22,7 +22,7 @@ ESA++ uses a unique indexing system to make data retrieval intuitive. You can ac
 
 .. code-block:: python
 
-    from gridwb.grid.components import Bus, Gen, Line
+    from gridwb.components import Bus, Gen, Line
     
     # Get all bus numbers and names as a DataFrame
     buses = wb[Bus, ['BusNum', 'BusName']]
