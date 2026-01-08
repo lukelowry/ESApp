@@ -1,32 +1,68 @@
-import numpy as np
-from pandas import DataFrame, Series, concat
+
+
+from .saw import SAW
 from .grid.components import Bus, Branch, Gen, Load, Shunt, Area, Zone, Substation, InjectionGroup, Interface, Contingency
 from .indextool import IndexTool
 
+import numpy as np
+from pandas import DataFrame
 class Adapter:
     """
     A convenient adapter for common PowerWorld operations, providing a pythonic
     interface to the underlying SAW functionality.
     """
-    def __init__(self, io: IndexTool):
+    esa: SAW
+
+    def voltage(self, asComplex=True):
         """
-        Initialize the Adapter.
+        The vector of voltages in PowerWorld.
 
         Parameters
         ----------
-        io : IndexTool
-            The IndexTool instance to use for I/O.
+        asComplex : bool, optional
+            Whether to return complex values. Defaults to True.
+
+        Returns
+        -------
+        pd.Series or tuple
+            Series of complex values if asComplex=True, 
+            else tuple of (Vmag, Angle in Radians).
         """
-        self.io = io
-        self.esa = io.esa
+        v_df = self[Bus, ['BusPUVolt','BusAngle']] 
+
+        vmag = v_df['BusPUVolt']
+        rad = v_df['BusAngle']*np.pi/180
+
+        if asComplex:
+            return vmag * np.exp(1j * rad)
+        
+        return vmag, rad
 
     # --- Simulation Control ---
 
-    def solve(self):
+    def pflow(self, getvolts=True) -> DataFrame:
         """
-        Solves the AC Power Flow.
+        Solve Power Flow in external system.
+        By default bus voltages will be returned.
+
+        Parameters
+        ----------
+        getvolts : bool, optional
+            Flag to indicate the voltages should be returned after power flow, 
+            defaults to True.
+
+        Returns
+        -------
+        pd.DataFrame or None
+            Dataframe of bus number and voltage if requested.
         """
-        self.io.pflow()
+        # Solve Power Flow through External Tool
+        self.esa.SolvePowerFlow()
+
+        # Request Voltages if needed
+        if getvolts:
+            return self.voltage()
+
 
     def reset(self):
         """
@@ -130,7 +166,7 @@ class Adapter:
             The voltage data.
         """
         fields = ['BusPUVolt', 'BusAngle'] if pu else ['BusKVVolt', 'BusAngle']
-        df = self.io[Bus, fields]
+        df = self[Bus, fields]
         
         mag = df[fields[0]]
         ang = df['BusAngle'] * np.pi / 180.0
@@ -148,7 +184,7 @@ class Adapter:
         pd.DataFrame
             Generator data.
         """
-        return self.io[Gen, ['GenMW', 'GenMVR', 'GenStatus']]
+        return self[Gen, ['GenMW', 'GenMVR', 'GenStatus']]
 
     def loads(self):
         """
@@ -159,7 +195,7 @@ class Adapter:
         pd.DataFrame
             Load data.
         """
-        return self.io[Load, ['LoadMW', 'LoadMVR', 'LoadStatus']]
+        return self[Load, ['LoadMW', 'LoadMVR', 'LoadStatus']]
 
     def shunts(self):
         """
@@ -170,7 +206,7 @@ class Adapter:
         pd.DataFrame
             Shunt data.
         """
-        return self.io[Shunt, ['ShuntMW', 'ShuntMVR', 'ShuntStatus']]
+        return self[Shunt, ['ShuntMW', 'ShuntMVR', 'ShuntStatus']]
 
     def lines(self):
         """
@@ -181,7 +217,7 @@ class Adapter:
         pd.DataFrame
             Line data.
         """
-        branches = self.io[Branch, :]
+        branches = self[Branch, :]
         return branches[branches['BranchDeviceType'] == 'Line']
 
     def transformers(self):
@@ -193,7 +229,7 @@ class Adapter:
         pd.DataFrame
             Transformer data.
         """
-        branches = self.io[Branch, :]
+        branches = self[Branch, :]
         return branches[branches['BranchDeviceType'] == 'Transformer']
 
     def areas(self):
@@ -205,7 +241,7 @@ class Adapter:
         pd.DataFrame
             Area data.
         """
-        return self.io[Area, :]
+        return self[Area, :]
 
     def zones(self):
         """
@@ -216,7 +252,7 @@ class Adapter:
         pd.DataFrame
             Zone data.
         """
-        return self.io[Zone, :]
+        return self[Zone, :]
 
     def get_fields(self, obj_type):
         """
@@ -246,7 +282,7 @@ class Adapter:
             Complex voltage vector.
         """
         V_df = np.vstack([np.abs(V), np.angle(V, deg=True)]).T
-        self.io[Bus, ['BusPUVolt', 'BusAngle']] = V_df
+        self[Bus, ['BusPUVolt', 'BusAngle']] = V_df
 
     def open_branch(self, bus1, bus2, ckt='1'):
         """
@@ -495,7 +531,7 @@ class Adapter:
         """
         # Retrieve branch connectivity and zone information
         # Note: 'BusZone' refers to From Bus Zone, 'BusZone:1' refers to To Bus Zone in PowerWorld
-        branches = self.io[Branch, ['BusNum', 'BusNum:1', 'LineCircuit', 'BusZone', 'BusZone:1']]
+        branches = self[Branch, ['BusNum', 'BusNum:1', 'LineCircuit', 'BusZone', 'BusZone:1']]
         
         # Filter for tie-lines where one end is in the zone and the other is not
         ties = branches[
@@ -527,12 +563,12 @@ class Adapter:
             Dictionary with 'bus_low', 'bus_high', 'branch_overload' DataFrames.
         """
         # Bus Violations
-        buses = self.io[Bus, ['BusNum', 'BusName', 'BusPUVolt']]
+        buses = self[Bus, ['BusNum', 'BusName', 'BusPUVolt']]
         low = buses[buses['BusPUVolt'] < v_min]
         high = buses[buses['BusPUVolt'] > v_max]
         
         # Branch Violations
-        branches = self.io[Branch, ['BusNum', 'BusNum:1', 'LineCircuit', 'LineMVA', 'LineLimit']]
+        branches = self[Branch, ['BusNum', 'BusNum:1', 'LineCircuit', 'LineMVA', 'LineLimit']]
         # Filter branches with valid limits to avoid division by zero or misleading results
         branches = branches[branches['LineLimit'] > 0]
         overloaded = branches[branches['LineMVA'] > (branches['LineLimit'] * (branch_max_pct / 100.0))]
@@ -773,3 +809,21 @@ class Adapter:
             Result string.
         """
         return self.esa.SolvePrimalLP()
+
+    def ybus(self, dense=False):
+        """
+        Returns the Y-Bus Matrix.
+
+        Parameters
+        ----------
+        dense : bool, optional
+            Whether to return a dense array. Defaults to False (sparse).
+
+        Returns
+        -------
+        Union[np.ndarray, csr_matrix]
+            The Y-Bus matrix.
+        """
+        return self.esa.get_ybus(dense)
+    
+ 

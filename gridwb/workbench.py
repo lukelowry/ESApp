@@ -8,7 +8,7 @@ from .apps import GIC, Network, ForcedOscillation
 from .indextool import IndexTool
 from .adapter import Adapter
 
-class GridWorkBench:
+class GridWorkBench(Adapter, IndexTool):
     """
     Main entry point for interacting with the PowerWorld grid model.
     """
@@ -23,17 +23,16 @@ class GridWorkBench:
         """
         if fname is None:
             return
+        self.fname = fname 
 
-        self.io = IndexTool(fname)
-        self.io.open()
+        self.open()
 
         # Applications
-        #self.dyn = Dynamics(self.io)
-        #self.statics = Statics(self.io)
-        self.gic = GIC(self.io)
-        self.network = Network(self.io)
-        self.modes = ForcedOscillation(self.io)
-        self.func = Adapter(self.io)
+        #self.dyn = Dynamics(self)
+        #self.statics = Statics(self)
+        self.gic = GIC(self)
+        self.network = Network(self)
+        self.modes = ForcedOscillation(self)
 
     def __getitem__(self, arg):
         """
@@ -49,7 +48,7 @@ class GridWorkBench:
         pd.DataFrame or pd.Series
             The retrieved data.
         """
-        return self.io[arg]
+        return self[arg]
     
     def __setitem__(self, args, value) -> None:
         """
@@ -62,38 +61,15 @@ class GridWorkBench:
         value : any
             The value(s) to write.
         """
-        self.io[args] = value
+        self[args] = value
 
     def save(self):
         """
         Save the open PowerWorld file.
         """
-        self.io.save()
+        self.esa.SaveCase()
 
-    def voltage(self, asComplex=True):
-        """
-        The vector of voltages in PowerWorld.
 
-        Parameters
-        ----------
-        asComplex : bool, optional
-            Whether to return complex values. Defaults to True.
-
-        Returns
-        -------
-        pd.Series or tuple
-            Series of complex values if asComplex=True, 
-            else tuple of (Vmag, Angle in Radians).
-        """
-        v_df = self.io[Bus, ['BusPUVolt','BusAngle']] 
-
-        vmag = v_df['BusPUVolt']
-        rad = v_df['BusAngle']*np.pi/180
-
-        if asComplex:
-            return vmag * np.exp(1j * rad)
-        
-        return vmag, rad
     
     def write_voltage(self,V):
         """
@@ -106,30 +82,9 @@ class GridWorkBench:
         """
         V_df =  np.vstack([np.abs(V), np.angle(V,deg=True)]).T
 
-        self.io[Bus,['BusPUVolt', 'BusAngle']] = V_df
+        self[Bus,['BusPUVolt', 'BusAngle']] = V_df
 
-    def pflow(self, getvolts=True) -> DataFrame:
-        """
-        Solve Power Flow in external system.
-        By default bus voltages will be returned.
 
-        Parameters
-        ----------
-        getvolts : bool, optional
-            Flag to indicate the voltages should be returned after power flow, 
-            defaults to True.
-
-        Returns
-        -------
-        pd.DataFrame or None
-            Dataframe of bus number and voltage if requested.
-        """
-        # Solve Power Flow through External Tool
-        self.io.pflow()
-
-        # Request Voltages if needed
-        if getvolts:
-            return self.voltage()
         
     ''' LOCATION FUNCTIONS '''
 
@@ -160,7 +115,7 @@ class GridWorkBench:
         pd.DataFrame or tuple
             Coordinates data.
         """
-        A, S = self.io[Bus, 'SubNum'],  self.io[Substation, ['Longitude', 'Latitude']]
+        A, S = self[Bus, 'SubNum'],  self[Substation, ['Longitude', 'Latitude']]
         LL = A.merge(S, on='SubNum') 
         if astuple:
             return LL['Longitude'], LL['Latitude']
@@ -169,52 +124,6 @@ class GridWorkBench:
     
     ''' Syntax Sugar '''
 
-    def lines(self):
-        """
-        Retrieves and returns all transmission line data. Convenience function.
 
-        Returns
-        -------
-        pd.DataFrame
-            Transmission line data.
-        """
-        # Get Data
-        branches = self.io[Branch, :]
-
-        # Return requested Records
-        return branches.loc[branches['BranchDeviceType']=='Line']
-    
-    def xfmrs(self):
-        """
-        Retrieves and returns all transformer data. Convenience function.
-
-        Returns
-        -------
-        pd.DataFrame
-            Transformer data.
-        """
-        # Get Data
-        branches = self.io[Branch, :]
-
-        # Return requested Records
-        return branches.loc[ branches['BranchDeviceType']=='Transformer']
-         
-    def ybus(self, dense=False):
-        """
-        Returns the Y-Bus Matrix.
-
-        Parameters
-        ----------
-        dense : bool, optional
-            Whether to return a dense array. Defaults to False (sparse).
-
-        Returns
-        -------
-        Union[np.ndarray, csr_matrix]
-            The Y-Bus matrix.
-        """
-        return self.io.esa.get_ybus(dense)
-    
- 
 
     
