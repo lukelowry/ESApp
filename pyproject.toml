@@ -57,8 +57,12 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-test = ["pytest"]
-dev = ["matplotlib"]
+test = [
+    "pytest"
+]
+dev = [
+    "matplotlib"
+]
 docs = [
     "sphinx",
     "sphinx-rtd-theme",

@@ -1,10 +1,10 @@
+from .saw import SAW
+from .gobject import GObject
+from .utils import timing
+
 from typing import Type
 from pandas import DataFrame
 from os import path
-
-from .gobject import GObject
-from .utils.decorators import timing
-from .saw import SAW
 
 
 # Helper Function to parse Python Syntax/Field Syntax outliers

@@ -20,7 +20,6 @@ extensions.append("sphinx.ext.autodoc")
 autodoc_default_options = {
     "members": True,
     "undoc-members": True,
-    #"imported-members": True,
     "member-order": "groupwise",
 }
 autodoc_preserve_defaults = True
@@ -64,7 +63,17 @@ napoleon_type_aliases = {
     "float": "float",
 }
 
-exclude_patterns = ["_build", "**.ipynb_checkpoints"]
+exclude_patterns = [
+    "_build",
+    "**.ipynb_checkpoints",
+    "**/*.cpg",
+    "**/*.dbf",
+    "**/*.prj",
+    "**/*.shp",
+    "**/*.shx",
+    "**/Shape.xml",
+    "**/Shape.shp.ea.iso.xml"
+]
 
 # Critical: RTD cannot run PowerWorld. Preserving local outputs.
 nbsphinx_execute = 'never'
@@ -93,6 +102,4 @@ autodoc_mock_imports = [
     "win32com", 
     "win32com.client", 
     "pythoncom",
-    "gridwb.apps.dynamics",
-    "gridwb.apps.statics",
 ]
