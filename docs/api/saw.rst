@@ -57,9 +57,6 @@ Mixins
 .. automodule:: gridwb.saw.regions
    :members:
 
-.. automodule:: gridwb.saw.pv
-   :members:
-
 .. automodule:: gridwb.saw.scheduled
    :members:
 
@@ -75,5 +72,5 @@ Mixins
 .. automodule:: gridwb.saw.transient
    :members:
 
-.. automodule:: gridwb.saw.weater
+.. automodule:: gridwb.saw.weather
    :members:

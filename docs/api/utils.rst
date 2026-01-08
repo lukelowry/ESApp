@@ -6,30 +6,30 @@ ESA++ includes a variety of utility modules for mathematical operations, geograp
 
 Mathematical
 ----------------------
-.. automodule:: mathtools
+.. automodule:: gridwb.utils.mathtools
    :members:
 
 B3D File Tools
 -----------------------
-.. automodule:: b3d
+.. automodule:: gridwb.utils.b3d
    :members:
 
 Custom Exceptions
 -----------------
-.. automodule:: exceptions
+.. automodule:: gridwb.utils.exceptions
    :members:
 
 Miscellaneous Helpers
 ---------------------
-.. automodule:: misc
+.. automodule:: gridwb.utils.misc
    :members:
 
 Decorators
 ----------
-.. automodule:: decorators
+.. automodule:: gridwb.utils.decorators
    :members:
 
 Mesh Processing
 ---------------
-.. automodule:: mesh
+.. automodule:: gridwb.utils.mesh
    :members:

@@ -1,12 +1,9 @@
 ESA++ Documentation
 ===================
 
+.. This pulls the main description from your project's README file.
 .. include:: ../README.rst
-   :start-after: ESA++
    :end-before: Documentation
-
-.. include:: ../README.rst
-   :start-before: Citation
 
 .. toctree::
    :maxdepth: 2

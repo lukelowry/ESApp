@@ -1,10 +1,12 @@
 API Reference
 =============
 
-This is the auto-generated API reference for the ``gridwb`` package.
+This section provides a detailed reference for the ESA++ API, partitioned by functional module.
 
-.. autosummary::
-   :toctree: api
-   :recursive:
+.. toctree::
+   :maxdepth: 2
 
-   gridwb
+   api/workbench
+   api/saw
+   api/apps
+   api/utils

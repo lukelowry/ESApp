@@ -1,8 +1,7 @@
 from .saw import SAW
 from .gobject import GObject
 from .utils import timing
-
-from typing import Type
+from typing import Type, Optional
 from pandas import DataFrame
 from os import path
 
@@ -24,8 +23,15 @@ class Indexable:
     fname: str
 
     def set_esa(self, esa: SAW):
-        self.esa = esa
+        """
+        Set the SAW (SimAuto Wrapper) instance for this object.
 
+        Parameters
+        ----------
+        esa : SAW
+            An initialized SAW instance.
+        """
+        self.esa = esa
 
     def getIO(self):
         """
@@ -33,8 +39,8 @@ class Indexable:
 
         Returns
         -------
-        IndexTool
-            The current instance.
+        Indexable
+            The current `Indexable` instance.
         """
         return self
 
@@ -57,7 +63,7 @@ class Indexable:
         # Attempt and Initialize TS so we get initial values
         self.esa.TSInitialize()
     
-    def __getitem__(self, index) -> DataFrame:
+    def __getitem__(self, index) -> Optional[DataFrame]:
         """Retrieve data from PowerWorld using indexer notation.
 
         This method allows for flexible querying of grid component data directly
@@ -73,8 +79,8 @@ class Indexable:
 
         Returns
         -------
-        pandas.DataFrame
-            A pandas DataFrame containing the requested data, or None if no
+        Optional[pandas.DataFrame]
+            A DataFrame containing the requested data, or ``None`` if no
             data could be retrieved.
 
         Raises
