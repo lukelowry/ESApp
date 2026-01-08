@@ -291,19 +291,53 @@ class Network(Indexable):
     
     
     def delay(self, min_delay=10e-4):
-        '''
-        Return Effective delay of branches.
+        r'''
+        Return the effective propagation delay (beta) of network branches.
+
+        This method calculates the lossless propagation delay used to construct
+        the Delay Graph Laplacian :math:`\mathscr{L} = \mathbf{A}^\top \mathbf{T}^{-2} \mathbf{A}`.
+        It derives effective branch parameters by aggregating nodal shunt 
+        admittances and series impedances.
+
+        Mathematical Derivation
+        -----------------------
+        The branch inductance is derived from the imaginary component of the
+        series branch impedance :math:`Z_{ij}`:
+
+        .. math:: \omega L_{ij} = \text{Im}(Z^{br}_{ij})
+
+        The effective branch capacitance :math:`C_{ij}` accounts for capacitor 
+        banks and constant impedance reactive loads by averaging the net nodal 
+        capacitances :math:`C_n` at the branch terminals (using a :math:`\pi`-model 
+        assumption):
+
+        .. math:: C_{ij} = \frac{1}{2}(C_i + C_j)
+
+        where :math:`\omega C_n = \text{Im}(Y^{sh}_n)`. The propagation delay 
+        :math:`\tau_{ij}` is then computed via the propagation constant 
+        :math:`\gamma = \sqrt{Z_{ij}Y_{ij}}`:
+
+        .. math:: \omega_{base}\tau_{ij} = \text{Im}(\sqrt{Z_{ij}Y_{ij}}) = \beta_{ij}
 
         Parameters
         ----------
         min_delay : float, optional
-            Minimum delay permitted. Defaults to 10e-4.
+            Minimum delay value permitted to prevent precision overflow during
+            Laplacian inversion (:math:`\mathbf{T}^{-2}`). Defaults to 10e-4.
 
         Returns
         -------
         pd.Series
-            Effective delay.
+            Effective propagation parameter (:math:`\beta`) for each branch,
+            enforced by the `min_delay` lower bound.
+
+        Notes
+        -----
+        For numerical stability and to avoid precision overflow when calculating 
+        :math:`1/\tau^2`, the returned value is currently the phase constant 
+        :math:`\beta` rather than :math:`\tau = \beta/\omega`.
         '''
+
 
         w = 2*np.pi*60
 

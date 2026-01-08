@@ -29,6 +29,7 @@ from ._helpers import (
     convert_list_to_variant,
     convert_df_to_variant,
     convert_nested_list_to_variant,
+    create_object_string,
 )
 
 
@@ -47,4 +48,5 @@ __all__ = [
     "convert_list_to_variant",
     "convert_df_to_variant",
     "convert_nested_list_to_variant",
+    "create_object_string",
 ]

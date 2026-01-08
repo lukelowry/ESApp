@@ -1,4 +1,5 @@
 """Sensitivity analysis specific functions."""
+from ._helpers import create_object_string
 
 
 class SensitivityMixin:
@@ -469,7 +470,8 @@ class SensitivityMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        return self.RunScriptCommand(f'CalculateVoltSense([BUS {bus_num}]);')
+        bus_str = create_object_string("Bus", bus_num)
+        return self.RunScriptCommand(f'CalculateVoltSense({bus_str});')
 
     def SetSensitivitiesAtOutOfServiceToClosest(self, filter_name: str = "", branch_dist_meas: str = ""):
         """Populates sensitivity values at out-of-service buses by interpolating from the closest in-service buses.

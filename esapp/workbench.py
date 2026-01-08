@@ -3,6 +3,7 @@ from .apps.network import Network
 from .apps.modes import ForcedOscillation
 from .indexable import Indexable
 from .grid import Bus, Branch, Gen, Load, Shunt, Area, Zone, Substation
+from .saw import create_object_string
 
 import numpy as np
 from pandas import DataFrame
@@ -24,27 +25,32 @@ class GridWorkBench(Indexable):
         --------
         >>> wb = GridWorkBench("case.pwb")
         """
-        if fname is None:
-            return
-        
-        # Required to set to use IndexTool
-        self.fname = fname 
-
-        # Sets the global esa object
-        self.open()
-
         # Applications
         self.network = Network()
-        self.network.set_esa(self.esa)
-
         self.gic     = GIC()
-        self.gic.set_esa(self.esa)
-
         self.modes   = ForcedOscillation()
-        self.modes.set_esa(self.esa)
 
         #self.dyn = Dynamics(self.esa)
         #self.statics = Statics(self.esa)
+
+        if fname:
+            # Required to set to use IndexTool
+            self.fname = fname
+            # Sets the global esa object
+            self.open()
+        else:
+            self.esa = None
+            self.fname = None
+
+        # Propagate the esa instance to the applications.
+        self.set_esa(self.esa)
+
+    def set_esa(self, esa):
+        """Sets the SAW instance for the workbench and its applications."""
+        super().set_esa(esa)
+        self.network.set_esa(esa)
+        self.gic.set_esa(esa)
+        self.modes.set_esa(esa)
 
     def voltage(self, asComplex=True):
         """
@@ -629,7 +635,7 @@ class GridWorkBench(Indexable):
         --------
         >>> wb.energize("Bus", "[1]")
         """
-        self.esa.CloseWithBreakers(obj_type, identifier, only_specified=False, close_normally_closed=True)
+        self.esa.CloseWithBreakers(obj_type, identifier)
 
     def deenergize(self, obj_type, identifier):
         """
@@ -965,7 +971,7 @@ class GridWorkBench(Indexable):
         --------
         >>> wb.fault(bus_num=5, fault_type="SLG")
         """
-        return self.esa.RunFault(f'[BUS {bus_num}]', fault_type, r, x)
+        return self.esa.RunFault(create_object_string("Bus", bus_num), fault_type, r, x)
     
     def clear_fault(self):
         """
@@ -997,7 +1003,9 @@ class GridWorkBench(Indexable):
         --------
         >>> path = wb.shortest_path(1, 10)
         """
-        return self.esa.DetermineShortestPath(f'[BUS {start_bus}]', f'[BUS {end_bus}]')
+        start_str = create_object_string("Bus", start_bus)
+        end_str = create_object_string("Bus", end_bus)
+        return self.esa.DetermineShortestPath(start_str, end_str)
 
     # --- Advanced Analysis ---
 

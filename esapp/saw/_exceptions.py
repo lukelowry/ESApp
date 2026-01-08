@@ -1,6 +1,10 @@
 """Custom exception classes for the SAW wrapper."""
 
 
+# COM Error Hex Codes indicating RPC failures (SimAuto crash/unresponsive)
+RPC_S_UNKNOWN_IF = "0x800706b5"  # The interface is unknown
+RPC_S_CALL_FAILED = "0x800706be" # The remote procedure call failed
+
 class Error(Exception):
     """
     Base class for exceptions in this module.

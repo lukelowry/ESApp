@@ -17,23 +17,31 @@ import sys
 try:
     from esapp.grid import Bus, Gen, Load, Branch, Contingency, Area, Zone, Shunt, GICXFormer, GObject
     from esapp import grid
-    from esapp.workbench import GridWorkBench
-    from esapp.saw import PowerWorldError, COMError, SimAutoFeatureError
+    from esapp.workbench import GridWorkBench    
+    from esapp.saw import PowerWorldError, COMError, SimAutoFeatureError, create_object_string
 except ImportError:
     raise
 
+# List of component types known to cause SimAuto process instability or crashes
+# when accessed via generic parameter retrieval methods.
+# NOTE There is no evidence that these actually caused crashes
+CRASH_PRONE_COMPONENTS = [
+    #"ATCLineChangeB", 
+    #"ATCScenario",
+    #"ATCZoneChange",
+    #"ATCGeneratorChange",
+    #"ATCInterfaceChange",
+]
 
 @pytest.fixture(scope="module")
-def wb():
-    case_path = os.environ.get("SAW_TEST_CASE")
-    if not case_path or not os.path.exists(case_path):
-        pytest.skip("SAW_TEST_CASE environment variable not set or file not found.")
-
-    print(f"\nConnecting to PowerWorld with case: {case_path}")
-    wb = GridWorkBench(case_path)
-    yield wb
-    print("\nClosing case and exiting PowerWorld...")
-    wb.close()
+def wb(saw_session):
+    """
+    Wraps the session-scoped SAW instance in a GridWorkBench object.
+    The lifecycle of the underlying SAW instance is managed by saw_session.
+    """
+    workbench = GridWorkBench()
+    workbench.set_esa(saw_session)
+    return workbench
 
 
 @pytest.fixture
@@ -174,16 +182,16 @@ class TestGridWorkBenchFunctions:
 
     def test_topology(self, wb):
         """Tests energize, deenergize, radial_paths, path_distance, network_cut."""
-        wb.deenergize("Bus", "[1]")
-        wb.energize("Bus", "[1]")
+        wb.deenergize("Bus", create_object_string("Bus", 1))
+        wb.energize("Bus", create_object_string("Bus", 1))
         
         wb.radial_paths()
         
-        dist = wb.path_distance("[BUS 1]")
+        dist = wb.path_distance(create_object_string("Bus", 1))
         assert dist is not None
         
         wb.select("Branch", "BusNum = 1")
-        wb.network_cut("[BUS 1]", branch_filter="SELECTED")
+        wb.network_cut(create_object_string("Bus", 1), branch_filter="SELECTED")
 
     # -------------------------------------------------------------------------
     # Analysis & Difference Flows
@@ -228,15 +236,15 @@ class TestGridWorkBenchFunctions:
         # PTDF
         areas = wb.areas()
         if len(areas) >= 2:
-            s = f'[AREA {areas.iloc[0]["AreaNum"]}]'
-            b = f'[AREA {areas.iloc[1]["AreaNum"]}]'
+            s = create_object_string("Area", areas.iloc[0]["AreaNum"])
+            b = create_object_string("Area", areas.iloc[1]["AreaNum"])
             wb.ptdf(s, b)
             
         # LODF
         lines = wb.lines()
         if not lines.empty:
             l = lines.iloc[0]
-            br = f'[BRANCH {l["BusNum"]} {l["BusNum:1"]} "{l["LineCircuit"]}"]'
+            br = create_object_string("Branch", l["BusNum"], l["BusNum:1"], l["LineCircuit"])
             wb.lodf(br)
             
         # Fault
@@ -256,8 +264,8 @@ class TestGridWorkBenchFunctions:
         # ATC
         areas = wb.areas()
         if len(areas) >= 2:
-            s = f'[AREA {areas.iloc[0]["AreaNum"]}]'
-            b = f'[AREA {areas.iloc[1]["AreaNum"]}]'
+            s = create_object_string("Area", areas.iloc[0]["AreaNum"])
+            b = create_object_string("Area", areas.iloc[1]["AreaNum"])
             wb.calculate_atc(s, b)
             
         # GIC
@@ -298,6 +306,9 @@ def test_component_access(wb, component_class):
     """
     Verifies that GridWorkBench can read key fields for every defined component.
     """
+    if component_class.TYPE in CRASH_PRONE_COMPONENTS:
+        pytest.skip(f"Skipping {component_class.TYPE}: Known to cause SimAuto crashes during iteration.")
+
     try:
         df = wb[component_class]
     except SimAutoFeatureError as e:

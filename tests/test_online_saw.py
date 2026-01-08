@@ -15,22 +15,17 @@ import numpy as np
 import sys 
 
 try:
-    from esapp.saw import SAW, PowerWorldError, PowerWorldPrerequisiteError, PowerWorldAddonError
+    from esapp.saw import SAW, PowerWorldError, PowerWorldPrerequisiteError, PowerWorldAddonError, create_object_string
 except ImportError:
     raise
 
 
 @pytest.fixture(scope="module")
-def saw_instance():
-    case_path = os.environ.get("SAW_TEST_CASE")
-    if not case_path or not os.path.exists(case_path):
-        pytest.skip("SAW_TEST_CASE environment variable not set or file not found.")
-
-    print(f"\nConnecting to PowerWorld with case: {case_path}")
-    saw = SAW(case_path, early_bind=True)
-    yield saw
-    print("\nClosing case and exiting PowerWorld...")
-    saw.exit()
+def saw_instance(saw_session):
+    """
+    Provides the session-scoped SAW instance to the tests in this module.
+    """
+    return saw_session
 
 
 @pytest.fixture
@@ -379,8 +374,8 @@ class TestOnlineSAW:
     def test_fault_run(self, saw_instance):
         buses = saw_instance.GetParametersMultipleElement("Bus", ["BusNum"])
         if buses is not None and not buses.empty:
-            bus_num = buses.iloc[0]["BusNum"]
-            saw_instance.RunFault(f"[BUS {bus_num}]", "SLG")
+            bus_str = create_object_string("Bus", buses.iloc[0]["BusNum"])
+            saw_instance.RunFault(bus_str, "SLG")
             saw_instance.FaultClear()
         else:
             pytest.skip("No buses found")
@@ -409,23 +404,23 @@ class TestOnlineSAW:
     def test_sensitivity_flow_sense(self, saw_instance):
         branches = saw_instance.GetParametersMultipleElement("Branch", ["BusNum", "BusNum:1", "LineCircuit"])
         if branches is not None and not branches.empty:
-            b = branches.iloc[0]
-            branch_str = f'[BRANCH {b["BusNum"]} {b["BusNum:1"]} "{b["LineCircuit"]}"]'
+            b = branches.iloc[0]            
+            branch_str = create_object_string("Branch", b["BusNum"], b["BusNum:1"], b["LineCircuit"])
             saw_instance.CalculateFlowSense(branch_str, "MW")
 
     def test_sensitivity_ptdf(self, saw_instance):
         areas = saw_instance.GetParametersMultipleElement("Area", ["AreaNum"])
         if areas is not None and len(areas) >= 2:
-            seller = f'[AREA {areas.iloc[0]["AreaNum"]}]'
-            buyer = f'[AREA {areas.iloc[1]["AreaNum"]}]'
+            seller = create_object_string("Area", areas.iloc[0]["AreaNum"])
+            buyer = create_object_string("Area", areas.iloc[1]["AreaNum"])
             saw_instance.CalculatePTDF(seller, buyer)
             saw_instance.CalculateVoltToTransferSense(seller, buyer)
 
     def test_sensitivity_lodf(self, saw_instance):
         branches = saw_instance.GetParametersMultipleElement("Branch", ["BusNum", "BusNum:1", "LineCircuit"])
         if branches is not None and not branches.empty:
-            b = branches.iloc[0]
-            branch_str = f'[BRANCH {b["BusNum"]} {b["BusNum:1"]} "{b["LineCircuit"]}"]'
+            b = branches.iloc[0]            
+            branch_str = create_object_string("Branch", b["BusNum"], b["BusNum:1"], b["LineCircuit"])
             saw_instance.CalculateLODF(branch_str)
 
     def test_sensitivity_shift_factors(self, saw_instance):
@@ -437,8 +432,8 @@ class TestOnlineSAW:
             closed_branches = branches[branches["LineStatus"] == "Closed"]
             if not closed_branches.empty:
                 b = closed_branches.iloc[0]
-                branch_str = f'[BRANCH {b["BusNum"]} {b["BusNum:1"]} "{b["LineCircuit"]}"]'
-                area_str = f'[AREA {areas.iloc[0]["AreaNum"]}]'
+                branch_str = create_object_string("Branch", b["BusNum"], b["BusNum:1"], b["LineCircuit"])
+                area_str = create_object_string("Area", areas.iloc[0]["AreaNum"])
                 
                 # Setup: Ensure area has participation points to avoid "no available participation points" error
                 saw_instance.SetParticipationFactors("CONSTANT", 1.0, area_str)
@@ -490,8 +485,8 @@ class TestOnlineSAW:
     def test_topology_path_distance(self, saw_instance):
         buses = saw_instance.GetParametersMultipleElement("Bus", ["BusNum"])
         if buses is not None and not buses.empty:
-            bus_num = buses.iloc[0]["BusNum"]
-            df = saw_instance.DeterminePathDistance(f"[BUS {bus_num}]")
+            bus_str = create_object_string("Bus", buses.iloc[0]["BusNum"])
+            df = saw_instance.DeterminePathDistance(bus_str)
             assert df is not None
 
     def test_topology_islands(self, saw_instance):
@@ -501,8 +496,8 @@ class TestOnlineSAW:
     def test_topology_shortest_path(self, saw_instance):
         buses = saw_instance.GetParametersMultipleElement("Bus", ["BusNum"])
         if buses is not None and len(buses) >= 2:
-            start = f"[BUS {buses.iloc[0]['BusNum']}]"
-            end = f"[BUS {buses.iloc[1]['BusNum']}]"
+            start = create_object_string("Bus", buses.iloc[0]['BusNum'])
+            end = create_object_string("Bus", buses.iloc[1]['BusNum'])
             df = saw_instance.DetermineShortestPath(start, end)
             assert df is not None
 
@@ -534,7 +529,7 @@ class TestOnlineSAW:
             bus_num = buses.iloc[0]["BusNum"]
             
             # To define a network cut, we need at least one branch in the cut.
-            # Let's find a branch connected to this bus and select it.
+            # Let's find a branch connected to this bus and select it.            
             saw_instance.UnSelectAll("Branch")
             # Get all branches and filter in pandas because GetParametersMultipleElement COM call doesn't support ad-hoc filters
             branches = saw_instance.GetParametersMultipleElement("Branch", ["BusNum", "BusNum:1", "LineCircuit"])
@@ -549,7 +544,8 @@ class TestOnlineSAW:
                     saw_instance.SetData("Branch", ["BusNum", "BusNum:1", "LineCircuit", "Selected"], [b['BusNum'], b['BusNum:1'], b['LineCircuit'], "YES"])
                     
                     # Now run the command
-                    saw_instance.SetSelectedFromNetworkCut(True, f"[BUS {bus_num}]", branch_filter="SELECTED", objects_to_select=["Bus"])
+                    bus_str = create_object_string("Bus", bus_num)
+                    saw_instance.SetSelectedFromNetworkCut(True, bus_str, branch_filter="SELECTED", objects_to_select=["Bus"])
                 else:
                     pytest.skip(f"No branches connected to bus {bus_num} to define a cut.")
             else:
@@ -571,9 +567,9 @@ class TestOnlineSAW:
     def test_topology_breakers(self, saw_instance):
         buses = saw_instance.GetParametersMultipleElement("Bus", ["BusNum"])
         if buses is not None and not buses.empty:
-            bus_num = buses.iloc[0]["BusNum"]
-            saw_instance.CloseWithBreakers("Bus", f"[{bus_num}]")
-            saw_instance.OpenWithBreakers("Bus", f"[{bus_num}]")
+            bus_str = create_object_string("Bus", buses.iloc[0]["BusNum"])
+            saw_instance.CloseWithBreakers("Bus", bus_str)
+            saw_instance.OpenWithBreakers("Bus", bus_str)
 
     # -------------------------------------------------------------------------
     # PV/QV Mixin Tests
@@ -597,7 +593,9 @@ class TestOnlineSAW:
         # Create dummy injection groups for PVSetSourceAndSink
         saw_instance.CreateData("InjectionGroup", ["Name"], ["SourceIG"])
         saw_instance.CreateData("InjectionGroup", ["Name"], ["SinkIG"])
-        saw_instance.PVSetSourceAndSink('[INJECTIONGROUP "SourceIG"]', '[INJECTIONGROUP "SinkIG"]')
+        source_ig = create_object_string("InjectionGroup", "SourceIG")
+        sink_ig = create_object_string("InjectionGroup", "SinkIG")
+        saw_instance.PVSetSourceAndSink(source_ig, sink_ig)
         
         saw_instance.QVSelectSingleBusPerSuperBus()
         saw_instance.RefineModel("AREA", "", "SHUNTS", 0.01)
@@ -647,8 +645,8 @@ class TestOnlineSAW:
     def test_transient_critical_time(self, saw_instance):
         branches = saw_instance.GetParametersMultipleElement("Branch", ["BusNum", "BusNum:1", "LineCircuit"])
         if branches is not None and not branches.empty:
-            b = branches.iloc[0]
-            branch_str = f'[BRANCH {b["BusNum"]} {b["BusNum:1"]} "{b["LineCircuit"]}"]'
+            b = branches.iloc[0]            
+            branch_str = create_object_string("Branch", b["BusNum"], b["BusNum:1"], b["LineCircuit"])
             saw_instance.TSCalculateCriticalClearTime(branch_str)
 
     def test_transient_playin(self, saw_instance):
@@ -724,8 +722,8 @@ class TestOnlineSAW:
     def test_atc_determine(self, saw_instance):
         areas = saw_instance.GetParametersMultipleElement("Area", ["AreaNum"])
         if areas is not None and len(areas) >= 2:
-            seller = f'[AREA {areas.iloc[0]["AreaNum"]}]'
-            buyer = f'[AREA {areas.iloc[1]["AreaNum"]}]'
+            seller = create_object_string("Area", areas.iloc[0]["AreaNum"])
+            buyer = create_object_string("Area", areas.iloc[1]["AreaNum"])
             saw_instance.DetermineATC(seller, buyer)
         else:
             pytest.skip("Not enough areas for ATC")
@@ -734,8 +732,8 @@ class TestOnlineSAW:
         # Setup: Ensure directions exist
         areas = saw_instance.GetParametersMultipleElement("Area", ["AreaNum"])
         if areas is not None and len(areas) >= 2:
-            s = f'[AREA {areas.iloc[0]["AreaNum"]}]'
-            b = f'[AREA {areas.iloc[1]["AreaNum"]}]'
+            s = create_object_string("Area", areas.iloc[0]["AreaNum"])
+            b = create_object_string("Area", areas.iloc[1]["AreaNum"])
             saw_instance.DirectionsAutoInsert(s, b)
 
         try:
@@ -1088,8 +1086,8 @@ class TestOnlineSAW:
     def test_modify_rotate(self, saw_instance):
         buses = saw_instance.GetParametersMultipleElement("Bus", ["BusNum"])
         if buses is not None and not buses.empty:
-            bus_num = buses.iloc[0]["BusNum"]
-            saw_instance.RotateBusAnglesInIsland(f"[BUS {bus_num}]", 0.0)
+            bus_str = create_object_string("Bus", buses.iloc[0]["BusNum"])
+            saw_instance.RotateBusAnglesInIsland(bus_str, 0.0)
 
     def test_modify_part(self, saw_instance):
         saw_instance.SetParticipationFactors("CONSTANT", 1.0, "SYSTEM")
@@ -1097,8 +1095,8 @@ class TestOnlineSAW:
     def test_modify_volt(self, saw_instance):
         buses = saw_instance.GetParametersMultipleElement("Bus", ["BusNum"])
         if buses is not None and not buses.empty:
-            bus_num = buses.iloc[0]["BusNum"]
-            saw_instance.SetScheduledVoltageForABus(f"[BUS {bus_num}]", 1.0)
+            bus_str = create_object_string("Bus", buses.iloc[0]["BusNum"])
+            saw_instance.SetScheduledVoltageForABus(bus_str, 1.0)
 
     def test_modify_split(self, saw_instance):
         # Destructive

@@ -358,7 +358,18 @@ class TopologyMixin:
         if switching_types:
             sw_types = "[" + ", ".join([f'"{t}"' for t in switching_types]) + "]"
         
-        return self.RunScriptCommand(f'CloseWithBreakers({object_type}, {filter_val}, {only}, {sw_types}, {cnc});')
+        # This command has a unique syntax where the object type is the first argument
+        # and the second argument is an identifier with keys *only*, not the full object string.
+        # This block handles cases where a full object string (e.g., from create_object_string)
+        # is passed as filter_val.
+        processed_val = filter_val
+        prefix_to_check = f"[{object_type.upper()} "
+        if filter_val.strip().upper().startswith(prefix_to_check):
+            # It's a full object string, extract just the keys part.
+            keys_part = filter_val.strip()[len(prefix_to_check):-1].strip()
+            processed_val = f"[{keys_part}]"
+
+        return self.RunScriptCommand(f'CloseWithBreakers({object_type}, {processed_val}, {only}, {sw_types}, {cnc});')
 
     def OpenWithBreakers(self, object_type: str, filter_val: str, switching_types: list = None, open_normally_open: bool = False):
         """
@@ -384,4 +395,15 @@ class TopologyMixin:
         sw_types = '["Breaker"]'
         if switching_types:
             sw_types = "[" + ", ".join([f'"{t}"' for t in switching_types]) + "]"
-        return self.RunScriptCommand(f'OpenWithBreakers({object_type}, {filter_val}, {sw_types}, {ono});')
+
+        # This command has a unique syntax where the object type is the first argument
+        # and the second argument is an identifier with keys *only*, not the full object string.
+        # This block handles cases where a full object string (e.g., from create_object_string)
+        # is passed as filter_val.
+        processed_val = filter_val
+        prefix_to_check = f"[{object_type.upper()} "
+        if filter_val.strip().upper().startswith(prefix_to_check):
+            keys_part = filter_val.strip()[len(prefix_to_check):-1].strip()
+            processed_val = f"[{keys_part}]"
+
+        return self.RunScriptCommand(f'OpenWithBreakers({object_type}, {processed_val}, {sw_types}, {ono});')

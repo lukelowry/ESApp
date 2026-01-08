@@ -12,7 +12,14 @@ import pandas as pd
 import pythoncom
 import win32com
 
-from ._exceptions import COMError, CommandNotRespectedError, Error, PowerWorldError
+from ._exceptions import (
+    COMError,
+    CommandNotRespectedError,
+    Error,
+    PowerWorldError,
+    RPC_S_UNKNOWN_IF,
+    RPC_S_CALL_FAILED,
+)
 from ._helpers import (
     convert_df_to_variant,
     convert_list_to_variant,
@@ -95,7 +102,6 @@ class SAWBase(object):
         FileName,
         early_bind=False,
         UIVisible=False,
-        object_field_lookup=("bus", "gen", "load", "shunt", "branch"),
         CreateIfNotFound: bool = False,
         UseDefinedNamesInVariables: bool = False,
         pw_order=False,
@@ -111,9 +117,6 @@ class SAWBase(object):
             Defaults to False.
         UIVisible : bool, optional
             If True, makes the PowerWorld Simulator application window visible. Defaults to False.
-        object_field_lookup : tuple, optional
-            A collection of object types (e.g., "bus", "gen") to pre-cache field metadata for.
-            Defaults to ("bus", "gen", "load", "shunt", "branch").
         CreateIfNotFound : bool, optional
             Sets the SimAuto property to create new objects during `ChangeParameters` calls. Defaults to False.
         UseDefinedNamesInVariables : bool, optional
@@ -171,11 +174,6 @@ class SAWBase(object):
         self.lodf = None
         self._object_fields = {}
         self._object_key_fields = {}
-
-        for obj in object_field_lookup:
-            o = obj.lower()
-            self.GetFieldList(o)
-            self.get_key_fields_for_object_type(ObjectType=o)
 
     def change_and_confirm_params_multiple_element(self, ObjectType: str, command_df: pd.DataFrame) -> None:
         """Modifies parameters for multiple elements and verifies the change was successfully applied in PowerWorld.
@@ -1336,6 +1334,11 @@ class SAWBase(object):
         try:
             output = f(*args)
         except Exception as e:
+            # Handle specific RPC server unavailable/unknown interface errors
+            msg = str(e)
+            if RPC_S_UNKNOWN_IF in msg or RPC_S_CALL_FAILED in msg:
+                m = f"SimAuto server crashed or is unresponsive during call to {func} with {args}. (RPC Error)"
+                self.log.critical(m)
             m = f"An error occurred when trying to call {func} with {args}"
             self.log.exception(m)
             raise COMError(m) from e

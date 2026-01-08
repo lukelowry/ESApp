@@ -73,3 +73,37 @@ def convert_df_to_variant(df):
 def convert_nested_list_to_variant(list_in: list) -> List[VARIANT]:
     """Given a list of lists, convert to a variant array."""
     return [convert_list_to_variant(sub_array) for sub_array in list_in]
+
+
+def create_object_string(object_type: str, *keys) -> str:
+    """
+    Helper to format a PowerWorld object string identifier.
+
+    This function creates strings formatted like '[BUS 1]' or '[BRANCH 1 2 "1"]'
+    which are used to identify objects in SimAuto script commands.
+
+    Parameters
+    ----------
+    object_type : str
+        The type of object (e.g. "Bus", "Gen", "Branch").
+    *keys : Any
+        The key values identifying the object. Strings will be automatically
+        enclosed in double quotes if they are not already quoted.
+
+    Returns
+    -------
+    str
+        Formatted string like '[ObjectType key1 key2 ...]'.
+    """
+    parts = [object_type.upper()]
+    for key in keys:
+        if isinstance(key, str):
+            # Check if already quoted with " or '
+            if (len(key) >= 2) and ((key.startswith('"') and key.endswith('"')) or (key.startswith("'") and key.endswith("'"))):
+                parts.append(key)
+            else:
+                parts.append(f'"{key}"')
+        else:
+            parts.append(str(key))
+    
+    return f"[{' '.join(parts)}]"
