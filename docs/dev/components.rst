@@ -10,24 +10,24 @@ ESA++ uses a code generation script to build the component types that enable int
 
 When a new version of PowerWorld is released, or if you need to access newly added fields, follow this procedure to update the component definitions:
 
-1.  **Export the Field List from PowerWorld**:
+ **Export the Field List from PowerWorld**:
     *   Open PowerWorld Simulator.
     *   Navigate to the **Window** ribbon.
     *   Click on **Export Case Object Fields**.
     *   Save the resulting tab-delimited text file.
 
-2.  **Prepare the Raw Data**:
+**Prepare the Raw Data**:
     *   Rename the exported file to ``PWRaw``.
     *   Place this file in the ``gridwb/grid/`` folder, overwriting the existing one.
 
-3.  **Run the Generation Script**:
+**Run the Generation Script**:
     *   Open a terminal in the project root.
     *   Execute the generation script:
         .. code-block:: bash
 
             python gridwb/grid/generate_components.py
 
-4.  **Verify the Changes**:
+**Verify the Changes**:
     *   The script will parse ``PWRaw`` and update ``gridwb/grid/components.py``.
     *   Check the console output for any errors or excluded objects/fields.
 

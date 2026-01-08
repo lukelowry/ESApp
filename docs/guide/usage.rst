@@ -3,17 +3,12 @@ Usage Guide
 
 This guide covers more advanced usage patterns of the ESA++ toolkit.
 
-Indexing with IndexTool
------------------------
-
-The ``IndexTool`` is the heart of ESA++, providing a powerful, Pythonic way to interact with PowerWorld data. Instead of calling verbose SimAuto functions, you use standard Python indexing syntax on the ``GridWorkBench`` object.
-
-Data Retrieval
+I/O with Numpy-Style Indexing
 ~~~~~~~~~~~~~~
 
 Retrieving data is as simple as indexing the workbench with a component class (like ``Bus``, ``Gen``, or ``Line``).
 
-**1. Get Primary Keys**
+**Get Primary Keys**
 
 To get just the primary keys for all objects of a type:
 
@@ -22,7 +17,7 @@ To get just the primary keys for all objects of a type:
     from gridwb.grid.components import Bus
     bus_keys = wb[Bus]
 
-**2. Get Specific Fields**
+**Get Specific Fields**
 
 Pass a string or a list of strings to retrieve specific fields:
 
@@ -34,7 +29,7 @@ Pass a string or a list of strings to retrieve specific fields:
     # Multiple fields
     bus_info = wb[Bus, ['BusName', 'BusPUVolt', 'BusAngle']]
 
-**3. Get All Fields**
+**Get All Fields**
 
 Use the slice operator ``:`` to retrieve all fields defined for that component:
 
@@ -42,7 +37,7 @@ Use the slice operator ``:`` to retrieve all fields defined for that component:
 
     all_gen_data = wb[Gen, :]
 
-**4. Using Component Attributes**
+**Using Component Attributes**
 
 For better IDE support and to avoid typos, you can use the attributes defined on the component classes:
 
@@ -55,7 +50,7 @@ Data Modification
 
 The same indexing syntax is used to update values in the PowerWorld case.
 
-**1. Broadcasting a Scalar**
+**Broadcasting a Scalar**
 
 Set a single value for all objects of a type:
 
@@ -64,7 +59,7 @@ Set a single value for all objects of a type:
     # Set all bus voltages to 1.05 pu
     wb[Bus, 'BusPUVolt'] = 1.05
 
-**2. Updating Multiple Fields**
+**Updating Multiple Fields**
 
 You can update multiple fields at once by passing a list of values:
 
@@ -73,7 +68,7 @@ You can update multiple fields at once by passing a list of values:
     # Update MW and MVAR for all generators
     wb[Gen, ['GenMW', 'GenMVR']] = [100.0, 20.0]
 
-**3. Bulk Update from DataFrame**
+**Bulk Update from DataFrame**
 
 If you have a DataFrame containing updated data (including the necessary primary keys), you can perform a bulk update:
 
@@ -83,26 +78,7 @@ If you have a DataFrame containing updated data (including the necessary primary
     wb[Bus] = df
 
 
-The Adapter
------------
-
-The ``Adapter`` (accessed via ``wb.func``) provides a collection of high-level helper functions for common tasks:
-
-.. code-block:: python
-
-    # Find voltage violations
-    violations = wb.func.find_violations(v_min=0.95, v_max=1.05)
-    
-    # Calculate PTDF between two areas
-    ptdf_df = wb.func.ptdf('[AREA 1]', '[AREA 2]')
-
-    # Run a full N-1 contingency analysis
-    wb.func.auto_insert_contingencies()
-    wb.func.solve_contingencies()
-    violations = wb.func.get_contingency_violations()
-
-
-The App Ecosystem
+Specific Applications
 -----------------
 
 ESA++ includes specialized "Apps" for complex analysis. For example, the GIC tool:
@@ -117,7 +93,7 @@ ESA++ includes specialized "Apps" for complex analysis. For example, the GIC too
     islands = wb.app.network.get_islands()
 
 
-Working with Matrices
+Power System Matricies
 ---------------------
 
 ESA++ makes it easy to extract system matrices for mathematical analysis:
@@ -134,7 +110,7 @@ ESA++ makes it easy to extract system matrices for mathematical analysis:
     jacobian = wb.io.esa.get_jacobian()
 
 
-Custom Scripts
+Custom AUX Scripts
 --------------
 
 You can run raw PowerWorld auxiliary scripts directly:

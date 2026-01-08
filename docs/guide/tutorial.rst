@@ -43,11 +43,12 @@ ESA++ allows you to filter data easily using standard Pandas operations on the r
 .. code-block:: python
 
     # Get only buses in Area 1
-    area_1_buses = wb[Bus, :][wb[Bus, :]['AreaNum'] == 1]
+    areas = wb[Bus, :]
+    area_1_buses = wb[Bus, :][areas['AreaNum'] == 1]
     
     # Find lines with loading above 90%
-    heavy_lines = wb[Line, ['BusNum', 'BusNum:1', 'LinePercent']]
-    heavy_lines = heavy_lines[heavy_lines['LinePercent'] > 90]
+    lines = wb[Line, 'LinePercent']
+    heavy_lines = heavy_lines[lines['LinePercent'] > 90]
     
     # Get data for a specific object by its primary key
     # For a Bus, the key is the Bus Number
@@ -60,14 +61,7 @@ You can solve power flow and retrieve results in one line:
 
 .. code-block:: python
 
-    # Solve power flow and get voltages
     voltages = wb.pflow()
-    
-    # Check if the power flow converged
-    if wb.io.esa.is_converged():
-        print("Power flow converged successfully!")
-    else:
-        print("Power flow failed to converge.")
 
 Modifying Data
 --------------
@@ -77,11 +71,11 @@ You can update grid parameters using the same indexing syntax:
 .. code-block:: python
 
     # Set the setpoint for Generator at Bus 5 to 150 MW
-    wb[Gen, 5, 'GenMW'] = 150.0
+    wb[Gen, 5, "GenMW"] = 150.0
     
     # You can also set values for multiple objects at once
     # Set all bus voltage setpoints to 1.02 pu
-    wb[Bus, 'BusVoltSet'] = 1.02
+    wb[Bus, "BusVoltSet"] = 1.02
 
 Saving Changes
 --------------
