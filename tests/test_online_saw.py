@@ -15,7 +15,7 @@ import numpy as np
 import sys 
 
 try:
-    from esapp.saw import SAW, PowerWorldError
+    from esapp.saw import SAW, PowerWorldError, PowerWorldPrerequisiteError, PowerWorldAddonError
 except ImportError:
     raise
 
@@ -300,12 +300,13 @@ class TestOnlineSAW:
 
     def test_contingency_combo(self, saw_instance):
         saw_instance.CTGComboDeleteAllResults()
+        # Setup: Ensure primary contingencies exist for the combo analysis
+        saw_instance.CTGAutoInsert()
+        saw_instance.CTGConvertToPrimaryCTG()
         try:
             saw_instance.CTGComboSolveAll()
-        except PowerWorldError as e:
-            if "at least one active primary contingency" in str(e):
-                pytest.skip("No active primary contingencies for Combo Analysis")
-            raise e
+        except PowerWorldPrerequisiteError:
+            pytest.skip("No active primary contingencies for Combo Analysis")
 
     def test_contingency_convert(self, saw_instance):
         saw_instance.CTGConvertAllToDeviceCTG()
@@ -316,11 +317,10 @@ class TestOnlineSAW:
 
     def test_contingency_create_interface(self, saw_instance):
         try:
-            saw_instance.CTGCreateContingentInterfaces("ALL")
-        except PowerWorldError as e:
-            if "could not be found" in str(e):
-                pytest.skip("Filter 'ALL' not found for CTGCreateContingentInterfaces")
-            raise e
+            # Use empty string for filter to imply 'all', as "ALL" is not always a valid named filter
+            saw_instance.CTGCreateContingentInterfaces("")
+        except PowerWorldPrerequisiteError:
+            pytest.skip("Filter 'ALL' not found for CTGCreateContingentInterfaces")
 
     def test_contingency_join(self, saw_instance):
         saw_instance.CTGJoinActiveCTGs(False, False, True)
@@ -366,12 +366,12 @@ class TestOnlineSAW:
         saw_instance.FaultAutoInsert()
 
     def test_fault_multiple(self, saw_instance):
+        # Setup: Ensure faults exist
+        saw_instance.FaultAutoInsert()
         try:
             saw_instance.FaultMultiple()
-        except PowerWorldError as e:
-            if "No active faults" in str(e):
-                pytest.skip("No active faults defined for FaultMultiple")
-            raise e
+        except PowerWorldPrerequisiteError:
+            pytest.skip("No active faults defined for FaultMultiple")
 
     # -------------------------------------------------------------------------
     # Sensitivity Mixin Tests
@@ -406,18 +406,22 @@ class TestOnlineSAW:
             saw_instance.CalculateLODF(branch_str)
 
     def test_sensitivity_shift_factors(self, saw_instance):
-        branches = saw_instance.GetParametersMultipleElement("Branch", ["BusNum", "BusNum:1", "LineCircuit"])
+        # Request LineStatus to filter for closed branches
+        branches = saw_instance.GetParametersMultipleElement("Branch", ["BusNum", "BusNum:1", "LineCircuit", "LineStatus"])
         areas = saw_instance.GetParametersMultipleElement("Area", ["AreaNum"])
         if branches is not None and not branches.empty and areas is not None and not areas.empty:
-            b = branches.iloc[0]
-            branch_str = f'[BRANCH {b["BusNum"]} {b["BusNum:1"]} "{b["LineCircuit"]}"]'
-            area_str = f'[AREA {areas.iloc[0]["AreaNum"]}]'
-            try:
-                saw_instance.CalculateShiftFactors(branch_str, "SELLER", area_str)
-            except PowerWorldError as e:
-                if "no available participation points" in str(e) or "is not online" in str(e):
+            # Filter for closed branches
+            closed_branches = branches[branches["LineStatus"] == "Closed"]
+            if not closed_branches.empty:
+                b = closed_branches.iloc[0]
+                branch_str = f'[BRANCH {b["BusNum"]} {b["BusNum:1"]} "{b["LineCircuit"]}"]'
+                area_str = f'[AREA {areas.iloc[0]["AreaNum"]}]'
+                try:
+                    saw_instance.CalculateShiftFactors(branch_str, "SELLER", area_str)
+                except PowerWorldPrerequisiteError as e:
                     pytest.skip(f"Shift factors calculation failed: {e}")
-                raise e
+            else:
+                pytest.skip("No closed branches found for shift factors")
     
     def test_sensitivity_extras(self, saw_instance):
         saw_instance.CalculateLODFAdvanced(True, "MATRIX", 10, 0.03, "DECIMAL", 4, True, "lodf.txt")
@@ -479,10 +483,8 @@ class TestOnlineSAW:
         tmp_aux = temp_file(".aux")
         try:
             saw_instance.DoFacilityAnalysis(tmp_aux)
-        except PowerWorldError as e:
-            if "There has to be at least one" in str(e):
-                pytest.skip("Facility analysis requires setup in GUI/Dialog")
-            raise e
+        except PowerWorldPrerequisiteError:
+            pytest.skip("Facility analysis requires setup in GUI/Dialog")
         assert os.path.exists(tmp_aux)
 
     def test_topology_radial(self, saw_instance):
@@ -691,12 +693,17 @@ class TestOnlineSAW:
             pytest.skip("Not enough areas for ATC")
 
     def test_atc_multiple(self, saw_instance):
+        # Setup: Ensure directions exist
+        areas = saw_instance.GetParametersMultipleElement("Area", ["AreaNum"])
+        if areas is not None and len(areas) >= 2:
+            s = f'[AREA {areas.iloc[0]["AreaNum"]}]'
+            b = f'[AREA {areas.iloc[1]["AreaNum"]}]'
+            saw_instance.DirectionsAutoInsert(s, b)
+
         try:
             saw_instance.DetermineATCMultipleDirections()
-        except PowerWorldError as e:
-            if "No directions set to Include" in str(e):
-                pytest.skip("No directions defined for ATC")
-            raise e
+        except PowerWorldPrerequisiteError:
+            pytest.skip("No directions defined for ATC")
 
     def test_atc_results(self, saw_instance):
         # Mocking fields to avoid error if no results
@@ -728,10 +735,8 @@ class TestOnlineSAW:
     def test_modify_calc(self, saw_instance):
         try:
             saw_instance.CalculateRXBGFromLengthConfigCondType()
-        except PowerWorldError as e:
-            if "TransLineCalc is not registered" in str(e):
-                pytest.skip("TransLineCalc not registered")
-            raise e
+        except PowerWorldAddonError:
+            pytest.skip("TransLineCalc not registered")
 
     def test_modify_base(self, saw_instance):
         saw_instance.ChangeSystemMVABase(100.0)
@@ -879,11 +884,8 @@ class TestOnlineSAW:
         saw_instance.TimeStepDoRun()
         try:
             saw_instance.TimeStepDoSinglePoint("2025-01-01T10:00:00")
-        except PowerWorldError as e:
-            if "out-of-range" in str(e):
-                pass  # Expected if time points not defined
-            else:
-                raise e
+        except PowerWorldPrerequisiteError:
+            pass  # Expected if time points not defined
         try:
             saw_instance.TimeStepClearResults()
         except PowerWorldError:

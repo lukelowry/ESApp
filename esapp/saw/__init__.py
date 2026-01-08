@@ -14,7 +14,15 @@ The package also defines custom exception classes for handling COM and
 PowerWorld-specific errors, along with helper functions for data conversion.
 """
 from .saw import SAW
-from ._exceptions import PowerWorldError, COMError, CommandNotRespectedError, Error
+from ._exceptions import (
+    PowerWorldError,
+    COMError,
+    CommandNotRespectedError,
+    Error,
+    SimAutoFeatureError,
+    PowerWorldPrerequisiteError,
+    PowerWorldAddonError,
+)
 from ._helpers import (
     df_to_aux,
     convert_to_windows_path,
@@ -31,6 +39,9 @@ __all__ = [
     "COMError",
     "CommandNotRespectedError",
     "Error",
+    "SimAutoFeatureError",
+    "PowerWorldPrerequisiteError",
+    "PowerWorldAddonError",
     "df_to_aux",
     "convert_to_windows_path",
     "convert_list_to_variant",

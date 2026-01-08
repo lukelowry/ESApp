@@ -1347,7 +1347,7 @@ class SAWBase(object):
             if output is None or output[0] == "":
                 pass
             elif "No data" not in output[0]:
-                raise PowerWorldError(output[0])
+                raise PowerWorldError.from_message(output[0])
         except TypeError as e:
             if "is not subscriptable" in e.args[0]:
                 if output == -1:

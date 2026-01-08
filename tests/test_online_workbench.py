@@ -18,7 +18,7 @@ try:
     from esapp.grid import Bus, Gen, Load, Branch, Contingency, Area, Zone, Shunt, GICXFormer, GObject
     from esapp import grid
     from esapp.workbench import GridWorkBench
-    from esapp.saw import PowerWorldError, COMError
+    from esapp.saw import PowerWorldError, COMError, SimAutoFeatureError
 except ImportError:
     raise
 
@@ -300,6 +300,8 @@ def test_component_access(wb, component_class):
     """
     try:
         df = wb[component_class]
+    except SimAutoFeatureError as e:
+        pytest.skip(f"Object type {component_class.TYPE} cannot be retrieved via SimAuto: {e.message}")
     except (PowerWorldError, COMError) as e:
         # Check if object is supported by checking if we can save fields
         with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as tmp:
@@ -310,8 +312,6 @@ def test_component_access(wb, component_class):
             # If save works but read fails, it's a real error (or memory issue)
             if "memory resources" in str(e):
                 pytest.skip(f"Object type {component_class.TYPE} has too many fields/objects.")
-            if "cannot be retrieved through SimAuto" in str(e):
-                pytest.skip(f"Object type {component_class.TYPE} cannot be retrieved via SimAuto.")
             pytest.fail(f"Object type {component_class.TYPE} is supported but failed to read: {e}")
         except PowerWorldError:
             pytest.skip(f"Object type {component_class.TYPE} not supported by this PW version.")

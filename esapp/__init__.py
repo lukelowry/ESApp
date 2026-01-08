@@ -11,7 +11,16 @@ The main entry point is the :class:`~.GridWorkBench` class.
 """
 
 # Please keep the docstring above up to date with all the imports.
-from .saw import SAW, PowerWorldError, COMError, CommandNotRespectedError, Error
+from .saw import (
+    SAW,
+    PowerWorldError,
+    COMError,
+    CommandNotRespectedError,
+    Error,
+    SimAutoFeatureError,
+    PowerWorldPrerequisiteError,
+    PowerWorldAddonError,
+)
 
 # Main Grid Work Bench Class
 from .workbench import GridWorkBench
