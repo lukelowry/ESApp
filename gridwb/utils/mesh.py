@@ -8,6 +8,7 @@ And conversions to useful formats.
 
 from dataclasses import dataclass
 import numpy as np
+import struct
 from scipy.sparse import csc_matrix
 
 def extract_unique_edges(faces):
@@ -50,41 +51,83 @@ class Mesh:
         Returns:
             Mesh: The constructed Mesh object.
         """
-        with open(filepath, 'r') as f:
-            lines = f.readlines()
-        
-        # Parse header
-        vertex_count = 0
-        face_count = 0
-        header_ended = False
-        line_idx = 0
-        
-        while not header_ended:
-            line = lines[line_idx].strip()
-            if line.startswith("element vertex"):
-                vertex_count = int(line.split()[-1])
-            elif line.startswith("element face"):
-                face_count = int(line.split()[-1])
-            elif line == "end_header":
-                header_ended = True
-            line_idx += 1
-        
-        # Parse vertices
-        vertices = []
-        for i in range(vertex_count):
-            parts = lines[line_idx + i].strip().split()
-            vertex = (float(parts[0]), float(parts[1]), float(parts[2]))
-            vertices.append(vertex)
-        
-        line_idx += vertex_count
-        
-        # Parse faces
-        faces = []
-        for i in range(face_count):
-            parts = lines[line_idx + i].strip().split()
-            vertex_indices = list(map(int, parts[1:]))  # Skip the first count element
-            faces.append(vertex_indices)
-        
+        with open(filepath, 'rb') as f:
+            # Parse Header
+            header_ended = False
+            fmt = "ascii"
+            vertex_count = 0
+            face_count = 0
+            vertex_props = []
+            current_element = None
+
+            while not header_ended:
+                line = f.readline().strip()
+                if not line:
+                    break
+                line_str = line.decode('ascii', errors='ignore')
+
+                if line_str == "end_header":
+                    header_ended = True
+                    break
+
+                parts = line_str.split()
+                if not parts:
+                    continue
+
+                if parts[0] == "format":
+                    fmt = parts[1]
+                elif parts[0] == "element":
+                    current_element = parts[1]
+                    if current_element == "vertex":
+                        vertex_count = int(parts[2])
+                    elif current_element == "face":
+                        face_count = int(parts[2])
+                elif parts[0] == "property":
+                    if current_element == "vertex":
+                        # parts[1] is type, parts[2] is name
+                        vertex_props.append((parts[2], parts[1]))
+
+            # Parse Body
+            vertices = []
+            faces = []
+
+            if fmt == "ascii":
+                lines = f.readlines()
+                for i in range(vertex_count):
+                    parts = lines[i].strip().split()
+                    # Assume first 3 are x, y, z
+                    v = (float(parts[0]), float(parts[1]), float(parts[2]))
+                    vertices.append(v)
+                
+                for i in range(face_count):
+                    parts = lines[vertex_count + i].strip().split()
+                    vertex_indices = [int(x) for x in parts[1:]]
+                    faces.append(vertex_indices)
+
+            elif fmt == "binary_little_endian":
+                np_type_map = {
+                    'char': 'i1', 'uchar': 'u1', 'short': 'i2', 'ushort': 'u2',
+                    'int': 'i4', 'uint': 'u4', 'float': 'f4', 'double': 'f8'
+                }
+                dtype_fields = [(name, np_type_map.get(type_str, 'f4')) for name, type_str in vertex_props]
+                vertex_dtype = np.dtype(dtype_fields)
+                
+                vertex_data = f.read(vertex_count * vertex_dtype.itemsize)
+                v_arr = np.frombuffer(vertex_data, dtype=vertex_dtype)
+                
+                # Extract x, y, z
+                if 'x' in v_arr.dtype.names and 'y' in v_arr.dtype.names and 'z' in v_arr.dtype.names:
+                    vertices = list(zip(v_arr['x'], v_arr['y'], v_arr['z']))
+                else:
+                    names = v_arr.dtype.names
+                    vertices = list(zip(v_arr[names[0]], v_arr[names[1]], v_arr[names[2]]))
+
+                for _ in range(face_count):
+                    n = struct.unpack('<B', f.read(1))[0] # uchar count
+                    faces.append(list(struct.unpack(f'<{n}i', f.read(n * 4)))) # int indices
+            else:
+                raise ValueError(f"Unsupported PLY format: {fmt}")
+
         return cls(vertices=vertices, faces=faces)
 
     def get_incidence_matrix(self) -> csc_matrix:
