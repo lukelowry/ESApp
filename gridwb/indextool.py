@@ -3,7 +3,7 @@ from pandas import DataFrame
 from os import path
 import numpy as np
 
-from .grid.components import *
+from .grid.components import GObject
 from .utils.decorators import timing
 from .saw import SAW
 

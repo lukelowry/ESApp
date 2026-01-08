@@ -1,4 +1,4 @@
-from .grid import Bus
+from .grid.components import Bus
 from .apps import GIC, Network, ForcedOscillation
 from .indextool import IndexTool
 from .adapter import Adapter
@@ -30,5 +30,3 @@ class GridWorkBench(Adapter, IndexTool):
         self.modes = ForcedOscillation(self)
         #self.dyn = Dynamics(self)
         #self.statics = Statics(self)
-
-

@@ -5,9 +5,3 @@ from .saw import SAW, PowerWorldError, COMError, CommandNotRespectedError,\
 
 # Main Grid Work Bench Class
 from .workbench import GridWorkBench
-
-# Utility Classes
-from .utils import *
-
-# Object Knowledge Base (Slow)
-# from .grid import *
