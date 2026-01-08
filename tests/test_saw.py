@@ -5,7 +5,7 @@ import pytest
 from unittest.mock import MagicMock, patch
 import pandas as pd
 import numpy as np
-from esapp.saw import SAW
+from esapp import SAW, grid
 
 def test_saw_initialization(saw_obj):
     """Test that the SAW object initializes correctly with the fixture."""
@@ -214,7 +214,6 @@ def test_matrix_branch_admittance(saw_obj):
     # Mock GetParametersMultipleElement to return dataframes for bus and branch
     with patch.object(saw_obj, 'GetParametersMultipleElement') as mock_get_params, \
          patch.object(saw_obj, 'get_key_field_list', return_value=["BusNum"]):
-        
         def side_effect(ObjectType, ParamList, FilterName=""):
             if ObjectType.lower() == "bus":
                 return pd.DataFrame({"BusNum": [1, 2]})
@@ -244,7 +243,7 @@ def test_matrix_incidence(saw_obj):
         }) if obj.lower() == "bus" else pd.DataFrame({
             "BusNum": [1, 2],
             "BusNum:1": [2, 1]
-        })
+        }) if obj.lower() == "branch" else pd.DataFrame()
         
         inc = saw_obj.get_incidence_matrix()
         assert inc.shape == (2, 2)
