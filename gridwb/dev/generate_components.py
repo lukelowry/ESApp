@@ -1,6 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
 """
 Parses the PowerWorld 'Case Objects Fields' Text File and generates a Python
 module (components.py) containing the structured data.

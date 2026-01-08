@@ -61,7 +61,7 @@ class InjectionVector:
         self.loaddf.loc[~isPos,'Alpha'] /= negSum if negSum>0 else 1
 
 
-def ybus_with_loads(Y, buses: list[Bus], loads: list[Load], gens=None):
+def ybus_with_loads(Y, buses, loads, gens=None):
     """
     Modifies a Y-Bus matrix to include constant impedance load and generation models.
 
@@ -111,7 +111,6 @@ def ybus_with_loads(Y, buses: list[Bus], loads: list[Load], gens=None):
     if gens is not None:
         for gen in gens:
 
-            gen: Gen
             if gen.TSGenMachineName == 'GENROU' and gen.GenStatus=='Closed':
                 continue
             else:
