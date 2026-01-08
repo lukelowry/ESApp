@@ -88,4 +88,11 @@ html_theme_options = {
     "navigation_depth": 2,
 }
 
-autodoc_mock_imports = ["ctypes", "win32com", "win32com.client", "pythoncom"]
+autodoc_mock_imports = [
+    "ctypes", 
+    "win32com", 
+    "win32com.client", 
+    "pythoncom",
+    "gridwb.apps.dynamics",
+    "gridwb.apps.statics",
+]

@@ -1,5 +1,7 @@
 from .grid.components import Bus
-from .apps import GIC, Network, ForcedOscillation
+from .apps.gic import GIC
+from .apps.network import Network
+from .apps.modes import ForcedOscillation
 from .indextool import IndexTool
 from .adapter import Adapter
 
