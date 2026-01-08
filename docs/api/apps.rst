@@ -9,3 +9,8 @@ Network Analysis
 ----------------
 .. automodule:: esapp.apps.network
    :members:
+
+GIC Analysis
+------------
+.. automodule:: esapp.apps.gic
+   :members:

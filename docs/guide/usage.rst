@@ -79,22 +79,22 @@ If you have a DataFrame containing updated data (including the necessary primary
 
 
 Specific Applications
------------------
+---------------------
 
 ESA++ includes specialized "Apps" for complex analysis. For example, the GIC tool:
 
 .. code-block:: python
 
     # Access the GIC application
-    gic_results = wb.app.gic.run_uniform_field(field_mag=1.0, angle=0)
+    gic_results = wb.calculate_gic(max_field=1.0, direction=0)
 
     # Use the Network app for topology analysis
-    is_connected = wb.app.network.is_connected()
-    islands = wb.app.network.get_islands()
+    is_connected = wb.network.is_connected()
+    islands = wb.network.get_islands()
 
 
 Power System Matricies
----------------------
+----------------------
 
 ESA++ makes it easy to extract system matrices for mathematical analysis:
 
@@ -111,7 +111,7 @@ ESA++ makes it easy to extract system matrices for mathematical analysis:
 
 
 Custom AUX Scripts
---------------
+------------------
 
 You can run raw PowerWorld auxiliary scripts directly:
 

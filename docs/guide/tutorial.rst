@@ -51,8 +51,8 @@ ESA++ allows you to filter data easily using standard Pandas operations on the r
     heavy_lines = heavy_lines[lines['LinePercent'] > 90]
     
     # Get data for a specific object by its primary key
-    # For a Bus, the key is the Bus Number
-    bus_5_data = wb[Bus, 5, ['BusPUVolt', 'BusAngle']]
+    all_bus_data = wb[Bus, ['BusNum', 'BusPUVolt', 'BusAngle']]
+    bus_5_data = all_bus_data[all_bus_data['BusNum'] == 5]
 
 Running Analysis
 ----------------
@@ -71,11 +71,11 @@ You can update grid parameters using the same indexing syntax:
 .. code-block:: python
 
     # Set the setpoint for Generator at Bus 5 to 150 MW
-    wb[Gen, 5, "GenMW"] = 150.0
+    wb.set_gen(bus=5, id='1', mw=150.0)
     
     # You can also set values for multiple objects at once
     # Set all bus voltage setpoints to 1.02 pu
-    wb[Bus, "BusVoltSet"] = 1.02
+    wb[Bus, 'BusVoltSet'] = 1.02
 
 Saving Changes
 --------------

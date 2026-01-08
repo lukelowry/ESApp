@@ -146,7 +146,7 @@ class Mesh:
         Returns
         -------
         scipy.sparse.csc_matrix
-            Matrix B of size (|V| x |E|).
+            Matrix B of size (\|V\| x \|E\|).
         """
         # Topological data
         vertices = self.vertices

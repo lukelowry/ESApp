@@ -4,3 +4,4 @@ sphinx-copybutton
 nbsphinx
 numpy<2.0
 ipykernel
+matplotlib

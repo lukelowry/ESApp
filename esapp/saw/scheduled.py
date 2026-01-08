@@ -24,26 +24,13 @@ class ScheduledActionsMixin:
 
         Returns
         -------
-        None
+        str
+            The result of the script command.
 
         Raises
         ------
         PowerWorldError
             If the SimAuto call fails.
-        ----------
-        start_time : str
-            The start time of the window.
-        end_time : str, optional
-            The end time of the window.
-        filter_name : str, optional
-            Filter to apply to the actions.
-        revert : bool, optional
-            Whether to revert the actions.
-
-        Returns
-        -------
-        str
-            The result of the script command.
         """
         rev = "YES" if revert else "NO"
         filt = f'"{filter_name}"' if filter_name else ""
@@ -61,20 +48,13 @@ class ScheduledActionsMixin:
 
         Returns
         -------
-        None
+        str
+            The result of the script command.
 
         Raises
         ------
         PowerWorldError
             If the SimAuto call fails.
-        ----------
-        identify_from_normal : bool, optional
-            Whether to identify from normal status.
-
-        Returns
-        -------
-        str
-            The result of the script command.
         """
         ifn = "YES" if identify_from_normal else "NO"
         return self.RunScriptCommand(f"IdentifyBreakersForScheduledActions({ifn});")
@@ -96,24 +76,13 @@ class ScheduledActionsMixin:
 
         Returns
         -------
-        None
+        str
+            The result of the script command.
 
         Raises
         ------
         PowerWorldError
             If the SimAuto call fails.
-        ----------
-        start_time : str
-            The start time of the window.
-        end_time : str, optional
-            The end time of the window.
-        filter_name : str, optional
-            Filter to apply to the actions.
-
-        Returns
-        -------
-        str
-            The result of the script command.
         """
         filt = f'"{filter_name}"' if filter_name else ""
         return self.RunScriptCommand(f'RevertScheduledActionsAt("{start_time}", "{end_time}", {filt});')
@@ -126,15 +95,13 @@ class ScheduledActionsMixin:
 
         Returns
         -------
-        None
+        str
+            The result of the script command.
 
         Raises
         ------
         PowerWorldError
             If the SimAuto call fails.
-        -------
-        str
-            The result of the script command.
         """
         return self.RunScriptCommand("ScheduledActionsSetReference;")
 
@@ -159,26 +126,13 @@ class ScheduledActionsMixin:
 
         Returns
         -------
-        None
+        str
+            The result of the script command.
 
         Raises
         ------
         PowerWorldError
             If the SimAuto call fails.
-        ----------
-        view_time : str
-            The time to view.
-        apply_actions : bool, optional
-            Whether to apply actions.
-        use_normal_status : bool, optional
-            Whether to use normal status.
-        apply_window : bool, optional
-            Whether to apply the window.
-
-        Returns
-        -------
-        str
-            The result of the script command.
         """
         aa = "YES" if apply_actions else "NO" if apply_actions is not None else ""
         uns = "YES" if use_normal_status else "NO" if use_normal_status is not None else ""
@@ -206,26 +160,13 @@ class ScheduledActionsMixin:
 
         Returns
         -------
-        None
+        str
+            The result of the script command.
 
         Raises
         ------
         PowerWorldError
             If the SimAuto call fails.
-        ----------
-        start_time : str
-            The start time of the window.
-        end_time : str
-            The end time of the window.
-        resolution : float, optional
-            The resolution of the window.
-        resolution_units : str, optional
-            The units of the resolution.
-
-        Returns
-        -------
-        str
-            The result of the script command.
         """
         res = str(resolution) if resolution is not None else ""
         units = resolution_units if resolution_units else ""

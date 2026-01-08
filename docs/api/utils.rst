@@ -33,3 +33,13 @@ Mesh Processing
 ---------------
 .. automodule:: esapp.utils.mesh
    :members:
+
+Geographic Mapping
+------------------
+.. automodule:: esapp.utils.map
+   :members:
+
+Wavelet Plotting
+----------------
+.. automodule:: esapp.utils.plotwavelet
+   :members:

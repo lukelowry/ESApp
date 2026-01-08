@@ -19,22 +19,13 @@ class SensitivityMixin:
 
         Returns
         -------
-        None
+        str
+            The result of the script command.
 
         Raises
         ------
         PowerWorldError
             If the SimAuto call fails.
-        ----------
-        flow_element : str
-            The flow element (e.g. '[BRANCH 1 2 1]' or '[INTERFACE "name"]').
-        flow_type : str
-            The type of flow (MW, MVAR, MVA).
-
-        Returns
-        -------
-        str
-            The result of the script command.
         """
         return self.RunScriptCommand(f'CalculateFlowSense({flow_element}, {flow_type});')
 
@@ -55,24 +46,13 @@ class SensitivityMixin:
 
         Returns
         -------
-        None
+        str
+            The result of the script command.
 
         Raises
         ------
         PowerWorldError
             If the SimAuto call fails.
-        ----------
-        seller : str
-            The seller (source) (e.g. '[AREA "Top"]').
-        buyer : str
-            The buyer (sink) (e.g. '[BUS 7]').
-        method : str, optional
-            Linear method (AC, DC, DCPS). Defaults to DC.
-
-        Returns
-        -------
-        str
-            The result of the script command.
         """
         return self.RunScriptCommand(f'CalculatePTDF({seller}, {buyer}, {method});')
 
@@ -94,24 +74,13 @@ class SensitivityMixin:
 
         Returns
         -------
-        None
+        str
+            The result of the script command.
 
         Raises
         ------
         PowerWorldError
             If the SimAuto call fails.
-        ----------
-        branch : str
-            The branch to outage/close (e.g. '[BRANCH 1 2 1]').
-        method : str, optional
-            Linear method (DC, DCPS). Defaults to DC.
-        post_closure_lcdf : str, optional
-            Optional YES/NO for LCDF calculation.
-
-        Returns
-        -------
-        str
-            The result of the script command.
         """
         args = f'{branch}, {method}'
         if post_closure_lcdf:

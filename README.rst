@@ -50,7 +50,7 @@ Here is a quick example of how ESA++ simplifies data access and power flow analy
     V = wb.pflow()
 
     # Do some action, write to PW
-    violations = wb.func.find_violations(v_min=0.95)
+    violations = wb.find_violations(v_min=0.95)
     wb[Gen, "GenMW"] = 100.0
 
     # Save case
