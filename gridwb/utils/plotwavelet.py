@@ -4,8 +4,7 @@ import numpy as np
 
 # MISC
 from os.path import dirname, abspath, sep
-from matplotlib.pylab import Axes
-from numpy import array, linspace, meshgrid, where, nan, pi, vstack, log
+from numpy import array, linspace, meshgrid, where, nan, pi
 from scipy.interpolate import LinearNDInterpolator, NearestNDInterpolator, CloughTocher2DInterpolator
 import geopandas as gpd
 import shapely.vectorized
@@ -13,6 +12,7 @@ import shapely.vectorized
 # MPL
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+from matplotlib.pyplot import Axes
 from matplotlib.colors import Normalize
 
 def get_shapeobj(shape='Texas'):

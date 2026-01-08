@@ -1,11 +1,11 @@
 from abc import ABC
-import numpy as np
+
 import scipy.sparse as sp
 from scipy.sparse.linalg import eigsh
-
-
-from numpy import block, diag, real, imag
 from scipy.linalg import schur
+
+import numpy as np
+from numpy import block, diag, real, imag
 
 # Constants
 MU0 = 1.256637e-6

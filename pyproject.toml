@@ -51,9 +51,7 @@ dependencies = [
     "pandas",
     "numpy",
     "scipy",
-    "pywin32; sys_platform == 'win32'",
-    "toolz",
-    "networkx",
+    "pywin32; sys_platform == 'win32'"
 ]
 
 [project.optional-dependencies]

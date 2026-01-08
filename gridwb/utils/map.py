@@ -1,18 +1,15 @@
-
 from functools import partial
 from os.path import dirname, abspath, sep
 import geopandas as gpd
+import numpy as np
+
 from matplotlib.axes import Axes
 from matplotlib.cm import ScalarMappable
 from matplotlib.colors import Normalize
-
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 
-import numpy as np
 
-
-# I Use this all the time
 def formatPlot(ax: Axes, 
                title='Chart Tile',
                xlabel='X Axis Label', 

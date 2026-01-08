@@ -1,6 +1,5 @@
 GridWorkBench
 =============
-.. currentmodule:: gridwb.workbench
 
 The ``GridWorkBench`` is the central orchestrator of the ESA++ toolkit. It manages the lifecycle of the 
 PowerWorld Simulator instance, handles case loading/saving, and provides the primary interface for 
@@ -10,5 +9,5 @@ The ``Indexable`` is the core engine of ESA++. It enables the intuitive indexing
 by translating Pythonic slices and keys into optimized SimAuto data requests. It handles both data retrieval 
 and bulk updates, returning results as native Pandas DataFrames.
 
-.. autoclass:: GridWorkBench
+.. autoclass:: gridwb.GridWorkBench
    :members:
