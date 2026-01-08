@@ -8,8 +8,8 @@ from typing import Type, List
 import pandas as pd
 from pandas.testing import assert_frame_equal
 
-from gridwb.indextool import IndexTool
-from gridwb.grid import components
+from gridwb.indexable import Indexable
+from gridwb import components
 
 
 def get_all_gobject_subclasses() -> List[Type[components.GObject]]:
@@ -32,19 +32,19 @@ def get_all_gobject_subclasses() -> List[Type[components.GObject]]:
 
 
 @pytest.fixture
-def idx_tool() -> IndexTool:
+def idx_tool() -> Indexable:
     """Provides a IndexTool instance with a mocked SAW dependency."""
     with patch('gridwb.indextool.SAW') as mock_saw_class:
         mock_esa = Mock()
         mock_saw_class.return_value = mock_esa
         
-        idx_tool_instance = IndexTool()
+        idx_tool_instance = Indexable()
         idx_tool_instance.esa = mock_esa
         yield idx_tool_instance
 
 
 @pytest.mark.parametrize("g_object", get_all_gobject_subclasses())
-def test_getitem_key_fields(idx_tool: IndexTool, g_object: Type[components.GObject]):
+def test_getitem_key_fields(idx_tool: Indexable, g_object: Type[components.GObject]):
     """Test `idx_tool[GObject]` retrieves only key fields."""
     # Arrange
     mock_esa = idx_tool.esa
@@ -70,7 +70,7 @@ def test_getitem_key_fields(idx_tool: IndexTool, g_object: Type[components.GObje
 
 
 @pytest.mark.parametrize("g_object", get_all_gobject_subclasses())
-def test_getitem_all_fields(idx_tool: IndexTool, g_object: Type[components.GObject]):
+def test_getitem_all_fields(idx_tool: Indexable, g_object: Type[components.GObject]):
     """Test `idx_tool[GObject, :]` retrieves all fields."""
     # Arrange
     mock_esa = idx_tool.esa
@@ -96,7 +96,7 @@ def test_getitem_all_fields(idx_tool: IndexTool, g_object: Type[components.GObje
 
 
 @pytest.mark.parametrize("g_object", get_all_gobject_subclasses())
-def test_setitem_broadcast(idx_tool: IndexTool, g_object: Type[components.GObject]):
+def test_setitem_broadcast(idx_tool: Indexable, g_object: Type[components.GObject]):
     """Test `idx_tool[GObject, 'Field'] = value` broadcasts a value."""
     # Arrange
     mock_esa = idx_tool.esa
@@ -130,7 +130,7 @@ def test_setitem_broadcast(idx_tool: IndexTool, g_object: Type[components.GObjec
 
 
 @pytest.mark.parametrize("g_object", get_all_gobject_subclasses())
-def test_setitem_bulk_update_from_df(idx_tool: IndexTool, g_object: Type[components.GObject]):
+def test_setitem_bulk_update_from_df(idx_tool: Indexable, g_object: Type[components.GObject]):
     """Test `idx_tool[GObject] = df` performs a bulk update."""
     # Arrange
     mock_esa = idx_tool.esa
@@ -153,7 +153,7 @@ def test_setitem_bulk_update_from_df(idx_tool: IndexTool, g_object: Type[compone
 
 
 @pytest.mark.parametrize("g_object", get_all_gobject_subclasses())
-def test_getitem_specific_fields(idx_tool: IndexTool, g_object: Type[components.GObject]):
+def test_getitem_specific_fields(idx_tool: Indexable, g_object: Type[components.GObject]):
     """Test `idx_tool[GObject, ['Field1', 'Field2']]` retrieves specific fields plus all keys."""
     # Arrange
     mock_esa = idx_tool.esa
@@ -180,7 +180,7 @@ def test_getitem_specific_fields(idx_tool: IndexTool, g_object: Type[components.
 
 
 @pytest.mark.parametrize("g_object", get_all_gobject_subclasses())
-def test_setitem_broadcast_multiple_fields(idx_tool: IndexTool, g_object: Type[components.GObject]):
+def test_setitem_broadcast_multiple_fields(idx_tool: Indexable, g_object: Type[components.GObject]):
     """Test `idx_tool[GObject, ['F1', 'F2']] = [v1, v2]` broadcasts multiple values."""
     # Arrange
     mock_esa = idx_tool.esa
@@ -210,7 +210,7 @@ def test_setitem_broadcast_multiple_fields(idx_tool: IndexTool, g_object: Type[c
     assert_frame_equal(sent_df, expected_df)
 
 
-def test_setitem_raises_error_on_invalid_index(idx_tool: IndexTool):
+def test_setitem_raises_error_on_invalid_index(idx_tool: Indexable):
     """Test that __setitem__ raises TypeError for unsupported index types."""
     with pytest.raises(TypeError, match="Unsupported index for __setitem__"):
         idx_tool[123] = "some_value"

@@ -1,9 +1,8 @@
 from typing import Type
 from pandas import DataFrame
 from os import path
-import numpy as np
 
-from .grid.components import GObject
+from .gobject import GObject
 from .utils.decorators import timing
 from .saw import SAW
 
@@ -13,7 +12,7 @@ from .saw import SAW
 fexcept = lambda t: "3" + t[5:] if t[:5] == "Three" else t
 
 # Power World Read/Write
-class IndexTool:
+class Indexable:
     """
     PowerWorld Read/Write tool providing indexer-based access to grid components.
 
@@ -22,17 +21,11 @@ class IndexTool:
     indexing syntax.
     """
     esa: SAW
+    fname: str
 
-    def __init__(self, fname: str = None):
-        """
-        Initialize the IndexTool.
+    def set_esa(self, esa: SAW):
+        self.esa = esa
 
-        Parameters
-        ----------
-        fname : str, optional
-            Path to the PowerWorld case file.
-        """
-        self.fname = fname
 
     def getIO(self):
         """

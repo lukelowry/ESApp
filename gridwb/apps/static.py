@@ -5,27 +5,27 @@ from numpy import nan, exp, any, arange, nanmin, isnan, inf
 from numpy.random import random
 
 # WorkBench Imports
-from ..indextool import IndexTool
-from ..grid.components import Contingency, Gen, Load, Bus,Shunt, PWCaseInformation, Branch
+from ..indexable import Indexable
+from ..components import Contingency, Gen, Load, Bus,Shunt, PWCaseInformation, Branch
 from ..utils.exceptions import *
-from .app import PWApp
+from ..saw import SAW
 
 # Annoying FutureWarnings
 warnings.simplefilter(action="ignore", category=FutureWarning)
 
 
 # Dynamics App (Simulation, Model, etc.)
-class Statics(PWApp):
+class Statics(Indexable):
 
-    io: IndexTool
+    io: Indexable
 
-    def __init__(self, io: IndexTool) -> None:
-        super().__init__(io)
+    def __init__(self, esa: SAW) -> None:
+        super().__init__(esa)
 
 
         # TODO don't need to read ALL of this!
-        gens = self.io[Gen, ['GenMVRMin', 'GenMVRMax']]
-        buses = self.io[Bus]
+        gens = self[Gen, ['GenMVRMin', 'GenMVRMax']]
+        buses = self[Bus]
 
         zipfields = ['LoadSMW', 'LoadSMVR','LoadIMW', 'LoadIMVR','LoadZMW', 'LoadZMVR']
         
@@ -45,7 +45,7 @@ class Statics(PWApp):
         l = l.fillna(0)
 
         # Send to PW
-        self.io[Load] = l
+        self[Load] = l
 
         # Smaller DF just for updating Constant Power at Buses for Injection Interface Functions
         self.DispatchPQ = l[['BusNum', 'LoadID'] + zipfields].copy()
@@ -59,10 +59,10 @@ class Statics(PWApp):
         '''Temporarily Change the Load with random variation and scale'''
 
         if self.load_nom is None or self.load_df is None:
-            self.load_df = self.io[Load, 'LoadMW']
+            self.load_df = self[Load, 'LoadMW']
             self.load_nom = self.load_df['LoadMW']
             
-        self.io[Load, 'LoadMW'] = scale*self.load_nom* exp(sigma*random(len(self.load_nom)))
+        self[Load, 'LoadMW'] = scale*self.load_nom* exp(sigma*random(len(self.load_nom)))
 
 
     def solve(self, ctgs: list[Contingency] = None):
@@ -79,15 +79,15 @@ class Statics(PWApp):
         # Prepare Data Fields
         gtype = self.metric["Type"]
         field = self.metric["Static"]
-        keyFields = self.io.keys(gtype)
+        keyFields = self.keys(gtype)
 
         # Get Keys OR Values
         def get(field: str = None) -> DataFrame:
             if field is None:
-                data = self.io.get(gtype)
+                data = self.get(gtype)
             else:
-                self.io.pflow()
-                data = self.io.get(gtype, [field])
+                self.pflow()
+                data = self.get(gtype, [field])
                 data.rename(columns={field: "Value"}, inplace=True)
                 data.drop(columns=keyFields, inplace=True)
 
@@ -116,7 +116,7 @@ class Statics(PWApp):
             refSol = get(field)
 
             # Set Reference (i.e. No CTG) and Solve
-            self.io.esa.RunScriptCommand(f"CTGSetAsReference;")
+            self.esa.RunScriptCommand(f"CTGSetAsReference;")
         except:
             print("Loading Does Not Converge.")
             df = DataFrame(
@@ -131,7 +131,7 @@ class Statics(PWApp):
 
             # Apply CTG
             if ctg != "SimOnly":
-                self.io.esa.RunScriptCommand(f"CTGApply({ctg})")
+                self.esa.RunScriptCommand(f"CTGApply({ctg})")
 
             # Solve, Drop Keys
             try:
@@ -143,7 +143,7 @@ class Statics(PWApp):
             data["Reference"] = refSol
 
             # Un-Apply CTG
-            self.io.esa.RunScriptCommand(f"CTGRestoreReference;")
+            self.esa.RunScriptCommand(f"CTGRestoreReference;")
 
             # Add Data to Main
             df = concat([df, data], ignore_index=True)
@@ -153,12 +153,12 @@ class Statics(PWApp):
     def gensAbovePMax(self, p=None, isClosed=None, tol=0.001):
         '''Returns True if any CLOSED gens are outside P limits. Active function.'''
         if p is None:
-            p = self.io[Gen, 'GenMW']['GenMW']
+            p = self[Gen, 'GenMW']['GenMW']
 
         isHigh = p > self.genpmax + tol
         isLow = p < self.genpmin - tol
         if isClosed is None:
-            isClosed = self.io[Gen, 'GenStatus']['GenStatus'] =='Closed'
+            isClosed = self[Gen, 'GenStatus']['GenStatus'] =='Closed'
         violation = isClosed & (isHigh | isLow)
 
         return any(violation)
@@ -167,12 +167,12 @@ class Statics(PWApp):
     def gensAboveQMax(self, q=None, isClosed=None, tol=0.001):
         '''Returns True if any CLOSED gens are outside Q limits. Active function.'''
         if q is None:
-            q = self.io[Gen, 'GenMVR']['GenMVR']
+            q = self[Gen, 'GenMVR']['GenMVR']
 
         isHigh = q > self.genqmax + tol
         isLow = q < self.genqmin - tol
         if isClosed is None:
-            isClosed = self.io[Gen, 'GenStatus']['GenStatus'] =='Closed'
+            isClosed = self[Gen, 'GenStatus']['GenStatus'] =='Closed'
         violation = isClosed & (isHigh | isLow)
 
         return any(violation)
@@ -204,7 +204,7 @@ class Statics(PWApp):
 
         # 1. Solved -> Last Solved Solution,     2. Stable -> Known HV Solution  
         if restore_when_done:  
-            self.io.save_state('BACKUP')
+            self.save_state('BACKUP')
 
         # Initialize Stability State Chain
         self.chain()
@@ -212,10 +212,10 @@ class Statics(PWApp):
         self.pushstate()
 
         # For solution Continuity
-        self.io.save_state('PREV')
+        self.save_state('PREV')
 
         # Set NR Tolerance in MVA
-        self.io.set_mva_tol(nrtol)
+        self.set_mva_tol(nrtol)
 
         log(f'Starting Injection at:  {initialmw:.4f} MW ')
         
@@ -238,10 +238,10 @@ class Statics(PWApp):
 
                 # Do Power Flow
                 log(f'\nPF: {pnow:>12.4f} MW', end='\t')
-                self.io.pflow() 
+                self.pflow() 
 
                 # Fail if slack is at max
-                qall = self.io[Gen, ['GenMVR','GenStatus']]
+                qall = self[Gen, ['GenMVR','GenStatus']]
                 qclosed = qall['GenStatus']=='Closed'
 
                 # Check Max Reactive Output
@@ -294,7 +294,7 @@ class Statics(PWApp):
 
 
                 # Store as solved solution - but not stable
-                self.io.save_state('PREV')
+                self.save_state('PREV')
 
                 pmax, qmax = max(pnow, pprev), max(qsum, qprev)
                 pprev, qprev = pnow, qsum
@@ -322,7 +322,7 @@ class Statics(PWApp):
                 if i==0:
                     log('First Injection Failed. This could be due to a LV Solution, or it is already past the boundary.')
                     #self.irestore(0)
-                    self.io.restore_state('PREV')
+                    self.restore_state('PREV')
                     log(f'-----------EXIT-----------\n\n')
                     return
 
@@ -333,7 +333,7 @@ class Statics(PWApp):
                 step *= backstepPercent
                 if pprev!=0: 
                     self.irestore(1)
-                    #self.io.restore_state('PREV')
+                    #self.restore_state('PREV')
 
             # Terminating Condition
             if step<minstep:
@@ -356,7 +356,7 @@ class Statics(PWApp):
 
         # Restore to before CPF Regardless of everything
         if restore_when_done: 
-            self.io.restore_state('BACKUP')
+            self.restore_state('BACKUP')
         log(f'-----------EXIT-----------\n\n')
 
     '''
@@ -384,13 +384,13 @@ class Statics(PWApp):
 
         # Save current state on the right of the queue
         self.stateidx += 1
-        self.io.save_state(f'GWBState{self.stateidx}')
+        self.save_state(f'GWBState{self.stateidx}')
 
         if verbose: print(f'Pushed States -> {self.stateidx},  Delete -> {self.stateidx-self.maxstates}')
 
         # Try and delete the state (nmax) behind this one
         if self.stateidx >= self.maxstates:
-            self.io.delete_state(f'GWBState{self.stateidx-self.maxstates}')
+            self.delete_state(f'GWBState{self.stateidx-self.maxstates}')
 
     def istore(self, n:int=0, verbose=False):
         '''
@@ -413,7 +413,7 @@ class Statics(PWApp):
         if verbose: print(f'Restore -> {self.stateidx-n}')
         
         # Restore
-        self.io.save_state(f'GWBState{self.stateidx-n}')
+        self.save_state(f'GWBState{self.stateidx-n}')
         
     def irestore(self, n:int=1, verbose=False):
         '''
@@ -441,7 +441,7 @@ class Statics(PWApp):
         if verbose: print(f'Restore -> {self.stateidx-n}')
         
         # Restore
-        self.io.restore_state(f'GWBState{self.stateidx-n}')
+        self.restore_state(f'GWBState{self.stateidx-n}')
         
     def setload(self, SP=None, SQ=None, IP=None, IQ=None, ZP=None, ZQ=None):
 
@@ -479,7 +479,7 @@ class Statics(PWApp):
             fields.append('LoadZMVR')
             self.DispatchPQ.loc[:,'LoadZMVR'] = ZQ
 
-        self.io[Load] = self.DispatchPQ.loc[:,fields]
+        self[Load] = self.DispatchPQ.loc[:,fields]
 
     def clearloads(self):
         '''
@@ -489,4 +489,4 @@ class Statics(PWApp):
         zipfields = ['LoadSMW', 'LoadSMVR','LoadIMW', 'LoadIMVR','LoadZMW', 'LoadZMVR']
         self.DispatchPQ.loc[:, zipfields] = 0
 
-        self.io[Load] = self.DispatchPQ 
+        self[Load] = self.DispatchPQ 

@@ -1,17 +1,9 @@
-from ..indextool import IndexTool
-from .app import PWApp
+from ..indexable import Indexable
 
 import numpy as np
 
 # Constructing Network Matricies and other metrics
-class ForcedOscillation(PWApp):
-
-    io: IndexTool
-
-    def __init__(self, io: IndexTool) -> None:
-        super().__init__(io)
-
-           # TEMPORARY
+class ForcedOscillation(Indexable):
 
     # Need to make a DEF folder
 

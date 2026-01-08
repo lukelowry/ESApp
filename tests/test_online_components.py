@@ -21,9 +21,9 @@ if parent_dir not in sys.path:
     sys.path.append(parent_dir)
 
 try:
-    from gridwb.indextool import IndexTool
-    from gridwb.grid import components
-    from gridwb.grid.components import GObject
+    from gridwb.indexable import Indexable
+    from gridwb import components
+    from gridwb.components import GObject
     from gridwb.saw import PowerWorldError, COMError
 except ImportError:
     print("Error: Could not import gridwb packages. Please ensure the package is in your Python path.")
@@ -37,7 +37,7 @@ def io_instance():
         pytest.skip("SAW_TEST_CASE environment variable not set or file not found.")
 
     print(f"\nConnecting to PowerWorld with case: {case_path}")
-    io = IndexTool(case_path)
+    io = Indexable(case_path)
     io.open()
     yield io
     print("\nClosing case...")

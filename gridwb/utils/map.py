@@ -9,10 +9,71 @@ from matplotlib.colors import Normalize
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 
-from .generic import darker_hsv_colormap, formatPlot
-
 import numpy as np
 
+
+# I Use this all the time
+def formatPlot(ax: Axes, 
+               title='Chart Tile',
+               xlabel='X Axis Label', 
+               ylabel="Y Axis Label", 
+               xlim=None, 
+               ylim=None, 
+               grid=True,
+               plotarea='linen', 
+               spineColor='black',
+               xticksep = None,
+               yticksep = None
+               ):
+    '''Generic Axes Formatter'''
+
+    ax.set_facecolor(plotarea)
+    ax.grid(grid)
+
+    # Grid plotted below all data
+    if grid:
+        ax.set_axisbelow(True)
+
+    ax.tick_params(color=spineColor, labelcolor=spineColor)
+    for spine in ax.spines.values():
+        spine.set_edgecolor(spineColor)
+
+    # Viewport
+    if xlim:
+        ax.set_xlim(xlim)
+        if xticksep:
+            ax.set_xticks(arange(*xlim,xticksep))
+    if ylim:
+        ax.set_ylim(ylim)
+        if yticksep:
+            pass
+    
+    # Text
+    ax.set_title(title)
+    ax.set_ylabel(ylabel)
+    ax.set_xlabel(xlabel)
+
+
+def darker_hsv_colormap(scale_factor=0.5):
+    """
+    Creates a modified version of the HSV colormap that is darker in shade.
+    Parameters:
+        scale_factor (float): Factor to scale the value (brightness). Should be between 0 and 1.
+                             1 means no change, 0 means complete darkness.
+    Returns:
+        darker_hsv_cmap: A modified colormap that is a darker version of the original HSV colormap.
+    """
+    # Create the HSV colormap in RGB
+    hsv_cmap = plt.cm.hsv(linspace(0, 1, 256))[:, :3]
+    hsv_colors = rgb_to_hsv(hsv_cmap)
+    
+    # Scale the Value component to make it darker
+    hsv_colors[:, 2] *= scale_factor
+    hsv_colors[:, 2] = clip(hsv_colors[:, 2], 0, 1)
+
+    darker_rgb_colors = hsv_to_rgb(hsv_colors)
+    darker_hsv_cmap = plt.cm.colors.ListedColormap(darker_rgb_colors)
+    return darker_hsv_cmap
 
 
 def border(ax, shape='Texas'):

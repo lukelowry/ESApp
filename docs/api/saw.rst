@@ -18,6 +18,9 @@ Mixins
 .. automodule:: gridwb.saw.atc
    :members:
 
+.. automodule:: gridwb.saw.base
+   :members:
+
 .. automodule:: gridwb.saw.case_actions
    :members:
 
@@ -27,8 +30,50 @@ Mixins
 .. automodule:: gridwb.saw.general
    :members:
 
+.. automodule:: gridwb.saw.gic
+   :members:
+
 .. automodule:: gridwb.saw.matrices
    :members:
 
+.. automodule:: gridwb.saw.modify
+   :members:
+
+.. automodule:: gridwb.saw.oneline
+   :members:
+
+.. automodule:: gridwb.saw.opf
+   :members:
+
+.. automodule:: gridwb.saw.powerflow
+   :members:
+
+.. automodule:: gridwb.saw.pv
+   :members:
+
+.. automodule:: gridwb.saw.qv
+   :members:
+
 .. automodule:: gridwb.saw.regions
+   :members:
+
+.. automodule:: gridwb.saw.pv
+   :members:
+
+.. automodule:: gridwb.saw.scheduled
+   :members:
+
+.. automodule:: gridwb.saw.sensitivity
+   :members:
+
+.. automodule:: gridwb.saw.timestep
+   :members:
+
+.. automodule:: gridwb.saw.topology
+   :members:
+
+.. automodule:: gridwb.saw.transient
+   :members:
+
+.. automodule:: gridwb.saw.weater
    :members:

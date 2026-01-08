@@ -1,8 +1,6 @@
 from abc import ABC
-from numpy import diff, pi
 import numpy as np
 import scipy.sparse as sp
-from typing import Any
 from scipy.sparse.linalg import eigsh
 
 

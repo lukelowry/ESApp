@@ -3,35 +3,32 @@ from pandas import DataFrame, concat
 
 # WorkBench Imports
 from ..saw import CommandNotRespectedError
-from ..grid.components import TSContingency
-from ..indextool import IndexTool
-from .app import PWApp
+from ..components import TSContingency
+from ..indexable import Indexable
 
 
 # Dynamics App (Simulation, Model, etc.)
-class Dynamics(PWApp):
-
-    io: IndexTool
+class Dynamics(Indexable):
 
     def fields(self, metric):
         '''Get TS Formatted Fields for Requested Objects'''
-        objs = self.io[metric["Type"]] # TODO I don't need to retrieve from PW I have it local. Will Speed up
+        objs = self[metric["Type"]] # TODO I don't need to retrieve from PW I have it local. Will Speed up
         os = objs['ObjectID']
         flist = [f"{str(os.loc[i])} | {metric['Dynamic']}" for i in range(len(os))]
         return flist
 
     # Set Run Time for list of contingencies
     def setRuntime(self, sec):
-        ctgs = self.io[TSContingency]
+        ctgs = self[TSContingency]
         ctgs["StartTime"] = 0
         ctgs["EndTime"] = sec
-        self.io.upload({TSContingency: ctgs})
+        self.upload({TSContingency: ctgs})
 
     # Create 'SimOnly' contingency if it does not exist
     # TODO Add TSCtgElement that closes an already closed gen at t=0
     def simonly(self):
         try:
-            self.io.esa.change_and_confirm_params_multiple_element(
+            self.esa.change_and_confirm_params_multiple_element(
                 ObjectType="TSContingency",
                 command_df=DataFrame({"TSCTGName": ["SimOnly"]}),
             )
@@ -44,13 +41,13 @@ class Dynamics(PWApp):
         # Unique List of Fields to Request From PW
 
         # Prepare Memory
-        self.io.clearram()
+        self.clearram()
 
         # Gen Obj Field list and Mark Fields for RAM storage
         objFields = []
         flatFields = []
         for objects, fields in self.retrieve:
-            self.io.saveinram(objects, fields)
+            self.saveinram(objects, fields)
             for id in objects['ObjectID']:
                 objFields += [f"{id} | {f}" for f in fields]
                 flatFields += fields
@@ -64,19 +61,19 @@ class Dynamics(PWApp):
             ctgs = [ctgs]
 
         # Only Sims Requested
-        self.io.skipallbut(ctgs)
+        self.skipallbut(ctgs)
 
         # Set Runtime for Simulation
         self.setRuntime(self.runtime)
 
         # Execute Dynamic Simulation for Specified CTGs - High Compute Time
-        self.io.TSSolveAll()
+        self.TSSolveAll()
 
         # Get Results
         meta, df = (None, None)
         for ctg in ctgs:
             # Extract incoming Dataframe
-            metaSim, dfSim = self.io.esa.TSGetContingencyResults(ctg, objFields)
+            metaSim, dfSim = self.esa.TSGetContingencyResults(ctg, objFields)
             # Weird ESA bug where if items at end are open, they don't return data :(
             # Happened Again, if last column is zero valued it removes the column. Awful
 
@@ -126,7 +123,7 @@ class Dynamics(PWApp):
         df: DataFrame = df.copy(deep=True)
 
         # Clear RAM in PW
-        self.io.clearram()
+        self.clearram()
 
         # Return as meta/data tuple
         return (meta, df)

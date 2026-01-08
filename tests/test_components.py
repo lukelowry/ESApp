@@ -2,7 +2,7 @@ import pytest
 import inspect
 from enum import Flag
 
-from gridwb.grid import components
+from gridwb import components
 
 # --- Fixtures ---
 

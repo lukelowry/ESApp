@@ -12,10 +12,9 @@ from scipy.sparse import coo_matrix, lil_matrix, hstack, vstack,  diags
 from enum import Enum, auto
 
 # WorkBench Imports
-from .app import PWApp
-from ..grid.components import GIC_Options_Value, GICInputVoltObject
-from ..grid.components import GICXFormer, Branch, Substation, Bus, Gen
-from ..indextool import IndexTool
+from ..components import GIC_Options_Value, GICInputVoltObject
+from ..components import GICXFormer, Branch, Substation, Bus, Gen
+from ..indexable import Indexable
 from ..utils.b3d import B3D
 
 
@@ -275,20 +274,18 @@ class GICFactory:
         return GICModel(self.subdf.copy(), b.copy(), self.linedf.copy(), x.copy(), self.gendf.copy())
 
 #  GWB App
-class GIC(PWApp):
-
-    io: IndexTool
+class GIC(Indexable):
 
     def gictool(self, calc_all_windings = False):
         '''Returns a new instance of GICTool, which creates various matricies and metrics regarding GICs.
         Don't set calc_all_windings=True unless you must
         '''
 
-        gicxfmrs = self.io[GICXFormer,:]
-        branches = self.io[Branch,:]
-        gens = self.io[Gen,:]
-        subs = self.io[Substation,:]
-        buses = self.io[Bus,:]
+        gicxfmrs = self[GICXFormer,:]
+        branches = self[Branch,:]
+        gens = self[Gen,:]
+        subs = self[Substation,:]
+        buses = self[Bus,:]
 
         return GICTool(gicxfmrs, branches, gens, subs, buses, customcalcs=calc_all_windings)
 
@@ -301,16 +298,16 @@ class GIC(PWApp):
         solvepf: Use produced results in Power Flow
         '''
 
-        self.io.esa.RunScriptCommand(f"GICCalculate({maxfield}, {direction}, {'YES' if solvepf else 'NO'})")
+        self.esa.RunScriptCommand(f"GICCalculate({maxfield}, {direction}, {'YES' if solvepf else 'NO'})")
 
     def cleargic(self):
         '''Clear the Power World Manual GIC Calculations. '''
-        self.io.esa.RunScriptCommand(f"GICClear;")
+        self.esa.RunScriptCommand(f"GICClear;")
 
     def loadb3d(self, ftype, fname, setuponload=True):
         '''Load B3D File for an Electric Field'''
         b = "YES" if setuponload else "NO"
-        self.io.esa.RunScriptCommand(f"GICLoad3DEfield({ftype},{fname},{b})")
+        self.esa.RunScriptCommand(f"GICLoad3DEfield({ftype},{fname},{b})")
 
     def minkv(self, kv):
         '''Set the minimum KV of lines to contribute to GIC Calculations'''
@@ -328,7 +325,7 @@ class GIC(PWApp):
         '''
 
         # Category Selectors
-        buscat = self.io[Bus,['BusCat']]['BusCat']
+        buscat = self[Bus,['BusCat']]['BusCat']
         slk = buscat=='Slack'
         pv = buscat=='PV'
         pq = ~(slk | pv) # I think this is the best way
@@ -424,26 +421,26 @@ class GIC(PWApp):
     def settings(self, value=None):
         '''View Settings or pass a DF to Change Settings'''
         if value is None:
-            return self.io.esa.GetParametersMultipleElement(
+            return self.esa.GetParametersMultipleElement(
                 GIC_Options_Value.TYPE, 
                 GIC_Options_Value.fields
             )[['VariableName', 'ValueField']]
         else:
-            self.io.upload({GIC_Options_Value: value})
+            self.upload({GIC_Options_Value: value})
 
     def calc_mode(self, mode: str):
         """GIC Calculation Mode (Either SnapShot, TimeVarying, 
         NonUniformTimeVarying, or SpatiallyUniformTimeVarying)"""
 
-        self.io.esa.RunScriptCommand(gicoption("CalcMode",mode))
+        self.esa.RunScriptCommand(gicoption("CalcMode",mode))
 
     def pf_include(self, include=True):
         '''Enable GIC for Power Flow Calculations'''
-        self.io.esa.RunScriptCommand(gicoption("IncludeInPowerFlow",include))
+        self.esa.RunScriptCommand(gicoption("IncludeInPowerFlow",include))
 
     def ts_include(self, include=True):
         '''Enable GIC for Time Domain'''
-        self.io.esa.RunScriptCommand(gicoption("IncludeTimeDomain",include))
+        self.esa.RunScriptCommand(gicoption("IncludeTimeDomain",include))
 
     def timevary_csv(self, fpath):
         '''Pass a CSV filepath to upload Time Varying 
@@ -468,7 +465,7 @@ class GIC(PWApp):
         # Send Field Data
         for row in csv.to_records(False):
             cmd = fcmd(obj, fields, list(row)).replace("'", "")
-            self.io.esa.RunScriptCommand(cmd)
+            self.esa.RunScriptCommand(cmd)
 
         print("GIC Time Varying Data Uploaded")
     
@@ -478,13 +475,13 @@ class GIC(PWApp):
         # If done with a 'Direct' approach this iterative method would not be necessary. However, it is fast regardless
         # and done so that users with non Power World data can easily use GICModel.
         
-        gicsubs = self.io[Substation, ["SubNum", "GICSubGroundOhms", "Longitude", "Latitude"]]
-        gicbus = self.io[Bus,["BusNum", "BusNomVolt", "SubNum"]]
+        gicsubs = self[Substation, ["SubNum", "GICSubGroundOhms", "Longitude", "Latitude"]]
+        gicbus = self[Bus,["BusNum", "BusNomVolt", "SubNum"]]
 
         linefields = ["BusNum", "BusNum:1", "GICConductance"]
         xfmrfields = ["SubNum", "BusNum", "BusNum:1", "XFConfiguration", "GICCoilRFrom", "GICCoilRTo", 'GICBlockDevice', 'XFIsAutoXF', 'XFMVABase', 'GICModelKUsed']
         
-        branches = self.io[Branch,linefields+xfmrfields+['BranchDeviceType']]
+        branches = self[Branch,linefields+xfmrfields+['BranchDeviceType']]
         isXFMR = branches['BranchDeviceType']=='Transformer'
         gicbranch = branches.loc[~isXFMR,linefields]
         gicxfmr   = branches.loc[isXFMR,xfmrfields]

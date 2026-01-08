@@ -21,9 +21,8 @@ if parent_dir not in sys.path:
     sys.path.append(parent_dir)
 
 try:
-    from gridwb.indextool import IndexTool
-    from gridwb.adapter import Adapter
-    from gridwb.grid.components import Bus, Gen, Load, Branch, Contingency
+    from gridwb.indexable import Indexable
+    from gridwb.components import Bus, Gen, Load, Branch, Contingency
 except ImportError:
     print("Error: Could not import gridwb packages. Please ensure the package is in your Python path.")
     sys.exit(1)
@@ -37,7 +36,7 @@ def adapter_instance():
 
     print(f"\nConnecting to PowerWorld with case: {case_path}")
     # IndexTool handles SAW creation internally
-    io = IndexTool(case_path)
+    io = Indexable(case_path)
     io.open()
     adapter = Adapter(io)
     yield adapter

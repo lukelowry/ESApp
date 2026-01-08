@@ -1,6 +1,5 @@
-from ..indextool import IndexTool
-from ..grid.components import Branch, Bus, DCTransmissionLine
-from .app import PWApp
+from ..components import Branch, Bus, DCTransmissionLine
+from ..indexable import Indexable
 
 from scipy.sparse import diags, lil_matrix, csc_matrix
 import numpy as np
@@ -17,15 +16,10 @@ class BranchType(Enum):
 
 
 # Constructing Network Matricies and other metrics
-class Network(PWApp):
+class Network(Indexable):
 
-    io: IndexTool
 
-    def __init__(self, io: IndexTool) -> None:
-        super().__init__(io)
-
-        # Incidence
-        self.A = None
+    A = None
 
 
     def busmap(self):
@@ -39,7 +33,7 @@ class Network(PWApp):
         pd.Series
             Mapping from BusNum to matrix index.
         '''
-        busNums = self.io[Bus]
+        busNums = self[Bus]
         return Series(busNums.index, busNums['BusNum'])
 
     def incidence(self, remake=True, hvdc=False):
@@ -67,10 +61,10 @@ class Network(PWApp):
 
         # Retrieve
         fields = ['BusNum', 'BusNum:1']
-        branches = self.io[Branch][fields]
+        branches = self[Branch][fields]
 
         if hvdc:
-            hvdc_branches = self.io[DCTransmissionLine,fields][fields]
+            hvdc_branches = self[DCTransmissionLine,fields][fields]
             branches = concat([branches,hvdc_branches], ignore_index=True)
 
         # Column Positions 
@@ -155,7 +149,7 @@ class Network(PWApp):
         # Just found out that this can be EITHER?? so have to figure 
         # out which to use. Porbably prefer first field
         field = ['LineLengthByParameters', 'LineLengthByParameters:2']
-        ell = self.io[Branch,field][field]
+        ell = self[Branch,field][field]
 
         ell_user = ell['LineLengthByParameters']
         ell.loc[ell_user>0,'LineLengthByParameters:2'] = ell.loc[ell_user>0,'LineLengthByParameters']
@@ -163,14 +157,14 @@ class Network(PWApp):
 
         if hvdc:
             field = 'LineLengthByParameters'
-            hvdc_ell = self.io[DCTransmissionLine,field][field]
+            hvdc_ell = self[DCTransmissionLine,field][field]
             ell = concat([ell, hvdc_ell], ignore_index=True)
 
         # Calculate the equivilent distance if same admittance of a line
         if longer_xfmr_lens:
 
             fields = ['LineX:2', 'LineR:2']
-            branches = self.io[Branch, fields][fields]
+            branches = self[Branch, fields][fields]
 
             isLongLine = ell > length_thresh_km
             lines = branches.loc[isLongLine]
@@ -231,7 +225,7 @@ class Network(PWApp):
             Complex admittance or impedance.
         '''
 
-        branches = self.io[Branch, ['LineR:2', 'LineX:2']]
+        branches = self[Branch, ['LineR:2', 'LineX:2']]
 
 
 
@@ -240,7 +234,7 @@ class Network(PWApp):
         Z = R + 1j*X 
 
         if hvdc: # Just add small impedence for HVDC
-            cnt = len(self.io[DCTransmissionLine])
+            cnt = len(self[DCTransmissionLine])
             Zdc = Z[:cnt].copy()
             Zdc[:] = 0.001
             Z = concat([Z, Zdc], ignore_index=True)
@@ -259,7 +253,7 @@ class Network(PWApp):
             Complex shunt admittance.
         '''
 
-        branches = self.io[Branch, ['LineG', 'LineC']]
+        branches = self[Branch, ['LineG', 'LineC']]
         G = branches['LineG']
         B = branches['LineC']
  
@@ -317,7 +311,7 @@ class Network(PWApp):
         Z = self.ybranch(asZ=True)
 
         # EFFECTIVE EDGE SHUNT ADMITTANCE
-        Ybus = self.io.esa.get_ybus()
+        Ybus = self.esa.get_ybus()
         SUM = np.ones(Ybus.shape[0])
         AVG = np.abs(self.incidence())/2 
         Y = AVG@Ybus@SUM 
