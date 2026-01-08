@@ -122,15 +122,22 @@ class Indexable:
     
     def __setitem__(self, args, value) -> None:
         """
-        Sets grid data in PowerWorld using indexer notation.
+        Set grid data in PowerWorld using indexer notation.
 
-        :param args: The target object type and optional fields.
-        :type args: Union[Type[GObject], Tuple[Type[GObject], Union[str, List[str]]]]
-        :param value: The data to write. If args is just a GObject, value must be a DataFrame 
-            containing primary keys. If args includes fields, value can be a scalar (broadcast) 
-            or a list/array matching the number of objects.
-        :type value: Union[pandas.DataFrame, Any]
-        :raises TypeError: If the index or value types are mismatched.
+        Parameters
+        ----------
+        args : Union[Type[GObject], Tuple[Type[GObject], Union[str, List[str]]]]
+            The target object type and optional fields.
+        value : Union[pandas.DataFrame, Any]
+            The data to write. If `args` is just a GObject type, `value`
+            must be a DataFrame containing primary keys. If `args` includes
+            fields, `value` can be a scalar (which is broadcast) or a
+            list/array matching the number of objects.
+
+        Raises
+        ------
+        TypeError
+            If the index or value types are mismatched or unsupported.
         """
         # Case 1: Bulk update from a DataFrame. e.g., wb.pw[Bus] = df
         if isinstance(args, type) and issubclass(args, GObject):

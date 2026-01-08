@@ -1,6 +1,11 @@
 """
-saw is short for SimAuto Wrapper. This package provides a class, SAW, for
-interfacing with PowerWorld's Simulator Automation Server (SimAuto).
+SimAuto Wrapper (:mod:`gridwb.saw`)
+==================================
+
+This module provides the low-level interface for communicating with the
+PowerWorld Simulator Automation Server (SimAuto). The primary entry point
+is the :class:`~.SAW` class. It also defines custom exception classes
+for handling COM and PowerWorld-specific errors.
 """
 from .saw import SAW
 from ._exceptions import PowerWorldError, COMError, CommandNotRespectedError, Error
