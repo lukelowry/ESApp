@@ -30,25 +30,33 @@ class Network(PWApp):
 
     def busmap(self):
         '''
-        Returns a Pandas Series indexed by BusNum to the positional value of each bus
-        in matricies like the Y-Bus, Incidence Matrix, Etc.
+        Returns a Pandas Series indexed by BusNum to the positional value of each bus.
 
-        Example usage:
-        branches['BusNum'].map(busmap)
+        Useful for mapping bus numbers to matrix indices.
+
+        Returns
+        -------
+        pd.Series
+            Mapping from BusNum to matrix index.
         '''
         busNums = self.io[Bus]
         return Series(busNums.index, busNums['BusNum'])
 
     def incidence(self, remake=True, hvdc=False):
         '''
-        Details
-            Returns incidence matrix. If alreayd made, retrieves from cache
-            instead of making it again.
+        Returns the sparse incidence matrix of the branch network.
 
-        Returns:
-            Sparse Incidence Matrix of the branch network of the grid.
+        Parameters
+        ----------
+        remake : bool, optional
+            If True, recalculates the matrix even if cached. Defaults to True.
+        hvdc : bool, optional
+            If True, includes HVDC lines. Defaults to False.
 
-        Dimensions: (Number of Branches)x(Number of Buses)
+        Returns
+        -------
+        scipy.sparse.lil_matrix
+            Sparse Incidence Matrix of the branch network (Branches x Buses).
         '''
 
         # If already made, don't remake
@@ -88,13 +96,23 @@ class Network(PWApp):
 
     def laplacian(self, weights: BranchType, longer_xfmr_lens=True, len_thresh=0.01, hvdc=False):
         '''
-        Description:
-            Uses the systems incident matrix and creates
-            a laplacian with branch weights as W
-        Parameters:
-            W: 1-D array of weights
-        Returns:
-            Sparse Laplacian
+        Uses the systems incident matrix and creates a laplacian with branch weights.
+
+        Parameters
+        ----------
+        weights : BranchType
+            Type of weights to use (LENGTH, RES_DIST, DELAY).
+        longer_xfmr_lens : bool, optional
+            If True, uses fictitious lengths for transformers. Defaults to True.
+        len_thresh : float, optional
+            Threshold for short lines in km. Defaults to 0.01.
+        hvdc : bool, optional
+            If True, includes HVDC lines. Defaults to False.
+
+        Returns
+        -------
+        scipy.sparse.csc_matrix
+            Sparse Laplacian matrix.
         '''
 
         if weights == BranchType.LENGTH:    #  m^-2
@@ -120,14 +138,18 @@ class Network(PWApp):
         Returns lengths of each branch in kilometers.
 
         Parameters
-            longer_xfmr_lens: Use a ficticious length that is approximately
-            the same length as it would be if it was a branch
-            If False, lengths are assumed to be 1 meter.
+        ----------
+        longer_xfmr_lens : bool, optional
+            Use a ficticious length for transformers. Defaults to False.
+        length_thresh_km : float, optional
+            Minimum length threshold in km. Defaults to 0.01.
+        hvdc : bool, optional
+            If True, includes HVDC lines. Defaults to False.
 
-            length_thresh_km: Branches less than 0.1km will use the 'equivilent elc. dist'.
-            This is an option because various devices may actually have zero distance
-
-            hvdc: if True, this will also include hvdc lines
+        Returns
+        -------
+        pd.Series
+            Lengths of branches.
         '''
 
         # This is distance in kilometers
@@ -177,12 +199,17 @@ class Network(PWApp):
     
     def zmag(self, hvdc=False):
         '''
-        Steady-state phase delays of the branches, approximated
-        as the angle of the complex value.
-        Units
-            Radians
-        Min/Max
-            -pi/2, 0
+        Steady-state phase delays of the branches, approximated as the angle of the complex value.
+
+        Parameters
+        ----------
+        hvdc : bool, optional
+            If True, includes HVDC lines. Defaults to False.
+
+        Returns
+        -------
+        pd.Series
+            Phase delays (radians).
         '''
         Y = self.ybranch(hvdc=hvdc) 
 
@@ -190,7 +217,19 @@ class Network(PWApp):
       
     def ybranch(self, asZ=False, hvdc=False):
         '''
-        Return Admittance of Lines in Complex Form
+        Return Admittance (or Impedance) of Lines in Complex Form.
+
+        Parameters
+        ----------
+        asZ : bool, optional
+            If True, returns Impedance (Z). If False, returns Admittance (Y). Defaults to False.
+        hvdc : bool, optional
+            If True, includes HVDC lines. Defaults to False.
+
+        Returns
+        -------
+        pd.Series
+            Complex admittance or impedance.
         '''
 
         branches = self.io[Branch, ['LineR:2', 'LineX:2']]
@@ -213,7 +252,12 @@ class Network(PWApp):
     
     def yshunt(self):
         '''
-        Return Admittance of Lines in Complex Form
+        Return Shunt Admittance of Lines in Complex Form.
+
+        Returns
+        -------
+        pd.Series
+            Complex shunt admittance.
         '''
 
         branches = self.io[Branch, ['LineG', 'LineC']]
@@ -223,7 +267,14 @@ class Network(PWApp):
         return G + 1j*B
 
     def gamma(self):
-        '''Returns approximation of propagation constants for each branch'''
+        '''
+        Returns approximation of propagation constants for each branch.
+
+        Returns
+        -------
+        pd.Series
+            Propagation constants.
+        '''
 
         # Length (Set Xfmr to 1 meter)
         ell = self.lengths()
@@ -248,8 +299,17 @@ class Network(PWApp):
     
     def delay(self, min_delay=10e-4):
         '''
-        Return Effective delay of branches
-        The minimum delay permitted is 10 us
+        Return Effective delay of branches.
+
+        Parameters
+        ----------
+        min_delay : float, optional
+            Minimum delay permitted. Defaults to 10e-4.
+
+        Returns
+        -------
+        pd.Series
+            Effective delay.
         '''
 
         w = 2*np.pi*60

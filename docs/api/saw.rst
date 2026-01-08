@@ -20,3 +20,15 @@ Mixins
 
 .. automodule:: gridwb.saw.case_actions
    :members:
+
+.. automodule:: gridwb.saw.contingency
+   :members:
+
+.. automodule:: gridwb.saw.general
+   :members:
+
+.. automodule:: gridwb.saw.matrices
+   :members:
+
+.. automodule:: gridwb.saw.regions
+   :members:

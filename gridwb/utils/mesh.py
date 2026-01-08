@@ -15,11 +15,15 @@ def extract_unique_edges(faces):
     """
     Extracts a sorted list of unique edges from a list of faces.
     
-    Args:
-        faces (list of lists): The mesh faces.
+    Parameters
+    ----------
+    faces : list of lists
+        The mesh faces.
         
-    Returns:
-        np.ndarray: An (M, 2) array of unique edges where col 0 < col 1.
+    Returns
+    -------
+    np.ndarray
+        An (M, 2) array of unique edges where col 0 < col 1.
     """
     unique_edges = set()
     
@@ -46,10 +50,15 @@ class Mesh:
         """
         Reads a .ply file and constructs a Mesh object.
         
-        Args:
-            filepath (str): Path to the .ply file.
-        Returns:
-            Mesh: The constructed Mesh object.
+        Parameters
+        ----------
+        filepath : str
+            Path to the .ply file.
+
+        Returns
+        -------
+        Mesh
+            The constructed Mesh object.
         """
         with open(filepath, 'rb') as f:
             # Parse Header
@@ -134,8 +143,10 @@ class Mesh:
         """
         Constructs the sparse oriented incidence matrix B for the mesh.
         
-        Returns:
-            scipy.sparse.csc_matrix: Matrix B of size (|V| x |E|).
+        Returns
+        -------
+        scipy.sparse.csc_matrix
+            Matrix B of size (|V| x |E|).
         """
         # Topological data
         vertices = self.vertices
@@ -161,8 +172,10 @@ class Mesh:
         """
         Returns the vertex coordinates as a numpy array.
         
-        Returns:
-            np.ndarray: An (N, 3) array of vertex coordinates.
+        Returns
+        -------
+        np.ndarray
+            An (N, 3) array of vertex coordinates.
         """
         return np.array(self.vertices)
 
@@ -170,8 +183,10 @@ class Mesh:
         """
         Constructs the graph Laplacian matrix L for the mesh.
         
-        Returns:
-            scipy.sparse.csc_matrix: The graph Laplacian matrix L.
+        Returns
+        -------
+        scipy.sparse.csc_matrix
+            The graph Laplacian matrix L.
         """
         B = self.get_incidence_matrix()
         L = B @ B.T

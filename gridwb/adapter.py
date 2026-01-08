@@ -617,19 +617,61 @@ class Adapter:
     def ptdf(self, seller, buyer, method='DC'):
         """
         Calculates PTDF between seller and buyer.
-        Seller/Buyer can be strings like '[AREA "Top"]' or '[BUS 1]'.
+
+        Parameters
+        ----------
+        seller : str
+            Seller identifier (e.g. '[AREA "Top"]' or '[BUS 1]').
+        buyer : str
+            Buyer identifier (e.g. '[AREA "Bottom"]' or '[BUS 2]').
+        method : str, optional
+            Calculation method ('DC', etc.). Defaults to 'DC'.
+
+        Returns
+        -------
+        pd.DataFrame
+            PTDF results.
         """
         return self.esa.CalculatePTDF(seller, buyer, method)
     
     def lodf(self, branch, method='DC'):
         """
         Calculates LODF for a branch.
-        Branch should be a string identifier like '[BRANCH 1 2 1]'.
+        
+        Parameters
+        ----------
+        branch : str
+            Branch identifier string like '[BRANCH 1 2 1]'.
+        method : str, optional
+            Calculation method. Defaults to 'DC'.
+
+        Returns
+        -------
+        pd.DataFrame
+            LODF results.
         """
         return self.esa.CalculateLODF(branch, method)
 
     def fault(self, bus_num, fault_type='SLG', r=0.0, x=0.0):
-        """Runs a fault at a specified bus number."""
+        """
+        Runs a fault at a specified bus number.
+
+        Parameters
+        ----------
+        bus_num : int
+            The bus number to fault.
+        fault_type : str, optional
+            Type of fault (e.g. 'SLG', '3PB'). Defaults to 'SLG'.
+        r : float, optional
+            Fault resistance. Defaults to 0.0.
+        x : float, optional
+            Fault reactance. Defaults to 0.0.
+
+        Returns
+        -------
+        str
+            Result string from SimAuto.
+        """
         return self.esa.RunFault(f'[BUS {bus_num}]', fault_type, r, x)
     
     def clear_fault(self):
@@ -639,28 +681,95 @@ class Adapter:
     def shortest_path(self, start_bus, end_bus):
         """
         Determines the shortest path between two buses.
-        Returns a DataFrame of the path.
+
+        Parameters
+        ----------
+        start_bus : int
+            Starting bus number.
+        end_bus : int
+            Ending bus number.
+
+        Returns
+        -------
+        pd.DataFrame
+            DataFrame describing the path.
         """
         return self.esa.DetermineShortestPath(f'[BUS {start_bus}]', f'[BUS {end_bus}]')
 
     # --- Advanced Analysis ---
 
     def run_pv(self, source, sink):
-        """Runs PV analysis between source and sink injection groups."""
+        """
+        Runs PV analysis between source and sink injection groups.
+
+        Parameters
+        ----------
+        source : str
+            Source injection group name.
+        sink : str
+            Sink injection group name.
+        """
         self.esa.RunPV(source, sink)
 
     def run_qv(self, filename=None):
-        """Runs QV analysis."""
+        """
+        Runs QV analysis.
+
+        Parameters
+        ----------
+        filename : str, optional
+            Filename to save results. Defaults to None.
+
+        Returns
+        -------
+        str
+            Result string.
+        """
         return self.esa.RunQV(filename)
     
     def calculate_atc(self, seller, buyer):
-        """Calculates Available Transfer Capability."""
+        """
+        Calculates Available Transfer Capability.
+
+        Parameters
+        ----------
+        seller : str
+            Seller identifier.
+        buyer : str
+            Buyer identifier.
+
+        Returns
+        -------
+        str
+            Result string.
+        """
         return self.esa.DetermineATC(seller, buyer)
     
     def calculate_gic(self, max_field, direction):
-        """Calculates GIC with specified field (V/km) and direction (degrees)."""
+        """
+        Calculates GIC with specified field (V/km) and direction (degrees).
+
+        Parameters
+        ----------
+        max_field : float
+            Maximum electric field in V/km.
+        direction : float
+            Direction of the field in degrees.
+
+        Returns
+        -------
+        str
+            Result string.
+        """
         return self.esa.CalculateGIC(max_field, direction)
     
     def solve_opf(self):
-        """Solves Primal LP OPF."""
+        """
+        Solves Primal LP OPF.
+
+        Returns
+        -------
+        str
+            Result string.
+        """
         return self.esa.SolvePrimalLP()

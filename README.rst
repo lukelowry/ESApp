@@ -38,23 +38,22 @@ Here is a quick example of how ESA++ simplifies data access and power flow analy
 
 .. code-block:: python
 
-    from gridwb import GridWorkBench
-    from gridwb.grid.components import *
+    from gridwb import *
 
     # Open Case
-    wb = GridWorkBench("my_grid_model.pwb")
+    wb = GridWorkBench("case_name.pwb")
 
-    # 2. Retrieve data 
-    bus_data = wb[Bus, ['BusName', 'BusPUVolt']]
+    # Retrieve data 
+    bus_data = wb[Bus, ["BusName", "BusPUVolt"]]
 
-    # 3. Solve power flow and get complex voltages
+    # Solve power flow
     V = wb.pflow()
 
-    # 4. Perform high-level operations 
+    # Do some action, write to PW
     violations = wb.func.find_violations(v_min=0.95)
+    wb[Gen, "GenMW"] = 100.0
 
-    # 5. Modify data and save
-    wb[Gen, 'GenMW'] = 100.0
+    # Save case
     wb.save()
 
 Why ESA++?
@@ -72,9 +71,8 @@ More Examples
 
 The `examples/ <https://github.com/lukelowry/ESApp/tree/main/docs/examples>`_ directory contains a gallery of demonstrations, including:
 
-- **Basic Data I/O**: Efficiently reading and writing large sets of grid parameters.
-- **Contingency Analysis**: Automating N-1 studies and processing violation matrices.
-- **Matrix Extraction**: Retrieving Y-Bus and Jacobian matrices for external mathematical modeling.
+- **Object Field Access**: Reduce the time you spend searching for field names with ESA++ IDE typehints for objects and fields.
+- **Matrix Extraction**: Retrieving Y-Bus, Jacobian, and GIC conductance matrices for external mathematical modeling.
 
 Testing
 -------

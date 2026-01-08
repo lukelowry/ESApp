@@ -6,3 +6,9 @@ The ``apps`` module contains specialized tools for advanced analysis like GIC, N
 .. automodule:: gridwb.apps
    :members:
    :undoc-members:
+
+Network Analysis
+----------------
+.. automodule:: gridwb.apps.network
+   :members:
+   :undoc-members:
