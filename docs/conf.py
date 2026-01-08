@@ -7,7 +7,7 @@ sys.path.insert(0, os.path.abspath(".."))
 
 extensions = [
     "sphinx.ext.autodoc",
-    #"sphinx.ext.autosummary",
+    "sphinx.ext.autosummary", # Re-enabled to allow automatic class listing
     "sphinx.ext.viewcode",
     "sphinx.ext.todo",
     "sphinx.ext.mathjax",
@@ -19,9 +19,8 @@ extensions = [
     "nbsphinx",
 ]
 
-#autosummary_generate = True  
+autosummary_generate = True  
 
-# CHANGED: Removed "members": True to prevent massive member lists by default
 autodoc_default_options = {
     "member-order": "groupwise",
 }
@@ -72,7 +71,7 @@ html_sourcelink_suffix = ''
 master_doc = "index"
 
 project = "ESA++"
-copyright = "2024, Luke Lowery"
+copyright = "2026, Luke Lowery"
 author = "Luke Lowery"
 
 try:
@@ -95,3 +94,18 @@ autodoc_mock_imports = [
     "fiona",
     "pyproj",
 ]
+
+def skip_all_class_members(app, what, name, obj, skip, options):
+    """
+    Forces Sphinx to skip documenting methods and attributes within classes 
+    specifically for the esapp.grid module.
+    """
+    # Target only the grid module
+    if "esapp.grid" in name:
+        # Skip everything that isn't a class (methods, attributes, properties, etc)
+        if what in ("method", "attribute", "property", "data"):
+            return True
+    return None
+
+def setup(app):
+    app.connect('autodoc-skip-member', skip_all_class_members)

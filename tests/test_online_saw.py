@@ -53,6 +53,11 @@ def temp_file():
 
 
 class TestOnlineSAW:
+    """
+    Tests for the SAW class.
+    NOTE: Tests are ordered carefully. Destructive tests (Modify, Regions, CaseActions)
+    that alter the case topology or numbering are placed at the end to avoid breaking other tests.
+    """
     # -------------------------------------------------------------------------
     # Base Mixin Tests
     # -------------------------------------------------------------------------
@@ -303,6 +308,24 @@ class TestOnlineSAW:
         # Setup: Ensure primary contingencies exist for the combo analysis
         saw_instance.CTGAutoInsert()
         saw_instance.CTGConvertToPrimaryCTG()
+
+        # Optimization: Skip most contingencies to avoid long runtimes on large cases
+        # Set all contingencies to Skip=YES
+        saw_instance.SetData("Contingency", ["Skip"], ["YES"], "ALL")
+        
+        # Unskip a few Primary contingencies to test the functionality
+        ctgs = saw_instance.ListOfDevices("Contingency")
+        if ctgs is not None and not ctgs.empty:
+            # Use CTGLabel if available, otherwise first column
+            name_col = "CTGLabel" if "CTGLabel" in ctgs.columns else ctgs.columns[0]
+            
+            # Try to find primary contingencies (suffix -Primary is default)
+            primary_ctgs = ctgs[ctgs[name_col].astype(str).str.endswith("-Primary")]
+            target_ctgs = primary_ctgs.head(2) if not primary_ctgs.empty else ctgs.head(2)
+            
+            for name in target_ctgs[name_col]:
+                saw_instance.SetData("Contingency", [name_col, "Skip"], [name, "NO"])
+
         try:
             saw_instance.CTGComboSolveAll()
         except PowerWorldPrerequisiteError:
@@ -416,6 +439,10 @@ class TestOnlineSAW:
                 b = closed_branches.iloc[0]
                 branch_str = f'[BRANCH {b["BusNum"]} {b["BusNum:1"]} "{b["LineCircuit"]}"]'
                 area_str = f'[AREA {areas.iloc[0]["AreaNum"]}]'
+                
+                # Setup: Ensure area has participation points to avoid "no available participation points" error
+                saw_instance.SetParticipationFactors("CONSTANT", 1.0, area_str)
+                
                 try:
                     saw_instance.CalculateShiftFactors(branch_str, "SELLER", area_str)
                 except PowerWorldPrerequisiteError as e:
@@ -481,6 +508,17 @@ class TestOnlineSAW:
 
     def test_topology_facility(self, saw_instance, temp_file):
         tmp_aux = temp_file(".aux")
+        
+        # Setup: Ensure at least one bus is marked as External (Equiv=YES) for facility analysis
+        buses = saw_instance.GetParametersMultipleElement("Bus", ["BusNum"])
+        if buses is not None and not buses.empty:
+            # Set the last bus to External
+            last_bus = buses.iloc[-1]["BusNum"]
+            try:
+                saw_instance.SetData("Bus", ["BusNum", "Equiv"], [last_bus, "YES"])
+            except Exception:
+                pass
+
         try:
             saw_instance.DoFacilityAnalysis(tmp_aux)
         except PowerWorldPrerequisiteError:
@@ -718,113 +756,6 @@ class TestOnlineSAW:
         saw_instance.GetATCResults(["MaxFlow", "LimitingContingency"])
 
     # -------------------------------------------------------------------------
-    # Modify Mixin Tests
-    # -------------------------------------------------------------------------
-
-    def test_modify_create_delete(self, saw_instance):
-        dummy_bus = 99999
-        saw_instance.CreateData("Bus", ["BusNum", "BusName"], [dummy_bus, "SAW_TEST"])
-        saw_instance.Delete("Bus", f"BusNum = {dummy_bus}")
-
-    def test_modify_auto(self, saw_instance):
-        saw_instance.AutoInsertTieLineTransactions()
-
-    def test_modify_branch(self, saw_instance):
-        saw_instance.BranchMVALimitReorder()
-
-    def test_modify_calc(self, saw_instance):
-        try:
-            saw_instance.CalculateRXBGFromLengthConfigCondType()
-        except PowerWorldAddonError:
-            pytest.skip("TransLineCalc not registered")
-
-    def test_modify_base(self, saw_instance):
-        saw_instance.ChangeSystemMVABase(100.0)
-
-    def test_modify_islands(self, saw_instance):
-        saw_instance.ClearSmallIslands()
-
-    def test_modify_create_line(self, saw_instance):
-        # Needs valid bus numbers, skipping actual creation to avoid clutter
-        pass
-
-    def test_modify_directions(self, saw_instance):
-        # Needs source/sink
-        pass
-
-    def test_modify_gen(self, saw_instance):
-        saw_instance.InitializeGenMvarLimits()
-        saw_instance.SetGenPMaxFromReactiveCapabilityCurve()
-
-    def test_modify_inj(self, saw_instance):
-        saw_instance.InjectionGroupsAutoInsert()
-        saw_instance.InjectionGroupCreate("TestIG", "Gen", 1.0, "")
-        saw_instance.RenameInjectionGroup("TestIG", "TestIG_Renamed")
-
-    def test_modify_interface(self, saw_instance):
-        saw_instance.InterfacesAutoInsert("AREA")
-        saw_instance.InterfaceCreate("TestInterface", True, "Branch", "SELECTED")
-        saw_instance.SetInterfaceLimitToMonitoredElementLimitSum()
-
-    def test_modify_merge(self, saw_instance):
-        # Destructive, skipping
-        pass
-
-    def test_modify_move(self, saw_instance):
-        # Destructive, skipping
-        pass
-
-    def test_modify_reassign(self, saw_instance):
-        saw_instance.ReassignIDs("Load", "BusName")
-
-    def test_modify_remove(self, saw_instance):
-        saw_instance.Remove3WXformerContainer()
-
-    def test_modify_rotate(self, saw_instance):
-        buses = saw_instance.GetParametersMultipleElement("Bus", ["BusNum"])
-        if buses is not None and not buses.empty:
-            bus_num = buses.iloc[0]["BusNum"]
-            saw_instance.RotateBusAnglesInIsland(f"[BUS {bus_num}]", 0.0)
-
-    def test_modify_part(self, saw_instance):
-        saw_instance.SetParticipationFactors("CONSTANT", 1.0, "SYSTEM")
-
-    def test_modify_volt(self, saw_instance):
-        buses = saw_instance.GetParametersMultipleElement("Bus", ["BusNum"])
-        if buses is not None and not buses.empty:
-            bus_num = buses.iloc[0]["BusNum"]
-            saw_instance.SetScheduledVoltageForABus(f"[BUS {bus_num}]", 1.0)
-
-    def test_modify_split(self, saw_instance):
-        # Destructive
-        pass
-
-    def test_modify_superarea(self, saw_instance):
-        saw_instance.CreateData("SuperArea", ["Name"], ["TestSuperArea"])
-        saw_instance.SuperAreaAddAreas("TestSuperArea", "ALL")
-        saw_instance.SuperAreaRemoveAreas("TestSuperArea", "ALL")
-
-    def test_modify_tap(self, saw_instance):
-        # Destructive
-        pass
-
-    def test_modify_extras(self, saw_instance):
-        saw_instance.InjectionGroupRemoveDuplicates()
-        saw_instance.InterfaceRemoveDuplicates()
-        saw_instance.DirectionsAutoInsertReference("Bus", "Slack")
-        
-        # Create interface for flattening
-        saw_instance.InterfaceCreate("TestInt", True, "Branch", "SELECTED")
-        saw_instance.InterfaceFlatten("TestInt")
-        
-        saw_instance.InterfaceFlattenFilter("ALL")
-        saw_instance.InterfaceModifyIsolatedElements()
-        
-        # Create contingency for adding elements
-        saw_instance.CreateData("Contingency", ["Name"], ["TestCtg"])
-        saw_instance.InterfaceAddElementsFromContingency("TestInt", "TestCtg")
-
-    # -------------------------------------------------------------------------
     # Scheduled Actions Mixin Tests
     # -------------------------------------------------------------------------
 
@@ -1057,38 +988,6 @@ class TestOnlineSAW:
         saw_instance.UnSelectAll("Bus")
 
     # -------------------------------------------------------------------------
-    # Case Actions Mixin Tests
-    # -------------------------------------------------------------------------
-
-    def test_case_description(self, saw_instance):
-        saw_instance.CaseDescriptionSet("Test Description")
-        saw_instance.CaseDescriptionClear()
-
-    def test_case_delete_external(self, saw_instance):
-        saw_instance.DeleteExternalSystem()
-
-    def test_case_equivalence(self, saw_instance):
-        saw_instance.Equivalence()
-
-    def test_case_renumber(self, saw_instance):
-        saw_instance.RenumberAreas()
-        saw_instance.RenumberBuses()
-        saw_instance.RenumberSubs()
-        saw_instance.RenumberZones()
-        saw_instance.RenumberCase()
-
-    def test_case_save_external(self, saw_instance, temp_file):
-        tmp_pwb = temp_file(".pwb")
-        saw_instance.SaveExternalSystem(tmp_pwb)
-
-    def test_case_save_merged(self, saw_instance, temp_file):
-        tmp_pwb = temp_file(".pwb")
-        saw_instance.SaveMergedFixedNumBusCase(tmp_pwb)
-
-    def test_case_scale(self, saw_instance):
-        saw_instance.Scale("LOAD", "FACTOR", [1.0], "SYSTEM")
-
-    # -------------------------------------------------------------------------
     # Oneline Mixin Tests
     # -------------------------------------------------------------------------
 
@@ -1121,6 +1020,168 @@ class TestOnlineSAW:
             saw_instance.ExportOnelineAsShapeFile("test.shp", "Oneline", "Desc")
         except PowerWorldError:
             pass
+
+    # -------------------------------------------------------------------------
+    # Modify Mixin Tests (Destructive - Run Late)
+    # -------------------------------------------------------------------------
+
+    def test_modify_create_delete(self, saw_instance):
+        dummy_bus = 99999
+        saw_instance.CreateData("Bus", ["BusNum", "BusName"], [dummy_bus, "SAW_TEST"])
+        saw_instance.Delete("Bus", f"BusNum = {dummy_bus}")
+
+    def test_modify_auto(self, saw_instance):
+        saw_instance.AutoInsertTieLineTransactions()
+
+    def test_modify_branch(self, saw_instance):
+        saw_instance.BranchMVALimitReorder()
+
+    def test_modify_calc(self, saw_instance):
+        try:
+            saw_instance.CalculateRXBGFromLengthConfigCondType()
+        except PowerWorldAddonError:
+            pytest.skip("TransLineCalc not registered")
+
+    def test_modify_base(self, saw_instance):
+        # Destructive: Changes system base
+        saw_instance.ChangeSystemMVABase(100.0)
+
+    def test_modify_islands(self, saw_instance):
+        saw_instance.ClearSmallIslands()
+
+    def test_modify_create_line(self, saw_instance):
+        # Needs valid bus numbers, skipping actual creation to avoid clutter
+        pass
+
+    def test_modify_directions(self, saw_instance):
+        # Needs source/sink
+        pass
+
+    def test_modify_gen(self, saw_instance):
+        saw_instance.InitializeGenMvarLimits()
+        saw_instance.SetGenPMaxFromReactiveCapabilityCurve()
+
+    def test_modify_inj(self, saw_instance):
+        saw_instance.InjectionGroupsAutoInsert()
+        saw_instance.InjectionGroupCreate("TestIG", "Gen", 1.0, "")
+        saw_instance.RenameInjectionGroup("TestIG", "TestIG_Renamed")
+
+    def test_modify_interface(self, saw_instance):
+        saw_instance.InterfacesAutoInsert("AREA")
+        saw_instance.InterfaceCreate("TestInterface", True, "Branch", "SELECTED")
+        saw_instance.SetInterfaceLimitToMonitoredElementLimitSum()
+
+    def test_modify_merge(self, saw_instance):
+        # Destructive, skipping
+        pass
+
+    def test_modify_move(self, saw_instance):
+        # Destructive, skipping
+        pass
+
+    def test_modify_reassign(self, saw_instance):
+        saw_instance.ReassignIDs("Load", "BusName")
+
+    def test_modify_remove(self, saw_instance):
+        saw_instance.Remove3WXformerContainer()
+
+    def test_modify_rotate(self, saw_instance):
+        buses = saw_instance.GetParametersMultipleElement("Bus", ["BusNum"])
+        if buses is not None and not buses.empty:
+            bus_num = buses.iloc[0]["BusNum"]
+            saw_instance.RotateBusAnglesInIsland(f"[BUS {bus_num}]", 0.0)
+
+    def test_modify_part(self, saw_instance):
+        saw_instance.SetParticipationFactors("CONSTANT", 1.0, "SYSTEM")
+
+    def test_modify_volt(self, saw_instance):
+        buses = saw_instance.GetParametersMultipleElement("Bus", ["BusNum"])
+        if buses is not None and not buses.empty:
+            bus_num = buses.iloc[0]["BusNum"]
+            saw_instance.SetScheduledVoltageForABus(f"[BUS {bus_num}]", 1.0)
+
+    def test_modify_split(self, saw_instance):
+        # Destructive
+        pass
+
+    def test_modify_superarea(self, saw_instance):
+        saw_instance.CreateData("SuperArea", ["Name"], ["TestSuperArea"])
+        saw_instance.SuperAreaAddAreas("TestSuperArea", "ALL")
+        saw_instance.SuperAreaRemoveAreas("TestSuperArea", "ALL")
+
+    def test_modify_tap(self, saw_instance):
+        # Destructive
+        pass
+
+    def test_modify_extras(self, saw_instance):
+        saw_instance.InjectionGroupRemoveDuplicates()
+        saw_instance.InterfaceRemoveDuplicates()
+        saw_instance.DirectionsAutoInsertReference("Bus", "Slack")
+        
+        # Create interface for flattening
+        saw_instance.InterfaceCreate("TestInt", True, "Branch", "SELECTED")
+        saw_instance.InterfaceFlatten("TestInt")
+        
+        saw_instance.InterfaceFlattenFilter("ALL")
+        saw_instance.InterfaceModifyIsolatedElements()
+        
+        # Create contingency for adding elements
+        saw_instance.CreateData("Contingency", ["Name"], ["TestCtg"])
+        saw_instance.InterfaceAddElementsFromContingency("TestInt", "TestCtg")
+
+    # -------------------------------------------------------------------------
+    # Regions Mixin Tests (Destructive - Run Late)
+    # -------------------------------------------------------------------------
+
+    def test_regions_update(self, saw_instance):
+        saw_instance.RegionUpdateBuses()
+
+    def test_regions_rename(self, saw_instance):
+        saw_instance.RegionRename("OldRegion", "NewRegion")
+        saw_instance.RegionRenameClass("OldClass", "NewClass")
+        saw_instance.RegionRenameProper1("OldP1", "NewP1")
+        saw_instance.RegionRenameProper2("OldP2", "NewP2")
+        saw_instance.RegionRenameProper3("OldP3", "NewP3")
+        saw_instance.RegionRenameProper12Flip()
+        
+    def test_regions_load(self, saw_instance, temp_file):
+        try:
+            saw_instance.RegionLoadShapefile(temp_file(".shp"), "Class", ["Attr"])
+        except Exception:
+            pass
+
+    # -------------------------------------------------------------------------
+    # Case Actions Mixin Tests (Highly Destructive - Run Last)
+    # -------------------------------------------------------------------------
+
+    def test_case_description(self, saw_instance):
+        saw_instance.CaseDescriptionSet("Test Description")
+        saw_instance.CaseDescriptionClear()
+
+    def test_case_delete_external(self, saw_instance):
+        saw_instance.DeleteExternalSystem()
+
+    def test_case_equivalence(self, saw_instance):
+        saw_instance.Equivalence()
+
+    def test_case_save_external(self, saw_instance, temp_file):
+        tmp_pwb = temp_file(".pwb")
+        saw_instance.SaveExternalSystem(tmp_pwb)
+
+    def test_case_save_merged(self, saw_instance, temp_file):
+        tmp_pwb = temp_file(".pwb")
+        saw_instance.SaveMergedFixedNumBusCase(tmp_pwb)
+
+    def test_case_scale(self, saw_instance):
+        saw_instance.Scale("LOAD", "FACTOR", [1.0], "SYSTEM")
+
+    def test_case_renumber(self, saw_instance):
+        # This invalidates all bus numbers in the case!
+        saw_instance.RenumberAreas()
+        saw_instance.RenumberBuses()
+        saw_instance.RenumberSubs()
+        saw_instance.RenumberZones()
+        saw_instance.RenumberCase()
 
 
 if __name__ == "__main__":
