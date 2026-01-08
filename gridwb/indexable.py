@@ -33,17 +33,6 @@ class Indexable:
         """
         self.esa = esa
 
-    def getIO(self):
-        """
-        Compatibility method for apps expecting a Context object.
-
-        Returns
-        -------
-        Indexable
-            The current `Indexable` instance.
-        """
-        return self
-
     @timing
     def open(self):
         """

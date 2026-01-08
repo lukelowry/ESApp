@@ -5,7 +5,7 @@ import numpy as np
 
 from matplotlib.axes import Axes
 from matplotlib.cm import ScalarMappable
-from matplotlib.colors import Normalize
+from matplotlib.colors import Normalize, rgb_to_hsv, hsv_to_rgb
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 
@@ -39,7 +39,7 @@ def formatPlot(ax: Axes,
     if xlim:
         ax.set_xlim(xlim)
         if xticksep:
-            ax.set_xticks(arange(*xlim,xticksep))
+            ax.set_xticks(np.arange(*xlim,xticksep))
     if ylim:
         ax.set_ylim(ylim)
         if yticksep:
@@ -61,12 +61,12 @@ def darker_hsv_colormap(scale_factor=0.5):
         darker_hsv_cmap: A modified colormap that is a darker version of the original HSV colormap.
     """
     # Create the HSV colormap in RGB
-    hsv_cmap = plt.cm.hsv(linspace(0, 1, 256))[:, :3]
+    hsv_cmap = plt.cm.hsv(np.linspace(0, 1, 256))[:, :3]
     hsv_colors = rgb_to_hsv(hsv_cmap)
     
     # Scale the Value component to make it darker
     hsv_colors[:, 2] *= scale_factor
-    hsv_colors[:, 2] = clip(hsv_colors[:, 2], 0, 1)
+    hsv_colors[:, 2] = np.clip(hsv_colors[:, 2], 0, 1)
 
     darker_rgb_colors = hsv_to_rgb(hsv_colors)
     darker_hsv_cmap = plt.cm.colors.ListedColormap(darker_rgb_colors)

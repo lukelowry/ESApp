@@ -22,7 +22,6 @@ extensions = [    "sphinx.ext.autodoc",
 autosummary_generate = True  # Automatically generate API doc pages
 autodoc_default_options = {
     "members": True,
-    "undoc-members": True,
     "member-order": "groupwise",
 }
 autodoc_preserve_defaults = True
@@ -70,7 +69,6 @@ exclude_patterns = [
     "**/Shape.xml",
     "**/Shape.shp.ea.iso.xml",
     "**/PWRaw",
-    "**/components.py"
 ]
 
 # Critical: RTD cannot run PowerWorld. Preserving local outputs.

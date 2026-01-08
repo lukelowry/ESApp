@@ -19,9 +19,7 @@ class Statics(Indexable):
 
     io: Indexable
 
-    def __init__(self, esa: SAW) -> None:
-        super().__init__(esa)
-
+    def __init__(self) -> None:
 
         # TODO don't need to read ALL of this!
         gens = self[Gen, ['GenMVRMin', 'GenMVRMax']]

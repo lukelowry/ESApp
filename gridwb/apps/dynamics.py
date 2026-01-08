@@ -22,7 +22,7 @@ class Dynamics(Indexable):
         ctgs = self[TSContingency]
         ctgs["StartTime"] = 0
         ctgs["EndTime"] = sec
-        self.upload({TSContingency: ctgs})
+        self[TSContingency] = ctgs
 
     # Create 'SimOnly' contingency if it does not exist
     # TODO Add TSCtgElement that closes an already closed gen at t=0
@@ -41,13 +41,13 @@ class Dynamics(Indexable):
         # Unique List of Fields to Request From PW
 
         # Prepare Memory
-        self.clearram()
+        self.esa.clearram()
 
         # Gen Obj Field list and Mark Fields for RAM storage
         objFields = []
         flatFields = []
         for objects, fields in self.retrieve:
-            self.saveinram(objects, fields)
+            self.esa.saveinram(objects, fields)
             for id in objects['ObjectID']:
                 objFields += [f"{id} | {f}" for f in fields]
                 flatFields += fields
@@ -61,13 +61,13 @@ class Dynamics(Indexable):
             ctgs = [ctgs]
 
         # Only Sims Requested
-        self.skipallbut(ctgs)
+        self.esa.skipallbut(ctgs)
 
         # Set Runtime for Simulation
         self.setRuntime(self.runtime)
 
         # Execute Dynamic Simulation for Specified CTGs - High Compute Time
-        self.TSSolveAll()
+        self.esa.TSSolveAll()
 
         # Get Results
         meta, df = (None, None)
@@ -123,7 +123,7 @@ class Dynamics(Indexable):
         df: DataFrame = df.copy(deep=True)
 
         # Clear RAM in PW
-        self.clearram()
+        self.esa.clearram()
 
         # Return as meta/data tuple
         return (meta, df)
