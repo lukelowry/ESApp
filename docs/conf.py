@@ -103,5 +103,7 @@ autodoc_mock_imports = [
     "win32com.client", 
     "pythoncom",
     "geopandas",
-    "shapely"
+    "shapely",
+    "fiona",
+    "pyproj"
 ]
