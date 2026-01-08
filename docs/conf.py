@@ -69,7 +69,8 @@ exclude_patterns = [
     "**/*.shx",
     "**/Shape.xml",
     "**/Shape.shp.ea.iso.xml",
-    "**/PWRaw"
+    "**/PWRaw",
+    "**/components.py"
 ]
 
 # Critical: RTD cannot run PowerWorld. Preserving local outputs.
@@ -102,5 +103,6 @@ autodoc_mock_imports = [
     "geopandas",
     "shapely",
     "fiona",
-    "pyproj"
+    "pyproj",
+    "gridwb.components"
 ]

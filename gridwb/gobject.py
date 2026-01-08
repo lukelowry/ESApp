@@ -1,18 +1,63 @@
+"""
+Defines the base components for creating structured grid object schemas.
+
+This module provides the `GObject` enum, a specialized base class used to define
+the data model for various power system components like buses, generators, and
+lines. It uses a unique pattern within the `Enum`'s `__new__` method to
+dynamically construct a schema, including field names, data types, and keys,
+from the class definition itself.
+
+The `FieldPriority` flag is used to categorize these fields, for example, to
+distinguish primary keys from other data attributes.
+"""
 
 from enum import Enum, Flag, auto
 
 class FieldPriority(Flag):
-    PRIMARY   = auto()
-    SECONDARY = auto()
-    REQUIRED  = auto()
-    OPTIONAL  = auto()
-    EDITABLE  = auto()
+    """
+    A Flag enumeration to define the characteristics of a GObject field.
+
+    These flags can be combined (e.g., `REQUIRED | EDITABLE`) to specify
+    multiple attributes for a single field.
+    """
+    PRIMARY   = auto()  #: Field is part of the primary key for the object.
+    SECONDARY = auto()  #: Field is part of a secondary key.
+    REQUIRED  = auto()  #: Field is required for data retrieval or updates.
+    OPTIONAL  = auto()  #: Field is optional.
+    EDITABLE  = auto()  #: Field is user-modifiable.
 
 
 class GObject(Enum):
+    """
+    A base class for defining the schema of a power system grid object.
+
+    This class uses a custom `Enum` implementation to parse its own members
+    at definition time, creating a structured schema for a grid component.
+    Subclasses should define their members to build the schema.
+
+    The class automatically populates `_FIELDS`, `_KEYS`, and `_TYPE` attributes
+    based on its member definitions. These are exposed through the `fields`,
+    `keys`, and `TYPE` class properties.
+
+    Example:
+    --------
+    .. code-block:: python
+
+        class Bus(GObject):
+            # The first member defines the PowerWorld object type string.
+            _ = 'Bus'
+
+            # Subsequent members define the object's fields.
+            # (FieldName, DataType, Priority)
+            Number = 'BusNum', int, FieldPriority.PRIMARY
+            Name = 'BusName', str, FieldPriority.REQUIRED | FieldPriority.EDITABLE
+            PUVolt = 'BusPUVolt', float, FieldPriority.OPTIONAL
+
+    """
 
     # Called when each field of a subclass is parsed by python
     def __new__(cls, *args):
+        """Dynamically construct Enum members to build a class-level schema."""
         # Initialize _FIELDS and _KEYS lists if they don't exist on the class itself
         if '_FIELDS' not in cls.__dict__:
             cls._FIELDS = []
