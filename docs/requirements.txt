@@ -2,4 +2,5 @@ sphinx
 sphinx-rtd-theme
 sphinx-copybutton
 nbsphinx
+numpy<2.0
 ipykernel

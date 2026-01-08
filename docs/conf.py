@@ -48,6 +48,8 @@ napoleon_type_aliases = {
     # Common aliases
     "np": "numpy",
     "np.ndarray": "~numpy.ndarray",
+    "pd": "pandas",
+    "pd.DataFrame": "~pandas.DataFrame",
 
     # Python built-ins and typing module
     "optional": "typing.Optional",
@@ -80,7 +82,7 @@ html_sourcelink_suffix = ''
 master_doc = "index"
 
 project = "ESA++"
-copyright = "2026, Luke Lowery"
+copyright = "2024, Luke Lowery"
 author = "Luke Lowery"
 try:
     version = importlib.metadata.version("esapp")
@@ -94,7 +96,6 @@ html_theme_options = {
 }
 
 autodoc_mock_imports = [
-    "ctypes", 
     "win32com", 
     "win32com.client", 
     "pythoncom",

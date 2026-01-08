@@ -49,7 +49,7 @@ classifiers = [
 ]
 dependencies = [
     "pandas",
-    "numpy",
+    "numpy<2.0",
     "scipy",
     "pywin32; sys_platform == 'win32'"
 ]
