@@ -65,14 +65,14 @@ napoleon_type_aliases = {
 
 exclude_patterns = [
     "_build",
-    "**.ipynb_checkpoints",
     "**/*.cpg",
     "**/*.dbf",
     "**/*.prj",
     "**/*.shp",
     "**/*.shx",
     "**/Shape.xml",
-    "**/Shape.shp.ea.iso.xml"
+    "**/Shape.shp.ea.iso.xml",
+    "**/PWRaw"
 ]
 
 # Critical: RTD cannot run PowerWorld. Preserving local outputs.
