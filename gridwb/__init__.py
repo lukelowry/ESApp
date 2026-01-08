@@ -10,7 +10,4 @@ from .workbench import GridWorkBench
 from .utils import *
 
 # Object Knowledge Base (Slow)
-from .grid import *
-
-# Type
-from .apps import *
+# from .grid import *

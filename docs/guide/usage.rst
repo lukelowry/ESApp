@@ -107,7 +107,7 @@ ESA++ makes it easy to extract system matrices for mathematical analysis:
     incidence = wb.network.incidence()
     
     # Get the Power Flow Jacobian
-    jacobian = wb.io.esa.get_jacobian()
+    jacobian = wb.esa.get_jacobian()
 
 
 Custom AUX Scripts
@@ -117,4 +117,4 @@ You can run raw PowerWorld auxiliary scripts directly:
 
 .. code-block:: python
 
-    wb.func.command('SolvePowerFlow(RECTNEWT);')
+    wb.command('SolvePowerFlow(RECTNEWT);')

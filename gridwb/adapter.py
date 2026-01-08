@@ -860,3 +860,21 @@ class Adapter:
             return LL['Longitude'], LL['Latitude']
         return LL
     
+    def save(self):
+        """
+        Save the open PowerWorld file.
+        """
+        self.esa.SaveCase()
+
+    def write_voltage(self,V):
+        """
+        Given Complex 1-D vector write to PowerWorld.
+
+        Parameters
+        ----------
+        V : np.ndarray
+            Complex voltage vector.
+        """
+        V_df =  np.vstack([np.abs(V), np.angle(V,deg=True)]).T
+
+        self[Bus,['BusPUVolt', 'BusAngle']] = V_df
