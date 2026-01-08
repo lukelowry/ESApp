@@ -102,4 +102,5 @@ autodoc_mock_imports = [
     "win32com", 
     "win32com.client", 
     "pythoncom",
+    "geopandas"
 ]
