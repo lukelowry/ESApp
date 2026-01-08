@@ -1,19 +1,10 @@
 import os
 import sys
-import shutil
 import importlib.metadata
 
 # Ensure the project root is in the path so sphinx can find the package
 # if it's not already installed in the environment.
 sys.path.insert(0, os.path.abspath(".."))
-
-# Copy examples directory to docs/examples so nbsphinx and sphinx-gallery can find them
-examples_source = os.path.abspath("../examples")
-examples_dest = os.path.abspath("examples")
-if os.path.exists(examples_source):
-    if os.path.exists(examples_dest):
-        shutil.rmtree(examples_dest)
-    shutil.copytree(examples_source, examples_dest)
 
 extensions = [
     "sphinx.ext.viewcode",
@@ -22,8 +13,7 @@ extensions = [
     "sphinx.ext.mathjax",
     "sphinx.ext.inheritance_diagram",
     "sphinx.ext.autosectionlabel",
-    "nbsphinx",
-    "sphinx_gallery.gen_gallery"
+    "nbsphinx"
 ]
 
 extensions.append("sphinx.ext.autodoc")
@@ -97,10 +87,3 @@ html_theme_options = {
 }
 
 autodoc_mock_imports = ["ctypes", "win32com", "win32com.client", "pythoncom"]
-
-sphinx_gallery_conf = {
-    'examples_dirs': 'examples',
-    'gallery_dirs': 'auto_examples',
-    'filename_pattern': r'.*\.py$',
-    'plot_gallery': False,
-}

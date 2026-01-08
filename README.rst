@@ -70,7 +70,7 @@ Traditional automation of PowerWorld Simulator often involves verbose COM calls 
 More Examples
 -------------
 
-The `examples/ <https://github.com/lukelowry/ESApp/tree/main/examples>`_ directory contains a gallery of demonstrations, including:
+The `examples/ <https://github.com/lukelowry/ESApp/tree/main/docs/examples>`_ directory contains a gallery of demonstrations, including:
 
 - **Basic Data I/O**: Efficiently reading and writing large sets of grid parameters.
 - **Contingency Analysis**: Automating N-1 studies and processing violation matrices.

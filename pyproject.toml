@@ -61,11 +61,8 @@ test = ["pytest"]
 dev = ["matplotlib"]
 docs = [
     "sphinx",
-    "sphinx-gallery",
     "sphinx-rtd-theme",
     "sphinx-copybutton",
-    "matplotlib",
-    "pillow",
     "nbsphinx",
     "ipykernel"
 ]
