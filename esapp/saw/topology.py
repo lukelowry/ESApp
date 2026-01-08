@@ -124,7 +124,7 @@ class TopologyMixin:
             The auxiliary file to which the results will be written.
         set_selected : bool, optional
             If True, sets the Selected field to YES for branches in the minimum cut. Defaults to False.
-        """
+        
         Returns
         -------
         str
