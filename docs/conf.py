@@ -69,7 +69,9 @@ exclude_patterns = ["_build", "**.ipynb_checkpoints"]
 # Critical: RTD cannot run PowerWorld. Preserving local outputs.
 nbsphinx_execute = 'never'
 
-source_suffix = ['.rst', '.ipynb']
+# Don't add .txt suffix to source files:
+html_sourcelink_suffix = ''
+
 master_doc = "index"
 
 project = "ESA++"
