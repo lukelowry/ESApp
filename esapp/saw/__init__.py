@@ -1,5 +1,5 @@
 """
-SimAuto Wrapper (:mod:`gridwb.saw`)
+SimAuto Wrapper (:mod:`esapp.saw`)
 ==================================
 
 This module provides the low-level interface for communicating with the

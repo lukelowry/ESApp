@@ -8,8 +8,8 @@ from typing import Type, List
 import pandas as pd
 from pandas.testing import assert_frame_equal
 
-from gridwb.indexable import Indexable
-from gridwb import grid
+from esapp.indexable import Indexable
+from esapp import grid
 
 
 def get_all_gobject_subclasses() -> List[Type[grid.GObject]]:
@@ -34,7 +34,7 @@ def get_all_gobject_subclasses() -> List[Type[grid.GObject]]:
 @pytest.fixture
 def indexable_instance() -> Indexable:
     """Provides an Indexable instance with a mocked SAW dependency."""
-    with patch('gridwb.indexable.SAW') as mock_saw_class:
+    with patch('esapp.indexable.SAW') as mock_saw_class:
         mock_esa = Mock()
         mock_saw_class.return_value = mock_esa
         

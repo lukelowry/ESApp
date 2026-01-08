@@ -3,9 +3,9 @@ Specialized Applications
 
 The ``apps`` module contains specialized tools for advanced analysis like GIC, Network topology, and more.
 
-.. currentmodule:: gridwb.apps
+.. currentmodule:: esapp.apps
 
 Network Analysis
 ----------------
-.. automodule:: gridwb.apps.network
+.. automodule:: esapp.apps.network
    :members:

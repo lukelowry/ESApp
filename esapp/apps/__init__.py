@@ -1,9 +1,9 @@
 """
-Specialized Applications (:mod:`gridwb.apps`)
+Specialized Applications (:mod:`esapp.apps`)
 ============================================
 
 This package contains higher-level, specialized tools for advanced power
-systems analysis tasks built on top of the core ``gridwb`` components.
+systems analysis tasks built on top of the core ``esapp`` components.
 """
 
 # Applications

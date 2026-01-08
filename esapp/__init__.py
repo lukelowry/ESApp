@@ -1,8 +1,8 @@
 """
-gridwb: A Pythonic Interface for PowerWorld Simulator
+esapp: A Pythonic Interface for PowerWorld Simulator
 =====================================================
 
-The ``gridwb`` package provides a high-level, object-oriented interface for
+The ``esapp`` package provides a high-level, object-oriented interface for
 interacting with PowerWorld Simulator's Automation Server (SimAuto). It aims
 to simplify common power systems analysis tasks by providing a more Pythonic
 and user-friendly API.

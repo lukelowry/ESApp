@@ -1,5 +1,5 @@
 """
-Online integration tests for GridWB components using IndexTool.
+Online integration tests for esapp components using IndexTool.
 This script connects to a live PowerWorld session and verifies that
 data can be retrieved for all defined GObject subclasses.
 
@@ -14,19 +14,19 @@ import inspect
 import pandas as pd
 import tempfile
 
-# Ensure gridwb can be imported if running from tests directory
+# Ensure esapp can be imported if running from tests directory
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
 if parent_dir not in sys.path:
     sys.path.append(parent_dir)
 
 try:
-    from gridwb.indexable import Indexable
-    from gridwb import grid
-    from gridwb.grid import GObject
-    from gridwb.saw import PowerWorldError, COMError
+    from esapp.indexable import Indexable
+    from esapp import grid
+    from esapp.grid import GObject
+    from esapp.saw import PowerWorldError, COMError
 except ImportError:
-    print("Error: Could not import gridwb packages. Please ensure the package is in your Python path.")
+    print("Error: Could not import esapp packages. Please ensure the package is in your Python path.")
     sys.exit(1)
 
 

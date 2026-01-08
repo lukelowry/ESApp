@@ -1,35 +1,35 @@
 Utilities
 =========
-.. currentmodule:: gridwb.utils
+.. currentmodule:: esapp.utils
 
 ESA++ includes a variety of utility modules for mathematical operations, geographic analysis, and debugging.
 
 Mathematical
 ----------------------
-.. automodule:: gridwb.utils.mathtools
+.. automodule:: esapp.utils.mathtools
    :members:
 
 B3D File Tools
 -----------------------
-.. automodule:: gridwb.utils.b3d
+.. automodule:: esapp.utils.b3d
    :members:
 
 Custom Exceptions
 -----------------
-.. automodule:: gridwb.utils.exceptions
+.. automodule:: esapp.utils.exceptions
    :members:
 
 Miscellaneous Helpers
 ---------------------
-.. automodule:: gridwb.utils.misc
+.. automodule:: esapp.utils.misc
    :members:
 
 Decorators
 ----------
-.. automodule:: gridwb.utils.decorators
+.. automodule:: esapp.utils.decorators
    :members:
 
 Mesh Processing
 ---------------
-.. automodule:: gridwb.utils.mesh
+.. automodule:: esapp.utils.mesh
    :members:

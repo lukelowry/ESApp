@@ -23,7 +23,7 @@ For local development and the latest features, install the package in editable m
 
 .. code-block:: bash
 
-    python -m pip install gridwb -e .
+    python -m pip install esapp -e .
 
 
 Documentation
@@ -38,7 +38,7 @@ Here is a quick example of how ESA++ simplifies data access and power flow analy
 
 .. code-block:: python
 
-    from gridwb import *
+    from esapp import *
 
     # Open Case
     wb = GridWorkBench("case_name.pwb")

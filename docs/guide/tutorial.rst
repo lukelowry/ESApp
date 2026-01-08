@@ -10,7 +10,7 @@ First, import the ``GridWorkBench`` and point it to your ``.pwb`` file:
 
 .. code-block:: python
 
-    from gridwb import GridWorkBench
+    from esapp import GridWorkBench
     
     # Initialize the workbench
     wb = GridWorkBench("path/to/your/case.pwb")
@@ -22,7 +22,7 @@ ESA++ uses a unique indexing system to make data retrieval intuitive. You can ac
 
 .. code-block:: python
 
-    from gridwb.components import Bus, Gen, Line
+    from esapp.components import Bus, Gen, Line
     
     # Get all bus numbers and names as a DataFrame
     buses = wb[Bus, ['BusNum', 'BusName']]

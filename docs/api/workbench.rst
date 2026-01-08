@@ -1,6 +1,6 @@
 GridWorkBench
 =============
-.. currentmodule:: gridwb.workbench
+.. currentmodule:: esapp.workbench
 
 The ``GridWorkBench`` is the central orchestrator of the ESA++ toolkit. It manages the lifecycle of the 
 PowerWorld Simulator instance, handles case loading/saving, and provides the primary interface for 
