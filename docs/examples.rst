@@ -11,7 +11,7 @@ These examples demonstrate the core functionality of ESA++ using Jupyter Noteboo
    examples/03_contingency_analysis
    examples/04_gic_analysis
    examples/05_matrix_extraction
-   examples/06_advanced_reporting
+   examples/06_exporting
    examples/07_network_expansion
    examples/08_scopf_analysis
    examples/09_atc_analysis

@@ -2,7 +2,7 @@ from ..indextool import IndexTool
 from ..grid.components import Branch, Bus, DCTransmissionLine
 from .app import PWApp
 
-from scipy.sparse import diags, lil_matrix
+from scipy.sparse import diags, lil_matrix, csc_matrix
 import numpy as np
 from pandas import Series, concat
 from enum import Enum
@@ -67,7 +67,7 @@ class Network(PWApp):
 
         # Retrieve
         fields = ['BusNum', 'BusNum:1']
-        branches = self.io[Branch,fields][fields]
+        branches = self.io[Branch][fields]
 
         if hvdc:
             hvdc_branches = self.io[DCTransmissionLine,fields][fields]
@@ -83,14 +83,13 @@ class Network(PWApp):
         branchIDs = np.arange(nbranches)
 
         # Sparse Arc-Incidence Matrix
+        # TODO crerate with COO for better performance
         A = lil_matrix((nbranches,len(bmap)))
         A[branchIDs, fromBus] = -1
         A[branchIDs, toBus]   = 1
+        A = csc_matrix(A)
 
         self.A = A
-
-        # Don't use until a sparse operation
-        #A = self.io.esa.get_incidence_matrix()
 
         return A
 

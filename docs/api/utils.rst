@@ -3,6 +3,8 @@ Utilities
 
 ESA++ includes a variety of utility modules for mathematical operations, geographic analysis, and debugging.
 
+.. currentmodule:: gridwb.utils
+
 Mathematical Operators
 ----------------------
 .. automodule:: gridwb.utils.math

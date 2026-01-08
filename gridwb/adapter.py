@@ -1,8 +1,7 @@
 
 
 from .saw import SAW
-from .grid.components import Bus, Branch, Gen, Load, Shunt, Area, Zone, Substation, InjectionGroup, Interface, Contingency
-from .indextool import IndexTool
+from .grid.components import Bus, Branch, Gen, Load, Shunt, Area, Zone, Substation
 
 import numpy as np
 from pandas import DataFrame
@@ -825,5 +824,39 @@ class Adapter:
             The Y-Bus matrix.
         """
         return self.esa.get_ybus(dense)
+        
+    ''' LOCATION FUNCTIONS '''
+
+    def busmap(self):
+        """
+        Returns a Pandas Series indexed by BusNum to the positional value of each bus
+        in matricies like the Y-Bus, Incidence Matrix, Etc.
+
+        Returns
+        -------
+        pd.Series
+            Series mapping BusNum to index.
+        """
+        return self.network.busmap()
     
- 
+    
+    def buscoords(self, astuple=True):
+        """
+        Retrive dataframe of bus latitude and longitude coordinates based on substation data.
+
+        Parameters
+        ----------
+        astuple : bool, optional
+            Whether to return as a tuple of (Lon, Lat). Defaults to True.
+
+        Returns
+        -------
+        pd.DataFrame or tuple
+            Coordinates data.
+        """
+        A, S = self[Bus, 'SubNum'],  self[Substation, ['Longitude', 'Latitude']]
+        LL = A.merge(S, on='SubNum') 
+        if astuple:
+            return LL['Longitude'], LL['Latitude']
+        return LL
+    

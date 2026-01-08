@@ -12,14 +12,16 @@ The ``Adapter`` (accessed via ``wb.func``) provides a high-level, Pythonic inter
 It abstracts away the verbose SimAuto script syntax into clean, one-liner methods for common engineering tasks 
 like contingency analysis, fault studies, and system scaling.
 
+I/O Indexing
+=====================
+
+The ``IndexTool`` is the core engine of ESA++. It enables the intuitive indexing syntax (e.g., ``wb[Bus, :]``) 
+by translating Pythonic slices and keys into optimized SimAuto data requests. It handles both data retrieval 
+and bulk updates, returning results as native Pandas DataFrames.
+
 .. currentmodule:: gridwb
 
 .. autoclass:: gridwb.GridWorkBench
    :members:
    :undoc-members:
    :show-inheritance:
-   :special-members: __getitem__, __setitem__
-
-.. automodule:: gridwb.indextool
-   :members:
-   :special-members: __getitem__, __setitem__
