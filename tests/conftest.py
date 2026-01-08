@@ -44,7 +44,7 @@ def saw_obj():
         ]
         mock_pwcom.GetFieldList.return_value = ("", field_list_data)
 
-        from gridwb.saw import SAW
+        from esapp.saw import SAW
 
         # Limit object field lookup to speed up test setup
         saw_instance = SAW(FileName="dummy.pwb", object_field_lookup=("bus",))

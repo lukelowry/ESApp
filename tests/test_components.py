@@ -2,7 +2,7 @@ import pytest
 import inspect
 from enum import Flag
 
-from gridwb import grid
+from esapp import grid
 
 # --- Fixtures ---
 
@@ -68,7 +68,7 @@ def test_gobject_member_values(test_gobject_class, member, expected_value):
 
 def test_gobject_str_representation(test_gobject_class):
     """Tests the __str__ representation of a GObject member."""
-    assert str(test_gobject_class.NAME) == "Field String: name"
+    assert str(test_gobject_class.NAME) == "name"
 
 # --- Parametrized tests for all GObject subclasses in components.py ---
 

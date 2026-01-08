@@ -8,23 +8,16 @@ Usage:
 """
 
 import os
-import sys
 import tempfile
 import pytest
 import pandas as pd
 import numpy as np
-
-# Ensure esapp can be imported if running from tests directory
-current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
-if parent_dir not in sys.path:
-    sys.path.append(parent_dir)
+import sys 
 
 try:
     from esapp.saw import SAW, PowerWorldError
 except ImportError:
-    print("Error: Could not import esapp.saw. Please ensure the package is in your Python path.")
-    sys.exit(1)
+    raise
 
 
 @pytest.fixture(scope="module")
