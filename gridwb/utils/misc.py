@@ -1,6 +1,5 @@
 from numpy import sum
 from pandas import DataFrame
-from ..components import Gen, Load, Bus
 
 
 class InjectionVector:

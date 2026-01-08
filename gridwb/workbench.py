@@ -2,10 +2,11 @@ from .apps.gic import GIC
 from .apps.network import Network
 from .apps.modes import ForcedOscillation
 from .indexable import Indexable
-from .components import Bus, Branch, Gen, Load, Shunt, Area, Zone, Substation
+from .grid import Bus, Branch, Gen, Load, Shunt, Area, Zone, Substation
 
 import numpy as np
 from pandas import DataFrame
+
 class GridWorkBench(Indexable):
     """
     Main entry point for interacting with the PowerWorld grid model.

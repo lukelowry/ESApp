@@ -2,18 +2,18 @@ import pytest
 import inspect
 from enum import Flag
 
-from gridwb import components
+from gridwb import grid
 
 # --- Fixtures ---
 
 @pytest.fixture(scope="module")
 def test_gobject_class():
     """A simple GObject subclass for testing purposes."""
-    class TestGObject(components.GObject):
-        ID = ("id", int, components.FieldPriority.PRIMARY)
-        NAME = ("name", str, components.FieldPriority.SECONDARY | components.FieldPriority.REQUIRED)
-        VALUE = ("value", float, components.FieldPriority.OPTIONAL | components.FieldPriority.EDITABLE)
-        DUPLICATE_KEY = ("duplicate_key", str, components.FieldPriority.PRIMARY | components.FieldPriority.SECONDARY)
+    class TestGObject(grid.GObject):
+        ID = ("id", int, grid.FieldPriority.PRIMARY)
+        NAME = ("name", str, grid.FieldPriority.SECONDARY | grid.FieldPriority.REQUIRED)
+        VALUE = ("value", float, grid.FieldPriority.OPTIONAL | grid.FieldPriority.EDITABLE)
+        DUPLICATE_KEY = ("duplicate_key", str, grid.FieldPriority.PRIMARY | grid.FieldPriority.SECONDARY)
         ObjectString = "TestGObject"
     return TestGObject
 
@@ -21,14 +21,14 @@ def test_gobject_class():
 
 def test_fieldpriority_is_flag():
     """Ensures FieldPriority is a Flag enum, allowing bitwise operations."""
-    assert issubclass(components.FieldPriority, Flag)
+    assert issubclass(grid.FieldPriority, Flag)
 
 def test_fieldpriority_combinations():
     """Tests bitwise combinations of FieldPriority flags."""
-    primary_required = components.FieldPriority.PRIMARY | components.FieldPriority.REQUIRED
-    assert components.FieldPriority.PRIMARY in primary_required
-    assert components.FieldPriority.REQUIRED in primary_required
-    assert components.FieldPriority.SECONDARY not in primary_required
+    primary_required = grid.FieldPriority.PRIMARY | grid.FieldPriority.REQUIRED
+    assert grid.FieldPriority.PRIMARY in primary_required
+    assert grid.FieldPriority.REQUIRED in primary_required
+    assert grid.FieldPriority.SECONDARY not in primary_required
 
 # --- Tests for GObject ---
 
@@ -38,8 +38,8 @@ def test_gobject_type_is_set(test_gobject_class):
 
 def test_gobject_with_no_type():
     """Tests GObject subclass without an ObjectString."""
-    class NoTypeObject(components.GObject):
-        FIELD = ("field", str, components.FieldPriority.OPTIONAL)
+    class NoTypeObject(grid.GObject):
+        FIELD = ("field", str, grid.FieldPriority.OPTIONAL)
     
     assert NoTypeObject.TYPE == 'NO_OBJECT_NAME'
 
@@ -56,10 +56,10 @@ def test_gobject_keys_are_collected(test_gobject_class):
     assert test_gobject_class.keys == expected_keys
 
 @pytest.mark.parametrize("member, expected_value", [
-    ("ID", (1, 'id', int, components.FieldPriority.PRIMARY)),
-    ("NAME", (2, 'name', str, components.FieldPriority.SECONDARY | components.FieldPriority.REQUIRED)),
-    ("VALUE", (3, 'value', float, components.FieldPriority.OPTIONAL | components.FieldPriority.EDITABLE)),
-    ("DUPLICATE_KEY", (4, 'duplicate_key', str, components.FieldPriority.PRIMARY | components.FieldPriority.SECONDARY)),
+    ("ID", (1, 'id', int, grid.FieldPriority.PRIMARY)),
+    ("NAME", (2, 'name', str, grid.FieldPriority.SECONDARY | grid.FieldPriority.REQUIRED)),
+    ("VALUE", (3, 'value', float, grid.FieldPriority.OPTIONAL | grid.FieldPriority.EDITABLE)),
+    ("DUPLICATE_KEY", (4, 'duplicate_key', str, grid.FieldPriority.PRIMARY | grid.FieldPriority.SECONDARY)),
     ("ObjectString", 5)
 ])
 def test_gobject_member_values(test_gobject_class, member, expected_value):
@@ -75,8 +75,8 @@ def test_gobject_str_representation(test_gobject_class):
 def get_gobject_subclasses():
     """Helper to discover all GObject subclasses in the components module."""
     return [
-        obj for _, obj in inspect.getmembers(components, inspect.isclass)
-        if issubclass(obj, components.GObject) and obj is not components.GObject
+        obj for _, obj in inspect.getmembers(grid, inspect.isclass)
+        if issubclass(obj, grid.GObject) and obj is not grid.GObject
     ]
 
 @pytest.mark.parametrize("g_object_class", get_gobject_subclasses())

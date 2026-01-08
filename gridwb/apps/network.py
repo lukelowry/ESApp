@@ -1,4 +1,4 @@
-from ..components import Branch, Bus, DCTransmissionLine
+from ..grid import Branch, Bus, DCTransmissionLine
 from ..indexable import Indexable
 
 from scipy.sparse import diags, lil_matrix, csc_matrix

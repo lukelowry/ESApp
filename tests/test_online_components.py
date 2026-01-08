@@ -22,8 +22,8 @@ if parent_dir not in sys.path:
 
 try:
     from gridwb.indexable import Indexable
-    from gridwb import components
-    from gridwb.components import GObject
+    from gridwb import grid
+    from gridwb.grid import GObject
     from gridwb.saw import PowerWorldError, COMError
 except ImportError:
     print("Error: Could not import gridwb packages. Please ensure the package is in your Python path.")
@@ -48,7 +48,7 @@ def io_instance():
 def get_gobject_subclasses():
     """Helper to discover all GObject subclasses in the components module."""
     return [
-        obj for _, obj in inspect.getmembers(components, inspect.isclass)
+        obj for _, obj in inspect.getmembers(grid, inspect.isclass)
         if issubclass(obj, GObject) and obj is not GObject
     ]
 

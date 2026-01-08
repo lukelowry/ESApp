@@ -12,8 +12,8 @@ from scipy.sparse import coo_matrix, lil_matrix, hstack, vstack,  diags
 from enum import Enum, auto
 
 # WorkBench Imports
-from ..components import GIC_Options_Value, GICInputVoltObject
-from ..components import GICXFormer, Branch, Substation, Bus, Gen
+from ..grid import GIC_Options_Value, GICInputVoltObject
+from ..grid import GICXFormer, Branch, Substation, Bus, Gen
 from ..indexable import Indexable
 from ..utils.b3d import B3D
 

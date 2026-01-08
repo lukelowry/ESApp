@@ -2,8 +2,7 @@ from numpy import nan, float32
 from pandas import DataFrame, concat
 
 # WorkBench Imports
-from ..saw import CommandNotRespectedError
-from ..components import TSContingency
+from ..grid import TSContingency
 from ..indexable import Indexable
 
 
