@@ -9,4 +9,3 @@ Network Analysis
 ----------------
 .. automodule:: gridwb.apps.network
    :members:
-   :undoc-members:

@@ -12,5 +12,3 @@ and bulk updates, returning results as native Pandas DataFrames.
 
 .. autoclass:: gridwb.GridWorkBench
    :members:
-   :undoc-members:
-   :show-inheritance:
