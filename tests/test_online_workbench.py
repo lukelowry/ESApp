@@ -310,8 +310,8 @@ def test_component_access(wb, component_class):
             # If save works but read fails, it's a real error (or memory issue)
             if "memory resources" in str(e):
                 pytest.skip(f"Object type {component_class.TYPE} has too many fields/objects.")
-                if "cannot be retrieved through SimAuto" in str(e):
-                    pytest.skip(f"Object type {component_class.TYPE} cannot be retrieved via SimAuto.")
+            if "cannot be retrieved through SimAuto" in str(e):
+                pytest.skip(f"Object type {component_class.TYPE} cannot be retrieved via SimAuto.")
             pytest.fail(f"Object type {component_class.TYPE} is supported but failed to read: {e}")
         except PowerWorldError:
             pytest.skip(f"Object type {component_class.TYPE} not supported by this PW version.")

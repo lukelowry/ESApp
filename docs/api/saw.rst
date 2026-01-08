@@ -10,7 +10,6 @@ functional area of the PowerWorld API, such as power flow, contingencies, transi
 .. autoclass:: SAW
    :members:
    :undoc-members:
-   :show-inheritance:
 
 Mixins
 ------
