@@ -25,13 +25,13 @@ ESA++ uses a unique indexing system to make data retrieval intuitive. You can ac
     from esapp.components import Bus, Gen, Line
     
     # Get all bus numbers and names as a DataFrame
-    buses = wb[Bus, ['BusNum', 'BusName']]
+    buses = wb[Bus, ["BusNum", "BusName"]]
     
     # Get all generator data (all fields)
     generators = wb[Gen, :]
     
     # Access specific fields for a subset of components using a list of keys
-    line_flows = wb[Line, ['BusNum', 'BusNum:1', 'LineMW']]
+    line_flows = wb[Line, ["BusNum", "BusNum:1", "LineMW"]]
 
 The power of the indexing syntax is that it returns standard Pandas objects, allowing you to use all of Pandas' filtering and analysis tools immediately.
 
@@ -43,15 +43,15 @@ ESA++ allows you to filter data easily using standard Pandas operations on the r
 .. code-block:: python
 
     # Get only buses in Area 1
-    areas = wb[Bus, :]
-    area_1_buses = wb[Bus, :][areas['AreaNum'] == 1]
+    all_buses = wb[Bus, :]
+    area_1_buses = all_buses[all_buses['AreaNum'] == 1]
     
     # Find lines with loading above 90%
-    lines = wb[Line, 'LinePercent']
-    heavy_lines = heavy_lines[lines['LinePercent'] > 90]
+    lines = wb[Line, ["LinePercent", "LineLimit"]]
+    heavy_lines = lines[lines['LinePercent'] > 90]
     
     # Get data for a specific object by its primary key
-    all_bus_data = wb[Bus, ['BusNum', 'BusPUVolt', 'BusAngle']]
+    all_bus_data = wb[Bus, ["BusNum", "BusPUVolt", "BusAngle"]]
     bus_5_data = all_bus_data[all_bus_data['BusNum'] == 5]
 
 Running Analysis
@@ -71,11 +71,11 @@ You can update grid parameters using the same indexing syntax:
 .. code-block:: python
 
     # Set the setpoint for Generator at Bus 5 to 150 MW
-    wb.set_gen(bus=5, id='1', mw=150.0)
+    wb.set_gen(bus=5, id="1", mw=150.0)
     
     # You can also set values for multiple objects at once
     # Set all bus voltage setpoints to 1.02 pu
-    wb[Bus, 'BusVoltSet'] = 1.02
+    wb[Bus, "BusVoltSet"] = 1.02
 
 Saving Changes
 --------------

@@ -19,6 +19,10 @@ class GridWorkBench(Indexable):
         ----------
         fname : str, optional
             Path to the PowerWorld case file (.pwb).
+
+        Examples
+        --------
+        >>> wb = GridWorkBench("case.pwb")
         """
         if fname is None:
             return
@@ -56,8 +60,13 @@ class GridWorkBench(Indexable):
         pd.Series or tuple
             Series of complex values if asComplex=True, 
             else tuple of (Vmag, Angle in Radians).
+
+        Examples
+        --------
+        >>> V = wb.voltage()
+        >>> V_mag, V_ang = wb.voltage(asComplex=False)
         """
-        v_df = self[Bus, ['BusPUVolt','BusAngle']] 
+        v_df = self[Bus, ["BusPUVolt", "BusAngle"]] 
 
         vmag = v_df['BusPUVolt']
         rad = v_df['BusAngle']*np.pi/180
@@ -84,6 +93,10 @@ class GridWorkBench(Indexable):
         -------
         pd.DataFrame or None
             Dataframe of bus number and voltage if requested.
+
+        Examples
+        --------
+        >>> wb.pflow()
         """
         # Solve Power Flow through External Tool
         self.esa.SolvePowerFlow()
@@ -96,6 +109,10 @@ class GridWorkBench(Indexable):
     def reset(self):
         """
         Resets the case to a flat start (1.0 pu voltage, 0.0 angle).
+
+        Examples
+        --------
+        >>> wb.reset()
         """
         self.esa.ResetToFlatStart()
 
@@ -107,6 +124,10 @@ class GridWorkBench(Indexable):
         ----------
         filename : str, optional
             The path to save the case to.
+
+        Examples
+        --------
+        >>> wb.save("case_modified.pwb")
         """
         self.esa.SaveCase(filename)
 
@@ -123,6 +144,10 @@ class GridWorkBench(Indexable):
         -------
         str
             The result of the command.
+
+        Examples
+        --------
+        >>> wb.command("SolvePowerFlow;")
         """
         return self.esa.RunScriptCommand(script)
 
@@ -134,12 +159,20 @@ class GridWorkBench(Indexable):
         ----------
         message : str
             The message to log.
+
+        Examples
+        --------
+        >>> wb.log("Starting analysis...")
         """
         self.esa.LogAdd(message)
 
     def close(self):
         """
         Closes the current case.
+
+        Examples
+        --------
+        >>> wb.close()
         """
         self.esa.CloseCase()
 
@@ -151,6 +184,10 @@ class GridWorkBench(Indexable):
         ----------
         mode : str
             The mode to enter ('RUN' or 'EDIT').
+
+        Examples
+        --------
+        >>> wb.mode("EDIT")
         """
         self.esa.EnterMode(mode)
 
@@ -164,6 +201,10 @@ class GridWorkBench(Indexable):
         ----------
         filename : str
             The path to the .aux file.
+
+        Examples
+        --------
+        >>> wb.load_aux("data.aux")
         """
         self.esa.LoadAux(filename)
     
@@ -175,6 +216,10 @@ class GridWorkBench(Indexable):
         ----------
         filename : str
             The path to the script file.
+
+        Examples
+        --------
+        >>> wb.load_script("run.pws")
         """
         self.esa.LoadScript(filename)
 
@@ -193,8 +238,12 @@ class GridWorkBench(Indexable):
         -------
         Union[pd.Series, Tuple[pd.Series, pd.Series]]
             The voltage data.
+
+        Examples
+        --------
+        >>> v_complex = wb.voltages()
         """
-        fields = ['BusPUVolt', 'BusAngle'] if pu else ['BusKVVolt', 'BusAngle']
+        fields = ["BusPUVolt", "BusAngle"] if pu else ["BusKVVolt", "BusAngle"]
         df = self[Bus, fields]
         
         mag = df[fields[0]]
@@ -212,8 +261,12 @@ class GridWorkBench(Indexable):
         -------
         pd.DataFrame
             Generator data.
+
+        Examples
+        --------
+        >>> gens = wb.generations()
         """
-        return self[Gen, ['GenMW', 'GenMVR', 'GenStatus']]
+        return self[Gen, ["GenMW", "GenMVR", "GenStatus"]]
 
     def loads(self):
         """
@@ -223,8 +276,12 @@ class GridWorkBench(Indexable):
         -------
         pd.DataFrame
             Load data.
+
+        Examples
+        --------
+        >>> loads = wb.loads()
         """
-        return self[Load, ['LoadMW', 'LoadMVR', 'LoadStatus']]
+        return self[Load, ["LoadMW", "LoadMVR", "LoadStatus"]]
 
     def shunts(self):
         """
@@ -234,8 +291,12 @@ class GridWorkBench(Indexable):
         -------
         pd.DataFrame
             Shunt data.
+
+        Examples
+        --------
+        >>> shunts = wb.shunts()
         """
-        return self[Shunt, ['ShuntMW', 'ShuntMVR', 'ShuntStatus']]
+        return self[Shunt, ["ShuntMW", "ShuntMVR", "ShuntStatus"]]
 
     def lines(self):
         """
@@ -245,9 +306,13 @@ class GridWorkBench(Indexable):
         -------
         pd.DataFrame
             Line data.
+
+        Examples
+        --------
+        >>> lines = wb.lines()
         """
         branches = self[Branch, :]
-        return branches[branches['BranchDeviceType'] == 'Line']
+        return branches[branches["BranchDeviceType"] == "Line"]
 
     def transformers(self):
         """
@@ -257,9 +322,13 @@ class GridWorkBench(Indexable):
         -------
         pd.DataFrame
             Transformer data.
+
+        Examples
+        --------
+        >>> xformers = wb.transformers()
         """
         branches = self[Branch, :]
-        return branches[branches['BranchDeviceType'] == 'Transformer']
+        return branches[branches["BranchDeviceType"] == "Transformer"]
 
     def areas(self):
         """
@@ -269,6 +338,10 @@ class GridWorkBench(Indexable):
         -------
         pd.DataFrame
             Area data.
+
+        Examples
+        --------
+        >>> areas = wb.areas()
         """
         return self[Area, :]
 
@@ -280,6 +353,10 @@ class GridWorkBench(Indexable):
         -------
         pd.DataFrame
             Zone data.
+
+        Examples
+        --------
+        >>> zones = wb.zones()
         """
         return self[Zone, :]
 
@@ -296,6 +373,10 @@ class GridWorkBench(Indexable):
         -------
         pd.DataFrame
             Field information.
+
+        Examples
+        --------
+        >>> fields = wb.get_fields("Bus")
         """
         return self.esa.GetFieldList(obj_type)
 
@@ -309,9 +390,14 @@ class GridWorkBench(Indexable):
         ----------
         V : np.ndarray
             Complex voltage vector.
+
+        Examples
+        --------
+        >>> V_new = np.ones(len(wb.buses)) * 1.05
+        >>> wb.set_voltages(V_new)
         """
         V_df = np.vstack([np.abs(V), np.angle(V, deg=True)]).T
-        self[Bus, ['BusPUVolt', 'BusAngle']] = V_df
+        self[Bus, ["BusPUVolt", "BusAngle"]] = V_df
 
     def open_branch(self, bus1, bus2, ckt='1'):
         """
@@ -325,6 +411,10 @@ class GridWorkBench(Indexable):
             To bus number.
         ckt : str, optional
             Circuit ID. Defaults to '1'.
+
+        Examples
+        --------
+        >>> wb.open_branch(1, 2, "1")
         """
         self.esa.ChangeParametersSingleElement("Branch", ["BusNum", "BusNum:1", "LineCircuit", "LineStatus"], [bus1, bus2, ckt, "Open"])
 
@@ -340,6 +430,10 @@ class GridWorkBench(Indexable):
             To bus number.
         ckt : str, optional
             Circuit ID. Defaults to '1'.
+
+        Examples
+        --------
+        >>> wb.close_branch(1, 2, "1")
         """
         self.esa.ChangeParametersSingleElement("Branch", ["BusNum", "BusNum:1", "LineCircuit", "LineStatus"], [bus1, bus2, ckt, "Closed"])
 
@@ -359,6 +453,10 @@ class GridWorkBench(Indexable):
             Mvar output.
         status : str, optional
             Status ('Closed' or 'Open').
+
+        Examples
+        --------
+        >>> wb.set_gen(bus=10, id="1", mw=150.0)
         """
         params = []
         values = []
@@ -391,6 +489,10 @@ class GridWorkBench(Indexable):
             Mvar demand.
         status : str, optional
             Status ('Closed' or 'Open').
+
+        Examples
+        --------
+        >>> wb.set_load(bus=5, id="1", mw=50.0)
         """
         params = []
         values = []
@@ -415,6 +517,10 @@ class GridWorkBench(Indexable):
         ----------
         factor : float
             Scaling factor.
+
+        Examples
+        --------
+        >>> wb.scale_load(1.1)  # Increase load by 10%
         """
         self.esa.Scale("LOAD", "FACTOR", [factor], "SYSTEM")
 
@@ -426,6 +532,10 @@ class GridWorkBench(Indexable):
         ----------
         factor : float
             Scaling factor.
+
+        Examples
+        --------
+        >>> wb.scale_gen(1.1)  # Increase generation by 10%
         """
         self.esa.Scale("GEN", "FACTOR", [factor], "SYSTEM")
 
@@ -440,6 +550,10 @@ class GridWorkBench(Indexable):
             The PowerWorld object type.
         **kwargs
             Field names and values.
+
+        Examples
+        --------
+        >>> wb.create("Load", BusNum=1, LoadID="1", LoadMW=10)
         """
         fields = list(kwargs.keys())
         values = list(kwargs.values())
@@ -455,6 +569,10 @@ class GridWorkBench(Indexable):
             The PowerWorld object type.
         filter_name : str, optional
             The filter to apply.
+
+        Examples
+        --------
+        >>> wb.delete("Gen", filter_name="AreaNum = 1")
         """
         self.esa.Delete(obj_type, filter_name)
 
@@ -468,6 +586,10 @@ class GridWorkBench(Indexable):
             The PowerWorld object type.
         filter_name : str, optional
             The filter to apply.
+
+        Examples
+        --------
+        >>> wb.select("Bus", filter_name="BusPUVolt < 0.95")
         """
         self.esa.SelectAll(obj_type, filter_name)
 
@@ -481,6 +603,10 @@ class GridWorkBench(Indexable):
             The PowerWorld object type.
         filter_name : str, optional
             The filter to apply.
+
+        Examples
+        --------
+        >>> wb.unselect("Bus")
         """
         self.esa.UnSelectAll(obj_type, filter_name)
 
@@ -498,6 +624,10 @@ class GridWorkBench(Indexable):
             Identifier string (e.g. '[1]', '[1 "1"]').
         close_breakers : bool, optional
             Whether to close breakers. Defaults to True.
+
+        Examples
+        --------
+        >>> wb.energize("Bus", "[1]")
         """
         self.esa.CloseWithBreakers(obj_type, identifier, only_specified=False, close_normally_closed=True)
 
@@ -511,12 +641,20 @@ class GridWorkBench(Indexable):
             Object type (e.g. 'Bus', 'Gen', 'Load').
         identifier : str
             Identifier string (e.g. '[1]', '[1 "1"]').
+      
+        Examples
+        --------
+        >>> wb.deenergize("Bus", "[1]")
         """
         self.esa.OpenWithBreakers(obj_type, identifier)
 
     def radial_paths(self):
         """
         Identifies radial paths in the network.
+
+        Examples
+        --------
+        >>> wb.radial_paths()
         """
         self.esa.FindRadialBusPaths()
 
@@ -533,6 +671,10 @@ class GridWorkBench(Indexable):
         -------
         pd.DataFrame
             Distance data.
+
+        Examples
+        --------
+        >>> dists = wb.path_distance("[BUS 1]")
         """
         return self.esa.DeterminePathDistance(start_element_str)
 
@@ -546,6 +688,10 @@ class GridWorkBench(Indexable):
             Bus identifier string (e.g. '[BUS 1]') on the desired side.
         branch_filter : str, optional
             Filter for branches defining the cut. Defaults to "SELECTED".
+
+        Examples
+        --------
+        >>> wb.network_cut("[BUS 1]")
         """
         self.esa.SetSelectedFromNetworkCut(True, bus_on_side, branch_filter=branch_filter, objects_to_select=["Bus", "Gen", "Load"])
 
@@ -557,10 +703,14 @@ class GridWorkBench(Indexable):
         ----------
         zone_num : int
             The zone number to isolate.
+
+        Examples
+        --------
+        >>> wb.isolate_zone(1)
         """
         # Retrieve branch connectivity and zone information
         # Note: 'BusZone' refers to From Bus Zone, 'BusZone:1' refers to To Bus Zone in PowerWorld
-        branches = self[Branch, ['BusNum', 'BusNum:1', 'LineCircuit', 'BusZone', 'BusZone:1']]
+        branches = self[Branch, ["BusNum", "BusNum:1", "LineCircuit", "BusZone", "BusZone:1"]]
         
         # Filter for tie-lines where one end is in the zone and the other is not
         ties = branches[
@@ -590,14 +740,18 @@ class GridWorkBench(Indexable):
         -------
         dict
             Dictionary with 'bus_low', 'bus_high', 'branch_overload' DataFrames.
+
+        Examples
+        --------
+        >>> viols = wb.find_violations(v_min=0.9, v_max=1.1)
         """
         # Bus Violations
-        buses = self[Bus, ['BusNum', 'BusName', 'BusPUVolt']]
+        buses = self[Bus, ["BusNum", "BusName", "BusPUVolt"]]
         low = buses[buses['BusPUVolt'] < v_min]
         high = buses[buses['BusPUVolt'] > v_max]
         
         # Branch Violations
-        branches = self[Branch, ['BusNum', 'BusNum:1', 'LineCircuit', 'LineMVA', 'LineLimit']]
+        branches = self[Branch, ["BusNum", "BusNum:1", "LineCircuit", "LineMVA", "LineLimit"]]
         # Filter branches with valid limits to avoid division by zero or misleading results
         branches = branches[branches['LineLimit'] > 0]
         overloaded = branches[branches['LineMVA'] > (branches['LineLimit'] * (branch_max_pct / 100.0))]
@@ -609,6 +763,10 @@ class GridWorkBench(Indexable):
     def set_as_base_case(self):
         """
         Sets the currently open case as the base case for difference flows.
+
+        Examples
+        --------
+        >>> wb.set_as_base_case()
         """
         self.esa.DiffCaseSetAsBase()
 
@@ -620,6 +778,10 @@ class GridWorkBench(Indexable):
         ----------
         mode : str, optional
             The mode to set. Defaults to "DIFFERENCE".
+
+        Examples
+        --------
+        >>> wb.diff_mode("DIFFERENCE")
         """
         self.esa.DiffCaseMode(mode)
 
@@ -634,6 +796,10 @@ class GridWorkBench(Indexable):
             Path to the case to compare against.
         output_aux : str
             Path to the output .aux file.
+
+        Examples
+        --------
+        >>> wb.compare_case("case2.pwb", "diff.aux")
         """
         self.esa.DiffCaseSetAsBase()
         self.esa.OpenCase(other_case_path)
@@ -643,19 +809,44 @@ class GridWorkBench(Indexable):
     # --- Analysis ---
 
     def run_contingency(self, name):
-        """Runs a single contingency."""
+        """
+        Runs a single contingency.
+
+        Examples
+        --------
+        >>> wb.run_contingency("Line 1-2 Out")
+        """
         self.esa.RunContingency(name)
 
     def solve_contingencies(self):
-        """Solves all defined contingencies."""
+        """
+        Solves all defined contingencies.
+
+        Examples
+        --------
+        >>> wb.solve_contingencies()
+        """
         self.esa.SolveContingencies()
     
     def auto_insert_contingencies(self):
-        """Auto-inserts contingencies based on current options."""
+        """
+        Auto-inserts contingencies based on current options.
+
+        Examples
+        --------
+        >>> wb.auto_insert_contingencies()
+        """
         self.esa.CTGAutoInsert()
 
     def violations(self, v_min=0.9, v_max=1.1):
-        """Returns a DataFrame of bus voltage violations."""
+        """
+        Returns a DataFrame of bus voltage violations.
+
+        Examples
+        --------
+        >>> v_viols = wb.violations(v_min=0.95, v_max=1.05)
+        >>> print(v_viols.head())
+        """
         v = self.voltages(pu=True, complex=False)[0]
         low = v[v < v_min]
         high = v[v > v_max]
@@ -663,18 +854,43 @@ class GridWorkBench(Indexable):
 
     def mismatches(self):
         """Returns bus mismatches."""
+        """
+        Returns bus mismatches.
+
+        Examples
+        --------
+        >>> mm = wb.mismatches()
+        """
         return self.esa.GetBusMismatches()
 
     def islands(self):
-        """Returns information about islands."""
+        """
+        Returns information about islands.
+
+        Examples
+        --------
+        >>> islands = wb.islands()
+        """
         return self.esa.DetermineBranchesThatCreateIslands()
 
     def save_image(self, filename, oneline_name, image_type="JPG"):
-        """Exports the oneline diagram to an image."""
+        """
+        Exports the oneline diagram to an image.
+
+        Examples
+        --------
+        >>> wb.save_image("oneline.jpg", "OneLine1")
+        """
         self.esa.ExportOneline(filename, oneline_name, image_type)
 
     def refresh_onelines(self):
-        """Relinks all open oneline diagrams."""
+        """
+        Relinks all open oneline diagrams.
+
+        Examples
+        --------
+        >>> wb.refresh_onelines()
+        """
         self.esa.RelinkAllOpenOnelines()
 
     # --- Sensitivity & Faults ---
@@ -696,6 +912,10 @@ class GridWorkBench(Indexable):
         -------
         pd.DataFrame
             PTDF results.
+
+        Examples
+        --------
+        >>> ptdf = wb.ptdf("[AREA 1]", "[AREA 2]")
         """
         return self.esa.CalculatePTDF(seller, buyer, method)
     
@@ -714,6 +934,10 @@ class GridWorkBench(Indexable):
         -------
         pd.DataFrame
             LODF results.
+
+        Examples
+        --------
+        >>> lodf = wb.lodf("[BRANCH 1 2 1]")
         """
         return self.esa.CalculateLODF(branch, method)
 
@@ -736,11 +960,21 @@ class GridWorkBench(Indexable):
         -------
         str
             Result string from SimAuto.
+
+        Examples
+        --------
+        >>> wb.fault(bus_num=5, fault_type="SLG")
         """
         return self.esa.RunFault(f'[BUS {bus_num}]', fault_type, r, x)
     
     def clear_fault(self):
-        """Clears the currently applied fault."""
+        """
+        Clears the currently applied fault.
+
+        Examples
+        --------
+        >>> wb.clear_fault()
+        """
         self.esa.FaultClear()
 
     def shortest_path(self, start_bus, end_bus):
@@ -758,6 +992,10 @@ class GridWorkBench(Indexable):
         -------
         pd.DataFrame
             DataFrame describing the path.
+
+        Examples
+        --------
+        >>> path = wb.shortest_path(1, 10)
         """
         return self.esa.DetermineShortestPath(f'[BUS {start_bus}]', f'[BUS {end_bus}]')
 
@@ -773,6 +1011,10 @@ class GridWorkBench(Indexable):
             Source injection group name.
         sink : str
             Sink injection group name.
+
+        Examples
+        --------
+        >>> wb.run_pv("SourceGroup", "SinkGroup")
         """
         self.esa.RunPV(source, sink)
 
@@ -789,6 +1031,10 @@ class GridWorkBench(Indexable):
         -------
         str
             Result string.
+
+        Examples
+        --------
+        >>> wb.run_qv("qv_results.csv")
         """
         return self.esa.RunQV(filename)
     
@@ -807,6 +1053,10 @@ class GridWorkBench(Indexable):
         -------
         str
             Result string.
+
+        Examples
+        --------
+        >>> wb.calculate_atc("[AREA 1]", "[AREA 2]")
         """
         return self.esa.DetermineATC(seller, buyer)
     
@@ -825,6 +1075,10 @@ class GridWorkBench(Indexable):
         -------
         str
             Result string.
+
+        Examples
+        --------
+        >>> wb.calculate_gic(max_field=1.0, direction=90.0)
         """
         return self.esa.CalculateGIC(max_field, direction)
     
@@ -836,6 +1090,10 @@ class GridWorkBench(Indexable):
         -------
         str
             Result string.
+
+        Examples
+        --------
+        >>> wb.solve_opf()
         """
         return self.esa.SolvePrimalLP()
 
@@ -852,6 +1110,10 @@ class GridWorkBench(Indexable):
         -------
         Union[np.ndarray, csr_matrix]
             The Y-Bus matrix.
+
+        Examples
+        --------
+        >>> Y = wb.ybus()
         """
         return self.esa.get_ybus(dense)
         
@@ -866,6 +1128,10 @@ class GridWorkBench(Indexable):
         -------
         pd.Series
             Series mapping BusNum to index.
+
+        Examples
+        --------
+        >>> mapping = wb.busmap()
         """
         return self.network.busmap()
     
@@ -883,8 +1149,12 @@ class GridWorkBench(Indexable):
         -------
         pd.DataFrame or tuple
             Coordinates data.
+
+        Examples
+        --------
+        >>> lon, lat = wb.buscoords()
         """
-        A, S = self[Bus, 'SubNum'],  self[Substation, ['Longitude', 'Latitude']]
+        A, S = self[Bus, "SubNum"],  self[Substation, ["Longitude", "Latitude"]]
         LL = A.merge(S, on='SubNum') 
         if astuple:
             return LL['Longitude'], LL['Latitude']
@@ -898,7 +1168,12 @@ class GridWorkBench(Indexable):
         ----------
         V : np.ndarray
             Complex voltage vector.
+
+        Examples
+        --------
+        >>> V_new = np.ones(len(wb.buses)) * 1.05
+        >>> wb.write_voltage(V_new)
         """
         V_df =  np.vstack([np.abs(V), np.angle(V,deg=True)]).T
 
-        self[Bus,['BusPUVolt', 'BusAngle']] = V_df
+        self[Bus, ["BusPUVolt", "BusAngle"]] = V_df

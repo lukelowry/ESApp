@@ -24,10 +24,10 @@ Pass a string or a list of strings to retrieve specific fields:
 .. code-block:: python
 
     # Single field
-    voltages = wb[Bus, 'BusPUVolt']
+    voltages = wb[Bus, "BusPUVolt"]
 
     # Multiple fields
-    bus_info = wb[Bus, ['BusName', 'BusPUVolt', 'BusAngle']]
+    bus_info = wb[Bus, ["BusName", "BusPUVolt", "BusAngle"]]
 
 **Get All Fields**
 
@@ -57,7 +57,7 @@ Set a single value for all objects of a type:
 .. code-block:: python
 
     # Set all bus voltages to 1.05 pu
-    wb[Bus, 'BusPUVolt'] = 1.05
+    wb[Bus, "BusPUVolt"] = 1.05
 
 **Updating Multiple Fields**
 
@@ -66,7 +66,7 @@ You can update multiple fields at once by passing a list of values:
 .. code-block:: python
 
     # Update MW and MVAR for all generators
-    wb[Gen, ['GenMW', 'GenMVR']] = [100.0, 20.0]
+    wb[Gen, ["GenMW", "GenMVR"]] = [100.0, 20.0]
 
 **Bulk Update from DataFrame**
 
@@ -90,7 +90,7 @@ ESA++ includes specialized "Apps" for complex analysis. For example, the GIC too
 
     # Use the Network app for topology analysis
     is_connected = wb.network.is_connected()
-    islands = wb.network.get_islands()
+    islands = wb.islands()
 
 
 Power System Matricies

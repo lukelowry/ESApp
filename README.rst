@@ -10,7 +10,7 @@ An open-source Python toolkit for power system automation, providing a high-perf
 Key Features
 ------------
 
-- **Intuitive Indexing Syntax**: Access and modify grid components using a unique indexing system (e.g., ``wb[Bus, 'BusPUVolt']``) that feels like native Python.
+- **Intuitive Indexing Syntax**: Access and modify grid components using a unique indexing system (e.g., ``wb[Bus, "BusPUVolt"]``) that feels like native Python.
 - **Comprehensive SimAuto Wrapper**: Full coverage of PowerWorld's API through the ``SAW`` class, organized into modular mixins for power flow, contingencies, transients, and more.
 - **High-Level Adapter Interface**: A collection of simplified "one-liner" functions for common tasks like GIC calculation, fault analysis, and voltage violation detection.
 - **Native Pandas Integration**: Every data retrieval operation returns a Pandas DataFrame or Series, enabling immediate analysis, filtering, and visualization.
@@ -38,10 +38,10 @@ Here is a quick example of how ESA++ simplifies data access and power flow analy
 
 .. code-block:: python
 
-    from esapp import *
+    from esapp import GridWorkBench, Bus, Gen
 
     # Open Case
-    wb = GridWorkBench("case_name.pwb")
+    wb = GridWorkBench("path/to/case.pwb")
 
     # Retrieve data 
     bus_data = wb[Bus, ["BusName", "BusPUVolt"]]

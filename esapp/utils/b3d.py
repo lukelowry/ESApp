@@ -2,9 +2,20 @@ from numpy import array, zeros, frombuffer, stack, meshgrid, linspace, ndarray
 from numpy import single, uint32, double, uint32, uint32
 
 class B3D:
+    """
+    Class for handling B3D (Binary 3D) file format for electric field data.
+    """
 
     def __init__(self, fname=None):
+        """
+        Initialize the B3D object.
 
+        Parameters
+        ----------
+        fname : str, optional
+            Path to a B3D file to load. Defaults to None.
+        """
+        
         # This function creates a default, tiny B3D object that can be set with data
 
         # Comment should be a single string which will be stored in the metadata of the B3D file
@@ -37,14 +48,30 @@ class B3D:
 
     @classmethod
     def from_mesh(cls, long, lat, ex: ndarray, ey: ndarray, times=None, comment="GWB Electric Field Data"):
-        '''
+        """
         Convert mesh-grid style efield data to B3D
         Only Supporting Static Fields at the moment.
-        longs: shape (n, )
-        lats: shape (m, )
-        ex: shape (n, m) Mesh array of X-Component Electric Field
-        ey: shape (n, m) Mesh array of Y-Component Electric Field
-        '''
+
+        Parameters
+        ----------
+        long : np.ndarray
+            Array of longitudes, shape (n, ).
+        lat : np.ndarray
+            Array of latitudes, shape (m, ).
+        ex : np.ndarray
+            Mesh array of X-Component Electric Field, shape (n, m).
+        ey : np.ndarray
+            Mesh array of Y-Component Electric Field, shape (n, m).
+        times : np.ndarray, optional
+            Time points. Defaults to None.
+        comment : str, optional
+            Comment string for metadata. Defaults to "GWB Electric Field Data".
+
+        Returns
+        -------
+        B3D
+            Initialized B3D object.
+        """
 
         b3d = cls()
         b3d.comment = comment
@@ -71,6 +98,14 @@ class B3D:
         return b3d
 
     def write_b3d_file(self, fname):
+        """
+        Write the B3D object to a file.
+
+        Parameters
+        ----------
+        fname : str
+            The path to write the file to.
+        """
         with open(fname, "wb") as f:
             n = self.lat.shape[0]
             nt = self.time.shape[0]
@@ -117,6 +152,14 @@ class B3D:
             f.write(stack([exd, eyd]).transpose().reshape(n*nt*2).tobytes())
 
     def load_b3d_file(self, fname):
+        """
+        Load a B3D file into the object.
+
+        Parameters
+        ----------
+        fname : str
+            The path to the B3D file.
+        """
         with open(fname, "rb") as f:
             b = f.read()
 
