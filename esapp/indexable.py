@@ -221,7 +221,11 @@ class Indexable:
 
             # Add the new values to the DataFrame of keys.
             # Pandas will broadcast a scalar `value` or align a list/array `value`.
-            change_df[fields] = value
+            # When fields has a single element, use the field name directly to avoid pandas treating it as multiple columns
+            if len(fields) == 1:
+                change_df[fields[0]] = value
+            else:
+                change_df[fields] = value
         
         # Send the minimal DataFrame to PowerWorld.
         self.esa.ChangeParametersMultipleElementRect(gtype.TYPE, change_df.columns.tolist(), change_df)

@@ -1,9 +1,25 @@
 """
-Integration tests for GridWorkBench functionality against a live PowerWorld case.
-Tests individual functions in workbench.py and validates component access.
+Integration tests for GridWorkBench functionality with live PowerWorld data.
 
-Usage:
-    python test_online_adapter.py "C:\\Path\\To\\Case.pwb"
+WHAT THIS TESTS:
+- Component collection access (buses, generators, loads, branches, etc.)
+- Data retrieval through component properties with real case data
+- DataFrame conversion from live PowerWorld data
+- Component-specific methods and attributes
+- Performance validation with actual datasets
+- Parametrized tests across all component types
+
+DEPENDENCIES:
+- PowerWorld Simulator installed and SimAuto registered
+- Valid PowerWorld case file configured in tests/config_test.py
+
+CONFIGURATION:
+    1. Copy tests/config_test.example.py to tests/config_test.py
+    2. Set SAW_TEST_CASE = r"C:\\Path\\To\\Your\\Case.pwb"
+
+USAGE:
+    pytest tests/test_integration_workbench.py -v
+    pytest tests/test_integration_workbench.py -k "Bus" -v  # Test only Bus components
 """
 
 import os
@@ -42,25 +58,6 @@ def wb(saw_session):
     workbench = GridWorkBench()
     workbench.set_esa(saw_session)
     return workbench
-
-
-@pytest.fixture
-def temp_file():
-    files = []
-
-    def _create(suffix):
-        tf = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
-        tf.close()
-        files.append(tf.name)
-        return tf.name
-
-    yield _create
-    for f in files:
-        if os.path.exists(f):
-            try:
-                os.remove(f)
-            except Exception:
-                pass
 
 
 class TestGridWorkBenchFunctions:

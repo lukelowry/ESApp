@@ -58,6 +58,20 @@ coverage.xml
 *.py,cover
 .hypothesis/
 .pytest_cache/
+test_output.log
+
+# Test configuration (contains local paths)
+tests/config_test.py
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
 
 # Translations
 *.mo
@@ -139,3 +153,5 @@ dmypy.json
 # vscode settings
 .vscode/
 .vscode/settings.json
+tests/test_indextool.py
+docs/examples/system_health_report.csv

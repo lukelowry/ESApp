@@ -632,9 +632,11 @@ class GeneralMixin:
         filt = f'"{filter_name}"' if filter_name and filter_name not in ["SELECTED", "AREAZONE"] else filter_name
         return self.RunScriptCommand(f"UnSelectAll({objecttype}, {filt});")
 
-    def SendToExcel(self, objecttype: str, fieldlist: List[str], filter_name: str = "", use_column_headers: bool = True, workbook: str = "", worksheet: str = "", sortfieldlist: List[str] = None, header_list: List[str] = None, header_value_list: List[str] = None, clear_existing: bool = True, row_shift: int = 0, col_shift: int = 0):
-        """Sends data for specified objects and fields directly to Microsoft Excel.
+    def SendToExcelAdvanced(self, objecttype: str, fieldlist: List[str], filter_name: str = "", use_column_headers: bool = True, workbook: str = "", worksheet: str = "", sortfieldlist: List[str] = None, header_list: List[str] = None, header_value_list: List[str] = None, clear_existing: bool = True, row_shift: int = 0, col_shift: int = 0):
+        """Sends data for specified objects and fields directly to Microsoft Excel with advanced options.
 
+        This is an extended version of SendToExcel that provides additional control over
+        Excel output including workbook/worksheet names, sorting, custom headers, and positioning.
         This method requires Microsoft Excel to be installed on the system.
 
         Parameters
@@ -675,6 +677,10 @@ class GeneralMixin:
         ------
         PowerWorldError
             If the SimAuto call fails (e.g., Excel not installed, invalid parameters).
+        
+        See Also
+        --------
+        SendToExcel : Basic version with fewer parameters for simple exports.
         """
         fields = "[" + ", ".join(fieldlist) + "]"
         filt = f'"{filter_name}"' if filter_name and filter_name not in ["SELECTED", "AREAZONE"] else filter_name

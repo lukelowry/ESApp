@@ -1,5 +1,20 @@
 """
-Unit tests for the SAW class and its mixins.
+Unit tests for the SAW class core methods and mixins.
+
+WHAT THIS TESTS:
+- Case file operations (open, save, close)
+- Script command execution via RunScriptCommand
+- Power flow solution commands (SolvePowerFlow, etc.)
+- Contingency analysis commands (RunContingency, SolveContingencies)
+- State management (StoreState, RestoreState, DeleteState)
+- Mode switching (EnterMode)
+- Logging and utility commands
+- Command string formatting and validation
+
+DEPENDENCIES: None (mocked COM interface, no PowerWorld required)
+
+USAGE:
+    pytest tests/test_saw_core_methods.py -v
 """
 import pytest
 from unittest.mock import MagicMock, patch

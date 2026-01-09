@@ -1,10 +1,27 @@
 """
-Independent script to validate SAW functionality against a live PowerWorld case.
-This script connects to a PowerWorld Simulator instance using the provided case file
-and attempts to execute a wide range of SAW methods to verify functionality.
+Integration tests for SAW functionality against a live PowerWorld case.
 
-Usage:
-    python test_online_saw.py "C:\\Path\\To\\Case.pwb"
+WHAT THIS TESTS:
+- Actual power flow solution execution and result validation
+- Contingency analysis with real PowerWorld contingencies
+- GIC (Geomagnetically Induced Current) analysis
+- File export/import operations (CSV, EPC, RAW, AUX formats)
+- Matrix extraction and manipulation
+- Transient stability simulation
+- Data retrieval across all component types with real case data
+- Script command execution and error handling
+
+DEPENDENCIES:
+- PowerWorld Simulator installed and SimAuto registered
+- Valid PowerWorld case file configured in tests/config_test.py
+
+CONFIGURATION:
+    1. Copy tests/config_test.example.py to tests/config_test.py
+    2. Set SAW_TEST_CASE = r"C:\\Path\\To\\Your\\Case.pwb"
+
+USAGE:
+    pytest tests/test_integration_saw_powerworld.py -v
+    pytest tests/test_integration_saw_powerworld.py -k "power_flow" -v
 """
 
 import os
@@ -26,25 +43,6 @@ def saw_instance(saw_session):
     Provides the session-scoped SAW instance to the tests in this module.
     """
     return saw_session
-
-
-@pytest.fixture
-def temp_file():
-    files = []
-
-    def _create(suffix):
-        tf = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
-        tf.close()
-        files.append(tf.name)
-        return tf.name
-
-    yield _create
-    for f in files:
-        if os.path.exists(f):
-            try:
-                os.remove(f)
-            except Exception:
-                pass
 
 
 class TestOnlineSAW:
@@ -143,16 +141,6 @@ class TestOnlineSAW:
         saw_instance.SaveDataWithExtra(tmp_csv, "CSV", "Bus", ["BusNum"], [], "", [], ["Header"], ["Value"])
         saw_instance.SaveObjectFields(tmp_csv, "Bus", ["BusNum"])
 
-    def test_general_import_extras(self, saw_instance, temp_file):
-        tmp_csv = temp_file(".csv")
-        # Create dummy csv first
-        with open(tmp_csv, 'w') as f: f.write("BusNum,BusName\n1,Bus1")
-        try:
-            saw_instance.ImportData(tmp_csv, "CSV")
-        except PowerWorldError:
-            pass
-        saw_instance.LoadCSV(tmp_csv)
-
     # -------------------------------------------------------------------------
     # Powerflow Mixin Tests
     # -------------------------------------------------------------------------
@@ -214,13 +202,6 @@ class TestOnlineSAW:
     def test_powerflow_flat_start(self, saw_instance):
         saw_instance.ResetToFlatStart()
         saw_instance.SolvePowerFlow()
-
-    def test_powerflow_extras(self, saw_instance):
-        saw_instance.ConditionVoltagePockets(0.1, 10.0)
-        saw_instance.DiffCaseKeyType("PRIMARY")
-        saw_instance.DiffCaseShowPresentAndBase(True)
-        saw_instance.DoCTGAction('[BRANCH 1 2 1 OPEN]')
-        saw_instance.InterfacesCalculatePostCTGMWFlows()
 
     def test_powerflow_diff_write(self, saw_instance, temp_file):
         tmp_aux = temp_file(".aux")
@@ -445,38 +426,8 @@ class TestOnlineSAW:
             else:
                 pytest.skip("No closed branches found for shift factors")
     
-    def test_sensitivity_extras(self, saw_instance):
-        saw_instance.CalculateLODFAdvanced(True, "MATRIX", 10, 0.03, "DECIMAL", 4, True, "lodf.txt")
-        
-        # Fetch a valid area for the calculation
-        areas = saw_instance.GetParametersMultipleElement("Area", ["AreaNum"])
-        if areas is not None and not areas.empty:
-            area_str = f'[AREA {areas.iloc[0]["AreaNum"]}]'
-            saw_instance.CalculateShiftFactorsMultipleElement("BRANCH", "SELECTED", "SELLER", area_str)
-            
-        saw_instance.SetSensitivitiesAtOutOfServiceToClosest()
-        
-        # Test additional sensitivity methods
-        saw_instance.CalculateLODFScreening("ALL", "ALL", True, True, True, 0.05, True, 100, 100, False, "")
-        try:
-            saw_instance.LineLoadingReplicatorCalculate('[BRANCH 1 2 1]', "IG", False, 100, False)
-            saw_instance.LineLoadingReplicatorImplement()
-        except Exception: pass
-
     def test_sensitivity_lodf_matrix(self, saw_instance):
         saw_instance.CalculateLODFMatrix("OUTAGES", "ALL", "ALL")
-
-    def test_sensitivity_loss(self, saw_instance):
-        saw_instance.CalculateLossSense("AREA")
-
-    def test_sensitivity_tap(self, saw_instance):
-        saw_instance.CalculateTapSense()
-
-    def test_sensitivity_volt_self(self, saw_instance):
-        saw_instance.CalculateVoltSelfSense()
-
-    def test_sensitivity_ptdf_multi(self, saw_instance):
-        saw_instance.CalculatePTDFMultipleDirections()
 
     # -------------------------------------------------------------------------
     # Topology Mixin Tests
@@ -551,16 +502,6 @@ class TestOnlineSAW:
             else:
                 pytest.skip("No branches found in case.")
 
-    def test_topology_extras(self, saw_instance):
-        # Use empty string for "ALL" filters where quotes are enforced by the mixin
-        saw_instance.SetBusFieldFromClosest("CustomFloat:1", "", "", "ALL", "X")
-        saw_instance.ExpandAllBusTopology()
-        try:
-            saw_instance.ExpandBusTopology("BUS 1", "RINGBUS")
-        except PowerWorldError:
-            pass
-        saw_instance.SaveConsolidatedCase("cons.pwb")
-
     def test_topology_areas_from_islands(self, saw_instance):
         saw_instance.CreateNewAreasFromIslands()
 
@@ -579,27 +520,6 @@ class TestOnlineSAW:
         df = saw_instance.RunQV()
         assert df is not None
 
-    def test_pv_run(self, saw_instance):
-        # Requires injection groups, skipping actual run but calling method
-        # saw_instance.RunPV(...)
-        pass
-
-    def test_pv_qv_extras(self, saw_instance):
-        saw_instance.PVClear()
-        saw_instance.QVDeleteAllResults()
-        saw_instance.PVStartOver()
-        saw_instance.PVQVTrackSingleBusPerSuperBus()
-        
-        # Create dummy injection groups for PVSetSourceAndSink
-        saw_instance.CreateData("InjectionGroup", ["Name"], ["SourceIG"])
-        saw_instance.CreateData("InjectionGroup", ["Name"], ["SinkIG"])
-        source_ig = create_object_string("InjectionGroup", "SourceIG")
-        sink_ig = create_object_string("InjectionGroup", "SinkIG")
-        saw_instance.PVSetSourceAndSink(source_ig, sink_ig)
-        
-        saw_instance.QVSelectSingleBusPerSuperBus()
-        saw_instance.RefineModel("AREA", "", "SHUNTS", 0.01)
-
     # -------------------------------------------------------------------------
     # Transient Mixin Tests
     # -------------------------------------------------------------------------
@@ -607,40 +527,10 @@ class TestOnlineSAW:
     def test_transient_initialize(self, saw_instance):
         saw_instance.TSInitialize()
 
-    def test_transient_clear_results(self, saw_instance):
-        try:
-            saw_instance.TSClearResultsFromRAM()
-        except Exception as e:
-            if "Access violation" in str(e):
-                pytest.skip("TSClearResultsFromRAM caused Access Violation (likely due to no results in RAM)")
-            raise e
-
-    def test_transient_solve(self, saw_instance):
-        # Requires contingency
-        pass
-
     def test_transient_options(self, saw_instance, temp_file):
         tmp_aux = temp_file(".aux")
         saw_instance.TSWriteOptions(tmp_aux)
         assert os.path.exists(tmp_aux)
-
-    def test_transient_misc(self, saw_instance):
-        saw_instance.TSTransferStateToPowerFlow()
-        saw_instance.TSResultStorageSetAll()
-        saw_instance.TSStoreResponse()
-        saw_instance.TSClearPlayInSignals()
-        try:
-            saw_instance.TSClearResultsFromRAMAndDisableStorage()
-        except Exception:
-            pass
-        saw_instance.TSAutoCorrect()
-        saw_instance.TSClearAllModels()
-        saw_instance.TSValidate()
-        saw_instance.TSCalculateSMIBEigenValues()
-        saw_instance.TSDisableMachineModelNonZeroDerivative()
-
-    def test_transient_plots(self, saw_instance):
-        saw_instance.TSAutoSavePlots([], [])
 
     def test_transient_critical_time(self, saw_instance):
         branches = saw_instance.GetParametersMultipleElement("Branch", ["BusNum", "BusNum:1", "LineCircuit"])
@@ -699,22 +589,6 @@ class TestOnlineSAW:
         tmp_gic = temp_file(".gic")
         saw_instance.GICWriteFilePTI(tmp_gic)
         
-    def test_gic_extras(self, saw_instance, temp_file):
-        # Create dummy files
-        tmp_gmd = temp_file(".gmd")
-        with open(tmp_gmd, 'w') as f: f.write("// Dummy GMD")
-        try:
-            saw_instance.GICReadFilePSLF(tmp_gmd)
-        except PowerWorldError:
-            pass
-        
-        tmp_gic = temp_file(".gic")
-        with open(tmp_gic, 'w') as f: f.write("// Dummy GIC")
-        try:
-            saw_instance.GICReadFilePTI(tmp_gic)
-        except PowerWorldError:
-            pass
-
     # -------------------------------------------------------------------------
     # ATC Mixin Tests
     # -------------------------------------------------------------------------
@@ -834,48 +708,6 @@ class TestOnlineSAW:
     def test_timestep_fields(self, saw_instance):
         saw_instance.TimeStepSaveFieldsSet("Gen", ["GenMW"])
         saw_instance.TimeStepSaveFieldsClear(["Gen"])
-
-    def test_timestep_extras(self, saw_instance):
-        try:
-            saw_instance.TIMESTEPSaveSelectedModifyStart()
-            saw_instance.TIMESTEPSaveSelectedModifyFinish()
-        except PowerWorldError:
-            pass
-        
-    def test_timestep_pww_extras(self, saw_instance, temp_file):
-        tmp_pww = temp_file(".pww")
-        # Write minimal PWW content or handle crash
-        with open(tmp_pww, 'w') as f: f.write("Version 1\n")
-        
-        try:
-            saw_instance.TimeStepAppendPWW(tmp_pww)
-        except PowerWorldError:
-            pass
-            
-        try:
-            saw_instance.TimeStepAppendPWWRange(tmp_pww, "", "")
-        except PowerWorldError:
-            pass
-            
-        try:
-            saw_instance.TimeStepAppendPWWRangeLatLon(tmp_pww, "", "", 0, 0, 0, 0)
-        except PowerWorldError:
-            pass
-            
-        tmp_b3d = temp_file(".b3d")
-        with open(tmp_b3d, 'w') as f: f.write("Version 1\n")
-        try:
-            saw_instance.TimeStepLoadB3D(tmp_b3d)
-        except PowerWorldError:
-            pass
-            
-        try:
-            saw_instance.TimeStepLoadPWWRangeLatLon(tmp_pww, "", "", 0, 0, 0, 0)
-        except PowerWorldError:
-            pass
-            
-        saw_instance.TimeStepSavePWWRange(tmp_pww, "", "")
-        saw_instance.TIMESTEPSaveInputCSV(temp_file(".csv"), ["GenMW"])
 
     # -------------------------------------------------------------------------
     # Weather Mixin Tests

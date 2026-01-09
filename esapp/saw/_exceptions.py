@@ -2,8 +2,8 @@
 
 
 # COM Error Hex Codes indicating RPC failures (SimAuto crash/unresponsive)
-RPC_S_UNKNOWN_IF = "0x800706b5"  # The interface is unknown
-RPC_S_CALL_FAILED = "0x800706be" # The remote procedure call failed
+RPC_S_UNKNOWN_IF = 0x800706b5  # The interface is unknown
+RPC_S_CALL_FAILED = 0x800706be # The remote procedure call failed
 
 class Error(Exception):
     """
@@ -132,7 +132,7 @@ class COMError(Error):
     pass
 
 
-class CommandNotRespectedError(Error):
+class CommandNotRespectedError(PowerWorldError):
     """
     Raised if a command sent into PowerWorld is not respected, but
     PowerWorld itself does not raise an error. This exception should

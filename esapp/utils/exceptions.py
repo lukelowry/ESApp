@@ -1,21 +1,26 @@
 
 
-class GridObjDNE(Exception):
+class ESAPlusError(Exception):
+    '''Base exception class for ESA++ library errors'''
+    pass
+
+
+class GridObjDNE(ESAPlusError):
     '''Describes a data query failure'''
     pass
 
-class FieldDataException(Exception):
+class FieldDataException(ESAPlusError):
     pass
 
-class AuxParseException(Exception):
+class AuxParseException(ESAPlusError):
     pass
 
-class ContainerDeletedException(Exception):
+class ContainerDeletedException(ESAPlusError):
     pass
 
 '''Observable Exceptions'''
 
-class PowerFlowException(Exception):
+class PowerFlowException(ESAPlusError):
     '''Raised When Power Flow Error Occurs'''
     pass
 
@@ -32,6 +37,6 @@ class GeneratorLimitException(PowerFlowException):
 
 ''' GIC Exceptions '''
 
-class GICException(Exception):
+class GICException(ESAPlusError):
     pass 
 

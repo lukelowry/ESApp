@@ -1336,7 +1336,7 @@ class SAWBase(object):
         except Exception as e:
             # Handle specific RPC server unavailable/unknown interface errors
             msg = str(e)
-            if RPC_S_UNKNOWN_IF in msg or RPC_S_CALL_FAILED in msg:
+            if hex(RPC_S_UNKNOWN_IF) in msg or hex(RPC_S_CALL_FAILED) in msg:
                 m = f"SimAuto server crashed or is unresponsive during call to {func} with {args}. (RPC Error)"
                 self.log.critical(m)
             m = f"An error occurred when trying to call {func} with {args}"

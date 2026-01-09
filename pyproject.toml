@@ -56,10 +56,16 @@ dependencies = [
 
 [project.optional-dependencies]
 test = [
-    "pytest"
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "pytest-xdist>=3.0",
+    "pytest-timeout>=2.1",
+    "pytest-mock>=3.10"
 ]
 dev = [
-    "matplotlib"
+    "matplotlib",
+    "pytest>=7.0",
+    "pytest-cov>=4.0"
 ]
 docs = [
     "sphinx",
@@ -77,6 +83,9 @@ Homepage = "https://github.com/lukelowry/ESApp"
 packages = {find = {}}
 include-package-data = true
 zip-safe = false
+
+[tool.setuptools.package-data]
+esapp = ["py.typed", "utils/shapes/**/*"]
 
 [tool.setuptools.dynamic]
 version = {file = "VERSION"}
