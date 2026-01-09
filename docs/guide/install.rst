@@ -33,5 +33,5 @@ Verify the installation
 Next steps
 ----------
 - Continue to the :doc:`usage` guide for indexing and API basics
-- See :doc:`../examples` for end-to-end notebooks
-- Review :doc:`../api` for full reference
+- See :doc:`examples` for end-to-end notebooks
+- Review :doc:`../api/api` for full reference

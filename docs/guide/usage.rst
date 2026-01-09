@@ -2,7 +2,7 @@ Usage Guide
 ===========
 
 This guide explains the core mechanics of ESA++—how to index, read, and write fields and when to drop down
-to SAW. If you want goal-driven, end-to-end scripts, head to :doc:`../examples`. Think of this page as the
+to SAW. If you want goal-driven, end-to-end scripts, head to :doc:`examples`. Think of this page as the
 reference for everyday interactions: get data, filter it, push edits back, and call lower-level SAW features
 when you need to.
 
@@ -144,6 +144,6 @@ linearized studies, external analytics, or custom contingency logic.
 
 Where to go next
 ----------------
-- End-to-end scripts: :doc:`../examples`
-- Full API reference: :doc:`../api`
+- End-to-end scripts: :doc:`examples`
+- Full API reference: :doc:`../api/api`
 - Development and tests: :doc:`../dev/tests`

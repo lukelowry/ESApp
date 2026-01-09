@@ -112,6 +112,8 @@ If you use this toolkit in your research or industrial projects, please cite the
 Authors
 -------
 
+Luke Lowery developed this module during his PhD studies at Texas A&M University. You can learn more on his `research page <https://lukelowry.github.io/>`_ or view his publications on `Google Scholar <https://scholar.google.com/citations?user=CTynuRMAAAAJ&hl=en>`_.
+
 ESA++ is maintained by **Luke Lowery** and **Adam Birchfield** at Texas A&M University. You can explore more of our research at the `Birchfield Research Group <https://birchfield.engr.tamu.edu/>`_.
 
 License

@@ -34,7 +34,7 @@ Rich Testing Suite
     :caption: User Guide
 
     guide/install
-    examples
+    guide/examples
     guide/usage
 
 
