@@ -6,7 +6,7 @@ This section provides a detailed reference for the ESA++ API, partitioned by fun
 .. toctree::
    :maxdepth: 2
 
-   api/workbench
-   api/saw
-   api/apps
-   api/utils
+   workbench
+   saw
+   apps
+   utils
