@@ -32,7 +32,7 @@ The component system consists of:
    - Field priority marking (required, optional)
    - Informative string representations
 
-2. **Field Definitions** (``esapp/grid/components.py``)
+2. **Field Definitions** (``esapp/grid.py``)
    
    Auto-generated classes defining all PowerWorld objects:
    
@@ -44,7 +44,7 @@ The component system consists of:
            BusName = (FieldPriority.OPTIONAL, str)
            BusPUVolt = (FieldPriority.OPTIONAL, np.float64)
 
-3. **Generation Script** (``esapp/grid/generate_components.py``)
+3. **Generation Script** (``esapp/dev/generate_components.py``)
    
    Python script that:
    - Parses PowerWorld field export (PWRaw format)
@@ -80,7 +80,7 @@ Step 2: Prepare the Raw Data
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 1. Rename the exported file to ``PWRaw``
-2. Place it in the ``esapp/grid/`` folder, overwriting the existing one
+2. Place it in the ``esapp/dev/`` folder, overwriting the existing one
 
 The PWRaw file format is tab-delimited with columns:
 
@@ -99,7 +99,7 @@ Execute the generation script from the project root:
 
 .. code-block:: bash
 
-    python esapp/grid/generate_components.py
+    python esapp/dev/generate_components.py
 
 The script will:
 
@@ -111,7 +111,7 @@ The script will:
    - **REQUIRED**: Must be specified when creating new objects
    - **OPTIONAL**: Can be read/written but not required
    
-4. Create ``esapp/grid/components.py`` with all component classes
+4. Create ``esapp/grid.py`` with all component classes
 5. Print progress to console including any warnings or excluded fields
 
 Step 4: Verify the Changes

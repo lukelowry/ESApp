@@ -30,12 +30,13 @@ Rich Testing Suite
    ESA++ requires a licensed installation of PowerWorld Simulator with SimAuto (COM interface) enabled.
 
 .. toctree::
-   :maxdepth: 2
-   :caption: User Guide
+    :maxdepth: 2
+    :caption: User Guide
 
-   guide/tutorial
-   guide/usage
-   examples
+    guide/install
+    examples
+    guide/usage
+
 
 .. toctree::
    :maxdepth: 2

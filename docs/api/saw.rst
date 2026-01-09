@@ -1,71 +1,10 @@
 SimAuto Wrapper (SAW)
 =====================
 
-The ``SAW`` (SimAuto Wrapper) class provides a comprehensive, object-oriented interface to the 
-PowerWorld Simulator's SimAuto COM server. It abstracts away COM complexity while providing access 
-to the full range of PowerWorld automation capabilities.
-
-Overview
---------
-
-SAW is organized into modular mixins, each covering a specific functional area:
-
-Base
-    Fundamental operations (open case, save, set data, get data, run scripts)
-Power Flow
-    AC/DC power flow solutions and analysis
-Contingency
-    Single and multi-element contingency analysis
-Optimization
-    Optimal power flow, SCOPF, and economic dispatch
-Sensitivity
-    PTDF, LODF, and other sensitivity calculations
-Transient Stability
-    Dynamic stability analysis and critical clearing time
-GIC
-    Geomagnetic induced current calculations
-ATC
-    Available transfer capability analysis
-Topology
-    Network modification and branching operations
-Voltage Analysis
-    P-V and Q-V curve generation
-Data Management
-    Export, import, and reporting
-Advanced
-    Matrices, regions, scheduled operations, weather effects
-
-Typical Usage
-~~~~~~~~~~~~~
-
-While GridWorkBench provides high-level convenience methods for common tasks, the SAW interface 
-allows access to the full PowerWorld API for advanced usage:
-
-.. code-block:: python
-
-    from esapp import GridWorkBench
-    
-    wb = GridWorkBench("case.pwb")
-    
-    wb.pflow()
-    wb.auto_insert_contingencies()
-    
-    saw = wb.esa
-    saw.SolveAC_OPF()
-
-Error Handling
-~~~~~~~~~~~~~~
-
-SAW provides specialized exception types for different PowerWorld errors:
-
-.. code-block:: python
-
-    from esapp import PowerWorldError, COMError, SimAutoFeatureError
-    
-    try:
-        wb.pflow()
-    except PowerWorldError as e:
-        print(f"PowerWorld error: {e}")
+The ``SAW`` (SimAuto Wrapper) class exposes the full PowerWorld API. It is organized into mixins
+corresponding to PowerWorld functional areas (power flow, contingencies, optimization, sensitivity,
+transient, GIC, ATC, topology, voltage analysis, data management). Use ``wb.esa`` to access SAW from
+``GridWorkBench``. This page lists the complete API.
 
 API Documentation
 ------------------
