@@ -42,7 +42,7 @@ Rich Testing Suite
    :maxdepth: 2
    :caption: API Reference
 
-   api
+   api/api
 
 .. toctree::
    :maxdepth: 1

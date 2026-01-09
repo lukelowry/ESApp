@@ -6,6 +6,7 @@ from .grid import Bus, Branch, Gen, Load, Shunt, Area, Zone, Substation
 from .saw import create_object_string
 
 import numpy as np
+from numpy import any as np_any
 from pandas import DataFrame
 
 class GridWorkBench(Indexable):
@@ -32,6 +33,13 @@ class GridWorkBench(Indexable):
 
         #self.dyn = Dynamics(self.esa)
         #self.statics = Statics(self.esa)
+
+        # State chain for iterative solvers
+        self._state_chain_idx = -1
+        self._state_chain_max = 2
+
+        # ZIP load dispatch dataframe (initialized on first use)
+        self._dispatch_pq = None
 
         if fname:
             # Required to set to use IndexTool
@@ -464,20 +472,13 @@ class GridWorkBench(Indexable):
         --------
         >>> wb.set_gen(bus=10, id="1", mw=150.0)
         """
-        params = []
-        values = []
-        if mw is not None:
-            params.append("GenMW")
-            values.append(mw)
-        if mvar is not None:
-            params.append("GenMVR")
-            values.append(mvar)
-        if status is not None:
-            params.append("GenStatus")
-            values.append(status)
+        param_map = {"GenMW": mw, "GenMVR": mvar, "GenStatus": status}
+        params = {k: v for k, v in param_map.items() if v is not None}
         
         if params:
-            self.esa.ChangeParametersSingleElement("Gen", ["BusNum", "GenID"] + params, [bus, id] + values)
+            fields = ["BusNum", "GenID"] + list(params.keys())
+            values = [bus, id] + list(params.values())
+            self.esa.ChangeParametersSingleElement("Gen", fields, values)
 
     def set_load(self, bus, id, mw=None, mvar=None, status=None):
         """
@@ -500,20 +501,13 @@ class GridWorkBench(Indexable):
         --------
         >>> wb.set_load(bus=5, id="1", mw=50.0)
         """
-        params = []
-        values = []
-        if mw is not None:
-            params.append("LoadMW")
-            values.append(mw)
-        if mvar is not None:
-            params.append("LoadMVR")
-            values.append(mvar)
-        if status is not None:
-            params.append("LoadStatus")
-            values.append(status)
+        param_map = {"LoadMW": mw, "LoadMVR": mvar, "LoadStatus": status}
+        params = {k: v for k, v in param_map.items() if v is not None}
         
         if params:
-            self.esa.ChangeParametersSingleElement("Load", ["BusNum", "LoadID"] + params, [bus, id] + values)
+            fields = ["BusNum", "LoadID"] + list(params.keys())
+            values = [bus, id] + list(params.values())
+            self.esa.ChangeParametersSingleElement("Load", fields, values)
 
     def scale_load(self, factor):
         """
@@ -701,69 +695,6 @@ class GridWorkBench(Indexable):
         """
         self.esa.SetSelectedFromNetworkCut(True, bus_on_side, branch_filter=branch_filter, objects_to_select=["Bus", "Gen", "Load"])
 
-    def isolate_zone(self, zone_num):
-        """
-        Opens all tie-lines connecting the specified zone to other zones.
-
-        Parameters
-        ----------
-        zone_num : int
-            The zone number to isolate.
-
-        Examples
-        --------
-        >>> wb.isolate_zone(1)
-        """
-        # Retrieve branch connectivity and zone information
-        # Note: 'BusZone' refers to From Bus Zone, 'BusZone:1' refers to To Bus Zone in PowerWorld
-        branches = self[Branch, ["BusNum", "BusNum:1", "LineCircuit", "BusZone", "BusZone:1"]]
-        
-        # Filter for tie-lines where one end is in the zone and the other is not
-        ties = branches[
-            ((branches['BusZone'] == zone_num) & (branches['BusZone:1'] != zone_num)) |
-            ((branches['BusZone'] != zone_num) & (branches['BusZone:1'] == zone_num))
-        ]
-        
-        for _, row in ties.iterrows():
-            self.open_branch(row['BusNum'], row['BusNum:1'], row['LineCircuit'])
-
-    # --- Validation & Comparison ---
-
-    def find_violations(self, v_min=0.95, v_max=1.05, branch_max_pct=100.0):
-        """
-        Finds bus voltage and branch flow violations.
-
-        Parameters
-        ----------
-        v_min : float, optional
-            Minimum per-unit voltage threshold. Defaults to 0.95.
-        v_max : float, optional
-            Maximum per-unit voltage threshold. Defaults to 1.05.
-        branch_max_pct : float, optional
-            Branch loading percentage threshold. Defaults to 100.0.
-
-        Returns
-        -------
-        dict
-            Dictionary with 'bus_low', 'bus_high', 'branch_overload' DataFrames.
-
-        Examples
-        --------
-        >>> viols = wb.find_violations(v_min=0.9, v_max=1.1)
-        """
-        # Bus Violations
-        buses = self[Bus, ["BusNum", "BusName", "BusPUVolt"]]
-        low = buses[buses['BusPUVolt'] < v_min]
-        high = buses[buses['BusPUVolt'] > v_max]
-        
-        # Branch Violations
-        branches = self[Branch, ["BusNum", "BusNum:1", "LineCircuit", "LineMVA", "LineLimit"]]
-        # Filter branches with valid limits to avoid division by zero or misleading results
-        branches = branches[branches['LineLimit'] > 0]
-        overloaded = branches[branches['LineMVA'] > (branches['LineLimit'] * (branch_max_pct / 100.0))]
-        
-        return {'bus_low': low, 'bus_high': high, 'branch_overload': overloaded}
-
     # --- Difference Flows ---
 
     def set_as_base_case(self):
@@ -790,27 +721,6 @@ class GridWorkBench(Indexable):
         >>> wb.diff_mode("DIFFERENCE")
         """
         self.esa.DiffCaseMode(mode)
-
-    def compare_case(self, other_case_path, output_aux):
-        """
-        Compares the current case (set as base) with another case file.
-        Generates an AUX file with the differences.
-
-        Parameters
-        ----------
-        other_case_path : str
-            Path to the case to compare against.
-        output_aux : str
-            Path to the output .aux file.
-
-        Examples
-        --------
-        >>> wb.compare_case("case2.pwb", "diff.aux")
-        """
-        self.esa.DiffCaseSetAsBase()
-        self.esa.OpenCase(other_case_path)
-        self.esa.DiffCaseRefresh()
-        self.esa.DiffCaseWriteCompleteModel(output_aux)
 
     # --- Analysis ---
 
@@ -878,16 +788,6 @@ class GridWorkBench(Indexable):
         >>> islands = wb.islands()
         """
         return self.esa.DetermineBranchesThatCreateIslands()
-
-    def save_image(self, filename, oneline_name, image_type="JPG"):
-        """
-        Exports the oneline diagram to an image.
-
-        Examples
-        --------
-        >>> wb.save_image("oneline.jpg", "OneLine1")
-        """
-        self.esa.ExportOneline(filename, oneline_name, image_type)
 
     def refresh_onelines(self):
         """
@@ -1009,65 +909,7 @@ class GridWorkBench(Indexable):
 
     # --- Advanced Analysis ---
 
-    def run_pv(self, source, sink):
-        """
-        Runs PV analysis between source and sink injection groups.
 
-        Parameters
-        ----------
-        source : str
-            Source injection group name.
-        sink : str
-            Sink injection group name.
-
-        Examples
-        --------
-        >>> wb.run_pv("SourceGroup", "SinkGroup")
-        """
-        self.esa.RunPV(source, sink)
-
-    def run_qv(self, filename=None):
-        """
-        Runs QV analysis.
-
-        Parameters
-        ----------
-        filename : str, optional
-            Filename to save results. Defaults to None.
-
-        Returns
-        -------
-        str
-            Result string.
-
-        Examples
-        --------
-        >>> wb.run_qv("qv_results.csv")
-        """
-        return self.esa.RunQV(filename)
-    
-    def calculate_atc(self, seller, buyer):
-        """
-        Calculates Available Transfer Capability.
-
-        Parameters
-        ----------
-        seller : str
-            Seller identifier.
-        buyer : str
-            Buyer identifier.
-
-        Returns
-        -------
-        str
-            Result string.
-
-        Examples
-        --------
-        >>> wb.calculate_atc("[AREA 1]", "[AREA 2]")
-        """
-        return self.esa.DetermineATC(seller, buyer)
-    
     def calculate_gic(self, max_field, direction):
         """
         Calculates GIC with specified field (V/km) and direction (degrees).
@@ -1185,3 +1027,141 @@ class GridWorkBench(Indexable):
         V_df =  np.vstack([np.abs(V), np.angle(V,deg=True)]).T
 
         self[Bus, ["BusPUVolt", "BusAngle"]] = V_df
+
+    # --- Generator Limit Checking ---
+
+    def gens_above_pmax(self, p=None, is_closed=None, tol=0.001):
+        """
+        Check if any closed generators are outside active power limits.
+
+        Parameters
+        ----------
+        p : pd.Series, optional
+            Generator MW output. If None, retrieves from case.
+        is_closed : pd.Series, optional
+            Boolean series of generator status. If None, retrieves from case.
+        tol : float, optional
+            Tolerance for limit checking. Defaults to 0.001.
+
+        Returns
+        -------
+        bool
+            True if any closed generators violate P limits.
+
+        Examples
+        --------
+        >>> if wb.gens_above_pmax():
+        ...     print("Generator P limit violation detected")
+        """
+        return self._check_gen_limits('GenMW', 'GenMWMax', 'GenMWMin', p, is_closed, tol)
+
+    def gens_above_qmax(self, q=None, is_closed=None, tol=0.001):
+        """
+        Check if any closed generators are outside reactive power limits.
+
+        Parameters
+        ----------
+        q : pd.Series, optional
+            Generator Mvar output. If None, retrieves from case.
+        is_closed : pd.Series, optional
+            Boolean series of generator status. If None, retrieves from case.
+        tol : float, optional
+            Tolerance for limit checking. Defaults to 0.001.
+
+        Returns
+        -------
+        bool
+            True if any closed generators violate Q limits.
+
+        Examples
+        --------
+        >>> if wb.gens_above_qmax():
+        ...     print("Generator Q limit violation detected")
+        """
+        return self._check_gen_limits('GenMVR', 'GenMVRMax', 'GenMVRMin', q, is_closed, tol)
+
+    # --- State Chain Management ---
+
+    def _check_gen_limits(self, value_col, max_col, min_col, value=None, is_closed=None, tol=0.001):
+        """
+        Helper method to check if generators exceed limits.
+
+        Parameters
+        ----------
+        value_col : str
+            Column name for current value (e.g., 'GenMW' or 'GenMVR').
+        max_col : str
+            Column name for maximum limit.
+        min_col : str
+            Column name for minimum limit.
+        value : pd.Series, optional
+            Current values. If None, retrieves from case.
+        is_closed : pd.Series, optional
+            Boolean series of generator status. If None, retrieves from case.
+        tol : float, optional
+            Tolerance for limit checking. Defaults to 0.001.
+
+        Returns
+        -------
+        bool
+            True if any closed generators violate limits.
+        """
+        gens = self[Gen, [value_col, max_col, min_col, 'GenStatus']]
+        
+        value = gens[value_col] if value is None else value
+        is_closed = (gens['GenStatus'] == 'Closed') if is_closed is None else is_closed
+        
+        violation = is_closed & ((value > gens[max_col] + tol) | (value < gens[min_col] - tol))
+        return np_any(violation)
+
+    # --- GIC Functions ---
+
+    def gic_storm(self, max_field: float, direction: float, solve_pf=True):
+        """
+        Configure a synthetic GIC storm with uniform electric field.
+
+        Parameters
+        ----------
+        max_field : float
+            Maximum electric field magnitude in Volts/km.
+        direction : float
+            Storm direction in degrees (0-360).
+        solve_pf : bool, optional
+            Whether to include results in power flow. Defaults to True.
+
+        Examples
+        --------
+        >>> wb.gic_storm(max_field=1.0, direction=90.0)
+        """
+        yn = "YES" if solve_pf else "NO"
+        self.esa.RunScriptCommand(f"GICCalculate({max_field}, {direction}, {yn})")
+
+    def gic_clear(self):
+        """
+        Clear manual GIC calculations from PowerWorld.
+
+        Examples
+        --------
+        >>> wb.gic_clear()
+        """
+        self.esa.RunScriptCommand("GICClear;")
+
+    def gic_load_b3d(self, file_type: str, filename: str, setup_on_load=True):
+        """
+        Load a B3D file containing electric field data for GIC analysis.
+
+        Parameters
+        ----------
+        file_type : str
+            The type of B3D file.
+        filename : str
+            Path to the B3D file.
+        setup_on_load : bool, optional
+            Whether to configure GIC settings on load. Defaults to True.
+
+        Examples
+        --------
+        >>> wb.gic_load_b3d("STORM", "storm_data.b3d")
+        """
+        yn = "YES" if setup_on_load else "NO"
+        self.esa.RunScriptCommand(f"GICLoad3DEfield({file_type}, {filename}, {yn})")

@@ -6,8 +6,15 @@ from ..grid import TSContingency
 from ..indexable import Indexable
 
 
-# Dynamics App (Simulation, Model, etc.)
 class Dynamics(Indexable):
+    """
+    Research-focused transient stability simulation application.
+    
+    This class provides specialized functions for dynamic simulation,
+    transient stability contingency solving, and result extraction.
+    These functions are intentionally untested as they are for highly
+    specific research and data analysis.
+    """
 
     def fields(self, metric):
         '''Get TS Formatted Fields for Requested Objects'''

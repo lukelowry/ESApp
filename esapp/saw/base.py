@@ -201,7 +201,29 @@ class SAWBase(object):
             ObjectType=ObjectType, command_df=command_df
         )
         df = self.GetParametersMultipleElement(ObjectType=ObjectType, ParamList=cleaned_df.columns.tolist())
-        eq = self._df_equiv_subset_of_other(df1=cleaned_df, df2=df, ObjectType=ObjectType)
+        
+        # Verify changes by merging on key fields and comparing values
+        kf = self.get_key_fields_for_object_type(ObjectType=ObjectType)
+        merged = pd.merge(
+            left=cleaned_df,
+            right=df,
+            how="inner",
+            on=kf["internal_field_name"].tolist(),
+            suffixes=("_in", "_out"),
+            copy=False,
+        )
+        
+        cols_in = merged.columns[merged.columns.str.endswith("_in")]
+        cols_out = merged.columns[merged.columns.str.endswith("_out")]
+        cols = cols_in.str.replace("_in", "")
+        numeric_cols = self.identify_numeric_fields(ObjectType=ObjectType, fields=cols)
+        str_cols = ~numeric_cols
+        
+        eq = np.allclose(
+            merged[cols_in[numeric_cols]].to_numpy(),
+            merged[cols_out[numeric_cols]].to_numpy(),
+        ) and np.array_equal(merged[cols_in[str_cols]].to_numpy(), merged[cols_out[str_cols]].to_numpy())
+        
         if not eq:
             m = (
                 "After calling ChangeParametersMultipleElement, not all parameters were actually changed "
@@ -209,18 +231,6 @@ class SAWBase(object):
                 "instead of GenRegPUVolt)."
             )
             raise CommandNotRespectedError(m)
-
-    def change_parameters_multiple_element_df(self, ObjectType: str, command_df: pd.DataFrame) -> None:
-        """Modifies parameters for multiple elements using a DataFrame without verification.
-        
-        Parameters
-        ----------
-        ObjectType : str
-            The PowerWorld object type.
-        command_df : pandas.DataFrame
-            A DataFrame containing the data to update.
-        """
-        self._change_parameters_multiple_element_df(ObjectType=ObjectType, command_df=command_df)
 
     def clean_df_or_series(
         self, obj: Union[pd.DataFrame, pd.Series], ObjectType: str
@@ -321,7 +331,15 @@ class SAWBase(object):
         key_field_df = field_list.loc[key_field_mask].copy()
         key_field_df["key_field"] = key_field_df["key_field"].str.replace(r"\*", "", regex=True)
         key_field_df["key_field"] = key_field_df["key_field"].str.replace("[A-Z]*", "", regex=True)
-        key_field_df["key_field_index"] = self._to_numeric(key_field_df["key_field"]) - 1
+        
+        # Convert to numeric, handling locale if needed
+        key_field_series = key_field_df["key_field"]
+        if self.decimal_delimiter != ".":
+            try:
+                key_field_series = key_field_series.str.replace(self.decimal_delimiter, ".")
+            except AttributeError:
+                pass
+        key_field_df["key_field_index"] = pd.to_numeric(key_field_series, errors='coerce').fillna(key_field_df["key_field"]) - 1
         key_field_df.drop("key_field", axis=1, inplace=True)
         key_field_df.set_index(keys="key_field_index", drop=True, verify_integrity=True, inplace=True)
         key_field_df.sort_index(axis=0, inplace=True)
@@ -758,7 +776,17 @@ class SAWBase(object):
         )
 
         s = pd.Series(output, index=ParamList)
-        return self.clean_df_or_series(obj=s, ObjectType=ObjectType)
+        
+        # Clean data if not using PowerWorld ordering
+        if not self.pw_order:
+            numeric = self.identify_numeric_fields(ObjectType=ObjectType, fields=s.index.to_numpy())
+            numeric_fields = s.index.to_numpy()[numeric]
+            for field in numeric_fields:
+                s[field] = pd.to_numeric(s[field], errors='coerce')
+            nn_fields = s.index.to_numpy()[~numeric]
+            s[nn_fields] = s[nn_fields].astype(str).str.strip()
+        
+        return s
 
     def GetParametersMultipleElement(
         self, ObjectType: str, ParamList: list, FilterName: str = ""
@@ -799,7 +827,24 @@ class SAWBase(object):
             return output
 
         df = pd.DataFrame(np.array(output).transpose(), columns=ParamList)
-        return self.clean_df_or_series(obj=df, ObjectType=ObjectType)
+        
+        # Clean data if not using PowerWorld ordering
+        if not self.pw_order:
+            numeric = self.identify_numeric_fields(ObjectType=ObjectType, fields=df.columns.to_numpy())
+            numeric_fields = df.columns.to_numpy()[numeric]
+            # Convert numeric fields - use coerce to turn errors into NaN, then fillna for originals
+            for field in numeric_fields:
+                df[field] = pd.to_numeric(df[field], errors='coerce')
+            nn_fields = df.columns.to_numpy()[~numeric]
+            df[nn_fields] = df[nn_fields].astype(str).apply(lambda x: x.str.strip())
+            try:
+                df.sort_values(by="BusNum", axis=0, inplace=True)
+                df.reset_index(drop=True, inplace=True)
+            except (KeyError, TypeError):
+                # KeyError if BusNum doesn't exist, TypeError if can't sort mixed types
+                pass
+        
+        return df
 
     def GetParamsRectTyped(
         self, ObjectType: str, ParamList: list, FilterName: str = ""
@@ -1005,7 +1050,21 @@ class SAWBase(object):
 
         df = pd.DataFrame(output).transpose()
         df.columns = kf["internal_field_name"].to_numpy()
-        df = self.clean_df_or_series(obj=df, ObjectType=ObjType)
+        
+        # Clean data if not using PowerWorld ordering
+        if not self.pw_order:
+            numeric = self.identify_numeric_fields(ObjectType=ObjType, fields=df.columns.to_numpy())
+            numeric_fields = df.columns.to_numpy()[numeric]
+            for field in numeric_fields:
+                df[field] = pd.to_numeric(df[field], errors='coerce')
+            nn_fields = df.columns.to_numpy()[~numeric]
+            df[nn_fields] = df[nn_fields].astype(str).apply(lambda x: x.str.strip())
+            try:
+                df.sort_values(by="BusNum", axis=0, inplace=True)
+                df.reset_index(drop=True, inplace=True)
+            except (KeyError, TypeError):
+                pass
+        
         return df
 
     def ListOfDevicesAsVariantStrings(self, ObjType: str, FilterName="") -> tuple:
@@ -1384,57 +1443,28 @@ class SAWBase(object):
         pandas.DataFrame
             The cleaned DataFrame that was sent to PowerWorld.
         """
-        cleaned_df = self.clean_df_or_series(obj=command_df, ObjectType=ObjectType)
+        cleaned_df = command_df.copy()
+        
+        # Clean data if not using PowerWorld ordering
+        if not self.pw_order:
+            numeric = self.identify_numeric_fields(ObjectType=ObjectType, fields=cleaned_df.columns.to_numpy())
+            numeric_fields = cleaned_df.columns.to_numpy()[numeric]
+            for field in numeric_fields:
+                cleaned_df[field] = pd.to_numeric(cleaned_df[field], errors='coerce')
+            nn_fields = cleaned_df.columns.to_numpy()[~numeric]
+            cleaned_df[nn_fields] = cleaned_df[nn_fields].astype(str).apply(lambda x: x.str.strip())
+            try:
+                cleaned_df.sort_values(by="BusNum", axis=0, inplace=True)
+                cleaned_df.reset_index(drop=True, inplace=True)
+            except (KeyError, TypeError):
+                pass
+        
         self.ChangeParametersMultipleElement(
             ObjectType=ObjectType,
             ParamList=cleaned_df.columns.tolist(),
             ValueList=cleaned_df.to_numpy().tolist(),
         )
         return cleaned_df
-
-    def _df_equiv_subset_of_other(self, df1: pd.DataFrame, df2: pd.DataFrame, ObjectType: str) -> bool:
-        """Internal helper to check if one DataFrame is equivalent to a subset of another.
-
-        This is used for verifying that changes applied to PowerWorld (represented by `df1`)
-        are correctly reflected when data is read back (`df2`). It performs a merge on
-        key fields and then compares the values of the changed parameters.
-
-        Parameters
-        ----------
-        df1 : pandas.DataFrame
-            The DataFrame representing the intended state (e.g., data sent to PowerWorld).
-        df2 : pandas.DataFrame
-            The DataFrame representing the actual state (e.g., data read back from PowerWorld).
-        ObjectType : str
-            The PowerWorld object type, used to retrieve key fields and identify numeric columns.
-
-        Returns
-        -------
-        bool
-            True if `df1` is equivalent to a subset of `df2` (i.e., all changes in `df1`
-            are reflected in `df2` for the common objects and columns), False otherwise.
-        """
-        kf = self.get_key_fields_for_object_type(ObjectType=ObjectType)
-        merged = pd.merge(
-            left=df1,
-            right=df2,
-            how="inner",
-            on=kf["internal_field_name"].tolist(),
-            suffixes=("_in", "_out"),
-            copy=False,
-        )
-
-        cols_in = merged.columns[merged.columns.str.endswith("_in")]
-        cols_out = merged.columns[merged.columns.str.endswith("_out")]
-
-        cols = cols_in.str.replace("_in", "")
-        numeric_cols = self.identify_numeric_fields(ObjectType=ObjectType, fields=cols)
-        str_cols = ~numeric_cols
-
-        return np.allclose(
-            merged[cols_in[numeric_cols]].to_numpy(),
-            merged[cols_out[numeric_cols]].to_numpy(),
-        ) and np.array_equal(merged[cols_in[str_cols]].to_numpy(), merged[cols_out[str_cols]].to_numpy())
 
     def _to_numeric(
         self, data: Union[pd.DataFrame, pd.Series], errors="ignore"

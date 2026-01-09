@@ -695,3 +695,135 @@ class GeneralMixin:
         
         cmd = f'SendtoExcel({objecttype}, {fields}, {filt}, {uch}, "{workbook}", "{worksheet}", {sorts}, {headers}, {values}, {ce}, {row_shift}, {col_shift});'
         return self.RunScriptCommand(cmd)
+
+    def LogAddDateTime(
+        self,
+        label: str,
+        include_date: bool = True,
+        include_time: bool = True,
+        include_milliseconds: bool = False
+    ):
+        """Adds the current date and time to the PowerWorld Simulator Message Log.
+
+        Use this action to add a timestamped entry to the message log for tracking
+        when certain operations occur during script execution.
+
+        Parameters
+        ----------
+        label : str
+            A string which will appear at the start of the line containing the date/time.
+        include_date : bool, optional
+            If True, includes the date in the log entry. Defaults to True.
+        include_time : bool, optional
+            If True, includes the time in the log entry. Defaults to True.
+        include_milliseconds : bool, optional
+            If True, includes milliseconds in the time. Defaults to False.
+
+        Returns
+        -------
+        None
+
+        Raises
+        ------
+        PowerWorldError
+            If the SimAuto call fails.
+
+        Examples
+        --------
+        >>> saw.LogAddDateTime("DateTime", True, True, True)
+        # Adds a log entry labeled "DateTime" with current date, time, and milliseconds.
+        """
+        id = "YES" if include_date else "NO"
+        it = "YES" if include_time else "NO"
+        im = "YES" if include_milliseconds else "NO"
+        return self.RunScriptCommand(f'LogAddDateTime("{label}", {id}, {it}, {im});')
+
+    def LoadAuxDirectory(
+        self,
+        file_directory: str,
+        filter_string: str = "",
+        create_if_not_found: bool = False
+    ):
+        """Loads multiple auxiliary files from a specified directory.
+
+        The auxiliary files will be loaded in alphabetical order by name. This is
+        useful for batch loading configuration files or data updates.
+
+        Parameters
+        ----------
+        file_directory : str
+            The directory where the auxiliary files are located.
+        filter_string : str, optional
+            A filter string using Windows wildcard patterns (e.g., "*.aux").
+            If not specified, all files in the directory are loaded. Defaults to "".
+        create_if_not_found : bool, optional
+            If True, objects that cannot be found will be created while reading
+            DATA sections from the files. Defaults to False.
+
+        Returns
+        -------
+        None
+
+        Raises
+        ------
+        PowerWorldError
+            If the SimAuto call fails (e.g., directory not found).
+
+        Examples
+        --------
+        >>> saw.LoadAuxDirectory("C:/SimCases/AuxFiles", "*.aux", True)
+        # Loads all .aux files from the directory in alphabetical order.
+        """
+        c = "YES" if create_if_not_found else "NO"
+        if filter_string:
+            return self.RunScriptCommand(f'LoadAuxDirectory("{file_directory}", "{filter_string}", {c});')
+        else:
+            return self.RunScriptCommand(f'LoadAuxDirectory("{file_directory}", , {c});')
+
+    def LoadData(self, filename: str, data_name: str, create_if_not_found: bool = False):
+        """Loads a named DATA section from another auxiliary file.
+
+        This opens the auxiliary file denoted by filename but only reads the
+        specific data section specified, ignoring other sections.
+
+        Parameters
+        ----------
+        filename : str
+            The filename of the auxiliary file being loaded.
+        data_name : str
+            The specific data section name from the auxiliary file that should be loaded.
+        create_if_not_found : bool, optional
+            If True, objects that cannot be found will be created. Defaults to False.
+
+        Returns
+        -------
+        None
+
+        Raises
+        ------
+        PowerWorldError
+            If the SimAuto call fails (e.g., file or data section not found).
+        """
+        c = "YES" if create_if_not_found else "NO"
+        return self.RunScriptCommand(f'LoadData("{filename}", {data_name}, {c});')
+
+    def StopAuxFile(self):
+        """Treats the remainder of the file after this command as a comment.
+
+        This includes any script commands inside the present SCRIPT block,
+        as well as all remaining SCRIPT or DATA blocks. Useful for temporarily
+        disabling portions of an auxiliary file.
+
+        Note: This command is primarily useful when executing auxiliary files
+        directly, not when using SimAuto programmatically.
+
+        Returns
+        -------
+        None
+
+        Raises
+        ------
+        PowerWorldError
+            If the SimAuto call fails.
+        """
+        return self.RunScriptCommand("StopAuxFile;")

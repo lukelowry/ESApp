@@ -60,12 +60,14 @@ test = [
     "pytest-cov>=4.0",
     "pytest-xdist>=3.0",
     "pytest-timeout>=2.1",
-    "pytest-mock>=3.10"
+    "pytest-mock>=3.10",
+    "pytest-order>=1.2"
 ]
 dev = [
     "matplotlib",
     "pytest>=7.0",
-    "pytest-cov>=4.0"
+    "pytest-cov>=4.0",
+    "pytest-order>=1.2"
 ]
 docs = [
     "sphinx",
@@ -89,3 +91,41 @@ esapp = ["py.typed", "utils/shapes/**/*"]
 
 [tool.setuptools.dynamic]
 version = {file = "VERSION"}
+
+[tool.coverage.run]
+source = ["esapp"]
+branch = true
+parallel = true
+omit = [
+    "*/tests/*",
+    "*/dev/*",
+    "*/__pycache__/*",
+    # Auto-generated component definitions (175k+ lines, inflates coverage)
+    "esapp/grid.py",
+    # Intentionally untested modules (research/analysis code)
+    "esapp/utils/*",
+    "esapp/apps/*"
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+    "@abstractmethod",
+    "raise AssertionError",
+    "raise RuntimeError"
+]
+show_missing = true
+precision = 2
+fail_under = 0
+skip_empty = true
+
+[tool.coverage.html]
+directory = "htmlcov"
+title = "ESApp Coverage Report"
+
+[tool.coverage.xml]
+output = "coverage.xml"

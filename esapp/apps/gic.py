@@ -275,6 +275,20 @@ class GICFactory:
 
 #  GWB App
 class GIC(Indexable):
+    """
+    Research-focused GIC (Geomagnetically Induced Current) analysis application.
+    
+    This class provides specialized functions for advanced GIC modeling,
+    sensitivity analysis, and matrix generation for research purposes.
+    These functions are intentionally untested as they are for highly
+    specific research and data analysis.
+    
+    For general-purpose GIC functions, use GridWorkBench methods:
+    - wb.gic_storm() for uniform electric field calculations
+    - wb.gic_clear() to clear GIC calculations
+    - wb.gic_load_b3d() to load B3D electric field files
+    - wb.calculate_gic() for basic GIC calculations
+    """
 
     def gictool(self, calc_all_windings = False):
         '''Returns a new instance of GICTool, which creates various matricies and metrics regarding GICs.

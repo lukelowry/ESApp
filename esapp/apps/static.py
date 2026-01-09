@@ -8,14 +8,25 @@ from numpy.random import random
 from ..indexable import Indexable
 from ..grid import Contingency, Gen, Load, Bus
 from ..utils.exceptions import *
-from ..saw import SAW
 
 # Annoying FutureWarnings
 warnings.simplefilter(action="ignore", category=FutureWarning)
 
 
-# Dynamics App (Simulation, Model, etc.)
 class Statics(Indexable):
+    """
+    Research-focused static analysis application.
+    
+    This class provides specialized functions for continuation power flow (CPF),
+    random load variation, and other advanced static analysis methods.
+    These functions are intentionally untested as they are for highly specific
+    research and data analysis.
+    
+    For general-purpose functions, use GridWorkBench methods:
+    - wb.gens_above_pmax() / wb.gens_above_qmax() for limit checking
+    - wb.init_state_chain() / wb.push_state() / wb.restore_state_chain() for state management
+    - wb.set_zip_load() / wb.clear_zip_loads() for load injection
+    """
 
     io: Indexable
 

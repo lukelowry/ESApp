@@ -324,6 +324,82 @@ def pytest_configure(config):
 
 
 # -------------------------------------------------------------------------
+# Assertion Helpers
+# -------------------------------------------------------------------------
+
+def assert_dataframe_valid(df, expected_columns=None, min_rows=1, name="DataFrame"):
+    """
+    Assert that a DataFrame is valid and has expected structure.
+    
+    Parameters
+    ----------
+    df : pd.DataFrame or None
+        The DataFrame to validate.
+    expected_columns : list, optional
+        List of column names that must be present.
+    min_rows : int, optional
+        Minimum number of rows expected. Default is 1.
+    name : str, optional
+        Name of the DataFrame for error messages.
+        
+    Raises
+    ------
+    AssertionError
+        If validation fails.
+    """
+    import pandas as pd
+    
+    assert df is not None, f"{name} is None"
+    assert isinstance(df, pd.DataFrame), f"{name} is not a DataFrame"
+    assert len(df) >= min_rows, f"{name} has {len(df)} rows, expected at least {min_rows}"
+    
+    if expected_columns:
+        for col in expected_columns:
+            assert col in df.columns, f"{name} missing expected column: {col}"
+
+
+def assert_voltage_reasonable(voltage, min_pu=0.5, max_pu=1.5):
+    """
+    Assert that a voltage value is within reasonable bounds.
+    
+    Parameters
+    ----------
+    voltage : float or array-like
+        Voltage value(s) in per-unit.
+    min_pu : float
+        Minimum acceptable voltage (default 0.5 pu).
+    max_pu : float
+        Maximum acceptable voltage (default 1.5 pu).
+    """
+    import numpy as np
+    voltage_arr = np.atleast_1d(voltage)
+    assert np.all(voltage_arr >= min_pu), f"Voltage below {min_pu} pu: {voltage_arr.min()}"
+    assert np.all(voltage_arr <= max_pu), f"Voltage above {max_pu} pu: {voltage_arr.max()}"
+
+
+def assert_matrix_valid(matrix, expected_shape=None, is_sparse=True):
+    """
+    Assert that a matrix is valid.
+    
+    Parameters
+    ----------
+    matrix : sparse matrix or ndarray
+        The matrix to validate.
+    expected_shape : tuple, optional
+        Expected (rows, cols) shape.
+    is_sparse : bool, optional
+        Whether matrix should be sparse.
+    """
+    assert matrix is not None, "Matrix is None"
+    
+    if is_sparse:
+        assert hasattr(matrix, "toarray"), "Matrix is not sparse"
+    
+    if expected_shape:
+        assert matrix.shape == expected_shape, f"Matrix shape {matrix.shape} != expected {expected_shape}"
+
+
+# -------------------------------------------------------------------------
 # Shared Test Utilities
 # -------------------------------------------------------------------------
 
@@ -410,6 +486,126 @@ def get_sample_gobject_subclasses():
         import warnings
         warnings.warn(f"Error getting GObject subclasses: {e}")
         return []
+
+
+# -------------------------------------------------------------------------
+# Additional Mocked SAW Fixtures
+# -------------------------------------------------------------------------
+
+@pytest.fixture
+def saw_with_error_responses():
+    """
+    Provides a SAW object configured to return errors for testing error handling.
+    
+    Use this fixture to test error paths and exception handling in code
+    that calls SAW methods.
+    
+    Yields
+    ------
+    SAW
+        A SAW instance configured to return error responses.
+    """
+    with patch("win32com.client.dynamic.Dispatch") as mock_dispatch, \
+         patch("win32com.client.gencache.EnsureDispatch", create=True), \
+         patch("tempfile.NamedTemporaryFile") as mock_tempfile, \
+         patch("os.unlink"):
+        
+        mock_pwcom = MagicMock()
+        mock_dispatch.return_value = mock_pwcom
+        
+        mock_ntf = MagicMock()
+        mock_ntf.name = "dummy_temp.axd"
+        mock_tempfile.return_value = mock_ntf
+        
+        # Setup minimal init requirements
+        mock_pwcom.OpenCase.return_value = ("",)
+        mock_pwcom.GetParametersSingleElement.return_value = ("", ("23", "Jan 01 2023"))
+        mock_pwcom.GetFieldList.return_value = ("", [])
+        
+        # Setup error responses for testing
+        mock_pwcom.RunScriptCommand.return_value = ("Error: Test error message",)
+        mock_pwcom.GetParametersMultipleElement.return_value = (
+            "Error: Object not found", None
+        )
+        mock_pwcom.ChangeParametersSingleElement.return_value = (
+            "Error: Could not modify object",
+        )
+        
+        saw_instance = SAW(FileName="dummy.pwb")
+        saw_instance._pwcom = mock_pwcom
+        
+        yield saw_instance
+
+
+@pytest.fixture
+def saw_empty_case():
+    """
+    Provides a SAW object configured to return empty data sets.
+    
+    Use this fixture to test handling of empty results (no buses, no generators, etc.)
+    
+    Yields
+    ------
+    SAW
+        A SAW instance configured to return empty data.
+    """
+    with patch("win32com.client.dynamic.Dispatch") as mock_dispatch, \
+         patch("win32com.client.gencache.EnsureDispatch", create=True), \
+         patch("tempfile.NamedTemporaryFile") as mock_tempfile, \
+         patch("os.unlink"):
+        
+        mock_pwcom = MagicMock()
+        mock_dispatch.return_value = mock_pwcom
+        
+        mock_ntf = MagicMock()
+        mock_ntf.name = "dummy_temp.axd"
+        mock_tempfile.return_value = mock_ntf
+        
+        mock_pwcom.OpenCase.return_value = ("",)
+        mock_pwcom.GetParametersSingleElement.return_value = ("", ("23", "Jan 01 2023"))
+        mock_pwcom.GetFieldList.return_value = ("", [])
+        
+        # Return empty data
+        mock_pwcom.RunScriptCommand.return_value = ("",)
+        mock_pwcom.GetParametersMultipleElement.return_value = ("", None)
+        
+        saw_instance = SAW(FileName="dummy.pwb")
+        saw_instance._pwcom = mock_pwcom
+        
+        yield saw_instance
+
+
+@pytest.fixture
+def workbench_mocked(saw_obj, sample_dataframe):
+    """
+    Provides a mocked GridWorkBench for testing workbench functionality.
+    
+    This fixture creates a workbench with a mocked SAW backend,
+    useful for testing workbench operations without PowerWorld.
+    
+    Parameters
+    ----------
+    saw_obj : SAW
+        The mocked SAW fixture.
+    sample_dataframe : pd.DataFrame
+        Sample data for bus results.
+        
+    Yields
+    ------
+    GridWorkBench or Mock
+        A mocked workbench object, or Mock if GridWorkBench is unavailable.
+    """
+    if GridWorkBench is None:
+        # Return a mock if workbench not available
+        mock_wb = MagicMock()
+        mock_wb.saw = saw_obj
+        yield mock_wb
+    else:
+        with patch.object(GridWorkBench, '__init__', lambda self, *args, **kwargs: None):
+            wb = GridWorkBench.__new__(GridWorkBench)
+            wb.saw = saw_obj
+            wb._case_path = "dummy.pwb"
+            yield wb
 
 
 def pytest_collection_modifyitems(config, items):

@@ -824,3 +824,28 @@ class ContingencyMixin:
         """
         app = "YES" if append else "NO"
         return self.RunScriptCommand(f'CTGWriteAuxUsingOptions("{filename}", {app});')
+
+    def CTGRestoreReference(self):
+        """Resets the system state to the reference state for contingency analysis.
+
+        Call this action after running contingencies to restore the system to its
+        baseline condition. The reference state is set by calling `CTGSetAsReference`.
+
+        This command undoes any changes made by contingency actions (e.g., line
+        outages, generator trips) and restores all values to the pre-contingency state.
+
+        Returns
+        -------
+        None
+
+        Raises
+        ------
+        PowerWorldError
+            If the SimAuto call fails (e.g., no reference state has been set).
+
+        See Also
+        --------
+        CTGSetAsReference : Sets the current state as the reference.
+        CTGApply : Applies contingency actions without solving.
+        """
+        return self.RunScriptCommand("CTGRestoreReference;")

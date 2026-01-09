@@ -251,3 +251,126 @@ def test_exception_with_traceback_info():
         tb_str = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
         assert "test_exception_with_traceback_info" in tb_str
         assert "PowerWorldError" in tb_str
+
+
+# -------------------------------------------------------------------------
+# Error Path Tests - Specific Scenarios
+# -------------------------------------------------------------------------
+
+class TestErrorPathScenarios:
+    """Tests for specific error paths in SAW operations."""
+
+    @pytest.fixture
+    def mock_saw(self):
+        """Create a fresh mocked SAW for each test."""
+        with patch("win32com.client.dynamic.Dispatch") as mock_dispatch, \
+             patch("win32com.client.gencache.EnsureDispatch", create=True), \
+             patch("tempfile.NamedTemporaryFile"), \
+             patch("os.unlink"):
+            
+            mock_pwcom = MagicMock()
+            mock_dispatch.return_value = mock_pwcom
+            
+            mock_pwcom.OpenCase.return_value = ("",)
+            mock_pwcom.GetParametersSingleElement.return_value = ("", ("23", "Jan 01 2023"))
+            mock_pwcom.GetFieldList.return_value = ("", [])
+            mock_pwcom.RunScriptCommand.return_value = ("",)
+            mock_pwcom.GetParametersMultipleElement.return_value = ("", [[1, 2], ["A", "B"]])
+            
+            saw = SAW(FileName="dummy.pwb")
+            saw._pwcom = mock_pwcom
+            
+            yield saw
+
+    def test_addon_error_detection(self, mock_saw):
+        """Test that add-on errors are detected and raised as PowerWorldAddonError."""
+        # Simulate an add-on not registered error
+        mock_saw._pwcom.RunScriptCommand.return_value = (
+            "Error: Add-on 'TransLineCalc' is not registered",
+        )
+        
+        with pytest.raises(PowerWorldError) as exc_info:
+            mock_saw.RunScriptCommand("CalculateRXBG")
+        
+        assert "Add-on" in str(exc_info.value) or "not registered" in str(exc_info.value)
+
+    def test_empty_data_returns_none(self, mock_saw):
+        """Test that empty data returns None or empty DataFrame."""
+        mock_saw._pwcom.GetParametersMultipleElement.return_value = ("", None)
+        
+        result = mock_saw.GetParametersMultipleElement("Bus", ["BusNum"])
+        assert result is None or (hasattr(result, "empty") and result.empty)
+
+    def test_object_not_found_error(self, mock_saw):
+        """Test error when object type is not found."""
+        mock_saw._pwcom.RunScriptCommand.return_value = (
+            "Error: Object type 'InvalidObject' not found",
+        )
+        
+        with pytest.raises(PowerWorldError):
+            mock_saw.RunScriptCommand("SelectAll(InvalidObject)")
+
+    def test_case_not_open_error(self, mock_saw):
+        """Test error when no case is open."""
+        mock_saw._pwcom.RunScriptCommand.return_value = (
+            "Error: No case is currently open",
+        )
+        
+        with pytest.raises(PowerWorldError):
+            mock_saw.RunScriptCommand("SolvePowerFlow")
+
+    def test_multiple_errors_in_response(self, mock_saw):
+        """Test handling of multiple errors in a single response."""
+        mock_saw._pwcom.RunScriptCommand.return_value = (
+            "Error: First error\nError: Second error",
+        )
+        
+        with pytest.raises(PowerWorldError) as exc_info:
+            mock_saw.RunScriptCommand("BadCommand")
+        
+        # Should contain at least the first error
+        assert "error" in str(exc_info.value).lower()
+
+    def test_warning_vs_error_handling(self, mock_saw):
+        """Test that warnings are handled differently from errors."""
+        # Some PowerWorld responses are warnings, not errors
+        mock_saw._pwcom.RunScriptCommand.return_value = ("",)  # No error
+        
+        # Should not raise
+        mock_saw.RunScriptCommand("ValidCommand")
+
+    def test_get_parameters_with_invalid_fields(self, mock_saw):
+        """Test error when requesting invalid field names."""
+        mock_saw._pwcom.GetParametersMultipleElement.return_value = (
+            "Error: Field 'InvalidField' not found for object type 'Bus'",
+            None
+        )
+        
+        with pytest.raises(PowerWorldError):
+            mock_saw.GetParametersMultipleElement("Bus", ["InvalidField"])
+
+
+class TestCOMErrorRecovery:
+    """Tests for COM error scenarios and recovery."""
+
+    def test_com_error_with_rpc_call_failed(self):
+        """Test handling of RPC_S_CALL_FAILED error."""
+        err = COMError(RPC_S_CALL_FAILED)
+        assert isinstance(err, Error)
+
+    def test_com_error_message_preservation(self):
+        """Test that COM error messages are preserved."""
+        import pywintypes
+        
+        # Simulate a COM error with a description
+        com_err = pywintypes.com_error(
+            -2147352567,  # DISP_E_EXCEPTION
+            "Automation error",
+            ("Error", 0, "Description of error", None, 0, -2147024809),
+            None
+        )
+        
+        # The exception should be constructable from this
+        wrapped_err = COMError(str(com_err))
+        assert "error" in str(wrapped_err).lower()
+

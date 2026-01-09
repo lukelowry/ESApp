@@ -178,42 +178,273 @@ class ATCMixin:
         return self.RunScriptCommand(f"ATCIncreaseTransferBy({amount});")
 
     def ATCRestoreInitialState(self):
-        """Restores the initial state for the ATC tool."""
+        """Restores the initial state for the ATC tool.
+
+        Call this action to restore the system to its state before any ATC
+        calculations were performed.
+
+        Returns
+        -------
+        None
+
+        Raises
+        ------
+        PowerWorldError
+            If the SimAuto call fails.
+        """
         return self.RunScriptCommand("ATCRestoreInitialState;")
 
     def ATCSetAsReference(self):
-        """Sets the present system state as the reference state for ATC analysis."""
+        """Sets the present system state as the reference state for ATC analysis.
+
+        This baseline state is used as the starting point for ATC calculations.
+
+        Returns
+        -------
+        None
+
+        Raises
+        ------
+        PowerWorldError
+            If the SimAuto call fails.
+        """
         return self.RunScriptCommand("ATCSetAsReference;")
 
     def ATCTakeMeToScenario(self, rl: int, g: int, i: int):
-        """Sets the present case according to the scenarios along the RL, G, and I axes."""
+        """Sets the present case according to the scenarios along the RL, G, and I axes.
+
+        All three parameters must be specified as integers indicating the index
+        of the respective scenario. Indices start at 0.
+
+        Parameters
+        ----------
+        rl : int
+            Index of the RL (line rating and zone load) scenario.
+        g : int
+            Index of the G (generator) scenario.
+        i : int
+            Index of the I (interface rating) scenario.
+
+        Returns
+        -------
+        None
+
+        Raises
+        ------
+        PowerWorldError
+            If the SimAuto call fails.
+        """
         return self.RunScriptCommand(f"ATCTakeMeToScenario({rl}, {g}, {i});")
 
     def ATCDataWriteOptionsAndResults(self, filename: str, append: bool = True, key_field: str = "PRIMARY"):
-        """Writes out all information related to ATC analysis to an auxiliary file."""
+        """Writes out all information related to ATC analysis to an auxiliary file.
+
+        Saves the same information as the ATCWriteResultsAndOptions script command.
+        The auxiliary file is formatted using the concise format for DATA section
+        headers and variable names. Data is written using DATA sections instead of
+        SUBDATA sections.
+
+        Note: This command was named ATCWriteAllOptions prior to December 2021.
+
+        Parameters
+        ----------
+        filename : str
+            Name of the auxiliary file to save.
+        append : bool, optional
+            If True, appends results to existing file. If False, overwrites. Defaults to True.
+        key_field : str, optional
+            Identifier to use for the data ("PRIMARY", "SECONDARY", "LABEL").
+            Defaults to "PRIMARY".
+
+        Returns
+        -------
+        None
+
+        Raises
+        ------
+        PowerWorldError
+            If the SimAuto call fails.
+        """
         app = "YES" if append else "NO"
         return self.RunScriptCommand(f'ATCDataWriteOptionsAndResults("{filename}", {app}, {key_field});')
 
+    def ATCWriteAllOptions(self, filename: str, append: bool = True, key_field: str = "PRIMARY"):
+        """Writes out all information related to ATC analysis (deprecated name).
+
+        .. deprecated::
+            Use `ATCDataWriteOptionsAndResults` instead. This method was renamed
+            in the December 9, 2021 patch of Simulator 22.
+
+        Parameters
+        ----------
+        filename : str
+            Name of the auxiliary file to save.
+        append : bool, optional
+            If True, appends results to existing file. Defaults to True.
+        key_field : str, optional
+            Identifier to use for the data. Defaults to "PRIMARY".
+
+        Returns
+        -------
+        None
+        """
+        return self.ATCDataWriteOptionsAndResults(filename, append, key_field)
+
     def ATCWriteResultsAndOptions(self, filename: str, append: bool = True):
-        """Writes out all information related to ATC analysis to an auxiliary file."""
+        """Writes out all information related to ATC analysis to an auxiliary file.
+
+        This includes Contingency Definitions, Remedial Action Definitions, Limit
+        Monitoring Settings, Solution Options, ATC Options, ATC results, as well as
+        any Model Criteria that are used by the Contingency and Remedial Action
+        Definitions.
+
+        Parameters
+        ----------
+        filename : str
+            Name of the auxiliary file to save.
+        append : bool, optional
+            If True, appends results to existing file. Defaults to True.
+
+        Returns
+        -------
+        None
+
+        Raises
+        ------
+        PowerWorldError
+            If the SimAuto call fails.
+        """
         app = "YES" if append else "NO"
         return self.RunScriptCommand(f'ATCWriteResultsAndOptions("{filename}", {app});')
 
     def ATCWriteScenarioLog(self, filename: str, append: bool = False, filter_name: str = ""):
-        """Writes out detailed log information for ATC Multiple Scenarios to a text file."""
+        """Writes out detailed log information for ATC Multiple Scenarios to a text file.
+
+        If no scenarios have been defined, no file will be created; this is not
+        treated as a fatal error.
+
+        Parameters
+        ----------
+        filename : str
+            Name of log file.
+        append : bool, optional
+            If True, appends to existing file. Defaults to False.
+        filter_name : str, optional
+            Filter name. Only scenarios meeting the filter will be written.
+            Defaults to "" (all scenarios).
+
+        Returns
+        -------
+        None
+
+        Raises
+        ------
+        PowerWorldError
+            If the SimAuto call fails.
+        """
         app = "YES" if append else "NO"
         filt = f'"{filter_name}"' if filter_name else ""
         return self.RunScriptCommand(f'ATCWriteScenarioLog("{filename}", {app}, {filt});')
 
+    def ATCWriteScenarioMinMax(
+        self,
+        filename: str,
+        filetype: str = "CSV",
+        append: bool = False,
+        fieldlist: List[str] = None,
+        operation: str = "MIN",
+        operation_field: str = "MaxFlow",
+        group_scenario: bool = True,
+    ):
+        """Writes out TransferLimiter results from multiple scenario ATC calculations.
+
+        The results are grouped based on the input parameters, and the minimum,
+        maximum, or minimum and maximum limiter from each group is written to file.
+
+        Parameters
+        ----------
+        filename : str
+            Name of output file.
+        filetype : str, optional
+            Output format: "AUX", "AUXCSV", "CSV", "CSVNOHEADER", "CSVCOLHEADER".
+            Defaults to "CSV".
+        append : bool, optional
+            If True, appends to existing file. Defaults to False.
+        fieldlist : List[str], optional
+            List of fields to save. Defaults to None.
+        operation : str, optional
+            Operation to perform on each grouping: "MIN", "MAX", or "MINMAX".
+            Defaults to "MIN".
+        operation_field : str, optional
+            Field to use for the min/max operation. Defaults to "MaxFlow".
+        group_scenario : bool, optional
+            If True, groups by scenario. Defaults to True.
+
+        Returns
+        -------
+        None
+
+        Raises
+        ------
+        PowerWorldError
+            If the SimAuto call fails.
+        """
+        app = "YES" if append else "NO"
+        gs = "YES" if group_scenario else "NO"
+        fields = ""
+        if fieldlist:
+            fields = "[" + ", ".join(fieldlist) + "]"
+        else:
+            fields = "[]"
+        return self.RunScriptCommand(
+            f'ATCWriteScenarioMinMax("{filename}", {filetype}, {app}, {fields}, {operation}, {operation_field}, {gs});'
+        )
+
     def ATCWriteToExcel(self, worksheet_name: str, fieldlist: List[str] = None):
-        """Sends ATC analysis results to an Excel spreadsheet for Multiple Scenarios ATC analysis."""
+        """Sends ATC analysis results to an Excel spreadsheet for Multiple Scenarios ATC analysis.
+
+        Parameters
+        ----------
+        worksheet_name : str
+            Name of the Excel worksheet.
+        fieldlist : List[str], optional
+            List of fields to include. Defaults to None (all fields).
+
+        Returns
+        -------
+        None
+
+        Raises
+        ------
+        PowerWorldError
+            If the SimAuto call fails.
+        """
         fields = ""
         if fieldlist:
             fields = ", [" + ", ".join(fieldlist) + "]"
         return self.RunScriptCommand(f'ATCWriteToExcel("{worksheet_name}"{fields});')
 
     def ATCWriteToText(self, filename: str, filetype: str = "TAB", fieldlist: List[str] = None):
-        """Writes Multiple Scenario ATC analysis results to text files."""
+        """Writes Multiple Scenario ATC analysis results to text files.
+
+        Parameters
+        ----------
+        filename : str
+            Base name of the output file.
+        filetype : str, optional
+            Output format: "TAB" or "CSV". Defaults to "TAB".
+        fieldlist : List[str], optional
+            List of fields to include. Defaults to None (all fields).
+
+        Returns
+        -------
+        None
+
+        Raises
+        ------
+        PowerWorldError
+            If the SimAuto call fails.
+        """
         fields = ""
         if fieldlist:
             fields = ", [" + ", ".join(fieldlist) + "]"

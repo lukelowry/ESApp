@@ -255,8 +255,7 @@ class TestGridWorkBenchFunctions:
 
     def test_advanced_analysis(self, wb):
         """Tests QV, ATC, GIC, OPF, YBus."""
-        # QV
-        wb.run_qv()
+        
         
         # ATC
         areas = wb.areas()

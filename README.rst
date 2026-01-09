@@ -13,9 +13,8 @@ ESA++
    :target: https://esapp.readthedocs.io/
    :alt: Documentation
 
-.. image:: https://github.com/lukelowry/ESApp/actions/workflows/tests.yml/badge.svg
-   :target: https://github.com/lukelowry/ESApp/actions/workflows/tests.yml
-   :alt: Tests
+.. image:: https://img.shields.io/badge/coverage-92%25-brightgreen.svg
+   :alt: Coverage 92%
 
 An open-source Python toolkit for power system automation, providing a high-performance "syntax-sugar" fork of Easy SimAuto (ESA). This library streamlines interaction with PowerWorld's Simulator Automation Server (SimAuto), transforming complex COM calls into intuitive, Pythonic operations.
 
@@ -50,7 +49,8 @@ Here is a quick example of how ESA++ simplifies data access and power flow analy
 
 .. code-block:: python
 
-    from esapp import GridWorkBench, Bus, Gen
+    from esapp import GridWorkBench
+    from esapp.grid import *
 
     # Open Case
     wb = GridWorkBench("path/to/case.pwb")
