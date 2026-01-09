@@ -10,18 +10,30 @@ Overview
 
 SAW is organized into modular mixins, each covering a specific functional area:
 
-- **Base**: Fundamental operations (open case, save, set data, get data, run scripts)
-- **Power Flow**: AC/DC power flow solutions and analysis
-- **Contingency**: Single and multi-element contingency analysis
-- **Optimization**: Optimal power flow, SCOPF, and economic dispatch
-- **Sensitivity**: PTDF, LODF, and other sensitivity calculations
-- **Transient Stability**: Dynamic stability analysis and critical clearing time
-- **GIC**: Geomagnetic induced current calculations  
-- **ATC**: Available transfer capability analysis
-- **Topology**: Network modification and branching operations
-- **Voltage Analysis**: P-V and Q-V curve generation
-- **Data Management**: Export, import, and reporting
-- **Advanced**: Matrices, regions, scheduled operations, weather effects
+Base
+    Fundamental operations (open case, save, set data, get data, run scripts)
+Power Flow
+    AC/DC power flow solutions and analysis
+Contingency
+    Single and multi-element contingency analysis
+Optimization
+    Optimal power flow, SCOPF, and economic dispatch
+Sensitivity
+    PTDF, LODF, and other sensitivity calculations
+Transient Stability
+    Dynamic stability analysis and critical clearing time
+GIC
+    Geomagnetic induced current calculations
+ATC
+    Available transfer capability analysis
+Topology
+    Network modification and branching operations
+Voltage Analysis
+    P-V and Q-V curve generation
+Data Management
+    Export, import, and reporting
+Advanced
+    Matrices, regions, scheduled operations, weather effects
 
 Typical Usage
 ~~~~~~~~~~~~~
@@ -35,11 +47,9 @@ allows access to the full PowerWorld API for advanced usage:
     
     wb = GridWorkBench("case.pwb")
     
-    # Use high-level methods (recommended for most tasks)
     wb.pflow()
     wb.auto_insert_contingencies()
     
-    # Or access SAW directly for advanced features
     saw = wb.esa
     saw.SolveAC_OPF()
 

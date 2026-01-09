@@ -9,10 +9,14 @@ Component Architecture
 ESA++ uses a sophisticated class generation system to represent all PowerWorld objects and their fields. 
 This architecture provides:
 
-- **Type Safety**: IDE autocompletion and type hints for all components
-- **Automatic Synchronization**: Stays compatible with new PowerWorld versions automatically
-- **Maintainability**: No manual class definitions needed
-- **Documentation**: Docstrings auto-generated from PowerWorld metadata
+Type Safety
+    IDE autocompletion and type hints for all components
+Automatic Synchronization
+    Stays compatible with new PowerWorld versions automatically
+Maintainability
+    No manual class definitions needed
+Documentation
+    Docstrings auto-generated from PowerWorld metadata
 
 The System
 ~~~~~~~~~~
@@ -21,11 +25,12 @@ The component system consists of:
 
 1. **GObject Base Class** (``esapp/gobject.py``)
    
-   A metaclass-based foundation that:
-   - Collects field definitions from class attributes
-   - Manages primary key information
-   - Provides field priority marking (required, optional)
-   - Generates informative string representations
+   A metaclass-based foundation that provides:
+   
+   - Field definition collection from class attributes
+   - Primary key information management
+   - Field priority marking (required, optional)
+   - Informative string representations
 
 2. **Field Definitions** (``esapp/grid/components.py``)
    
@@ -38,7 +43,6 @@ The component system consists of:
            BusNum = (FieldPriority.PRIMARY_KEY, np.int32)
            BusName = (FieldPriority.OPTIONAL, str)
            BusPUVolt = (FieldPriority.OPTIONAL, np.float64)
-           # ... hundreds more fields
 
 3. **Generation Script** (``esapp/grid/generate_components.py``)
    
@@ -54,11 +58,10 @@ The component system consists of:
    
    .. code-block:: python
    
-       # User code
        buses = wb[Bus, ["BusNum", "BusPUVolt"]]
-       
-       # Translates to
-       SimAuto.GetDataRaw("Bus", None, ["BusNum", "BusPUVolt"])
+   
+   .. note::
+      Translates to ``SimAuto.GetDataRaw("Bus", None, ["BusNum", "BusPUVolt"])``
 
 Updating Component Definitions
 -------------------------------
@@ -114,22 +117,21 @@ The script will:
 Step 4: Verify the Changes
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-1. Check console output for errors or excluded objects/fields
+1. Check console output for errors or excluded objects/fields:
 
-   .. code-block:: bash
+   .. code-block:: text
 
-       ...
        Processed 150 object types with 5247 total fields
        Excluded: 12 fields due to naming conflicts
        Component definitions updated successfully
 
-2. Run unit tests to verify component generation
+2. Run unit tests to verify component generation:
 
    .. code-block:: bash
 
        pytest tests/test_grid_components.py -v
 
-3. Run integration tests if PowerWorld is available
+3. Run integration tests if PowerWorld is available:
 
    .. code-block:: bash
 
@@ -141,14 +143,22 @@ Generation Script Behavior
 The ``generate_components.py`` script handles several important tasks:
 
 **Field Name Sanitization**
-  - Removes colons: ``Bus:Num`` → ``Bus__Num`` (stored as ``Bus:Num`` internally)
-  - Removes spaces: ``Line Name`` → ``Line_Name``
-  - Converts to valid Python identifiers
+
+Colons
+    ``Bus:Num`` → ``Bus__Num`` (stored as ``Bus:Num`` internally)
+Spaces
+    ``Line Name`` → ``Line_Name``
+Identifiers
+    Converts to valid Python identifiers
 
 **Priority Assignment**
-  - PRIMARY_KEY fields marked as KeyType="KEY" in PWRaw
-  - REQUIRED fields marked as KeyType="REQUIRED"
-  - Remaining fields marked as OPTIONAL
+
+PRIMARY_KEY
+    Fields marked as KeyType="KEY" in PWRaw
+REQUIRED
+    Fields marked as KeyType="REQUIRED"
+OPTIONAL
+    Remaining fields
 
 **Conflict Resolution**
   - Fields with invalid names are excluded (rare)
@@ -171,17 +181,12 @@ A generated component class looks like:
     class Bus(GObject):
         """A power system bus/node - represents a point of electrical connection"""
         
-        # Primary keys
         BusNum = (FieldPriority.PRIMARY_KEY, np.int32)
-        
-        # Common fields
         BusName = (FieldPriority.OPTIONAL, str)
         BusPUVolt = (FieldPriority.OPTIONAL, np.float64)
         BusAngle = (FieldPriority.OPTIONAL, np.float64)
         AreaNum = (FieldPriority.OPTIONAL, np.int32)
         ZoneNum = (FieldPriority.OPTIONAL, np.int32)
-        
-        # ... hundreds more fields
         
         _object_type = "Bus"
         _fields = ["BusNum", "BusName", "BusPUVolt", ...]
@@ -196,11 +201,11 @@ In user code, components are used for type-safe data access:
 
     from esapp.grid import Bus
     
-    # IDE provides autocompletion for all fields
     data = wb[Bus, [Bus.BusNum, Bus.BusName, Bus.BusPUVolt]]
-    
-    # Equivalent to string-based access
     data = wb[Bus, ["BusNum", "BusName", "BusPUVolt"]]
+
+.. note::
+   IDE provides autocompletion for all fields when using class attributes.
 
 Maintenance Recommendations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -24,25 +24,25 @@ The Network app provides tools for analyzing power system topology and extractin
 
 Key Features:
 
-- **Y-Bus Matrix**: Extract the sparse admittance matrix for power flow calculations
-- **Incidence Matrix**: Get the bus-branch incidence matrix for network analysis
-- **Laplacian Matrix**: Calculate the network Laplacian with various weight types (length, resistance distance, delay)
-- **Bus Mapping**: Map bus numbers to matrix indices
-- **Branch Lengths**: Extract branch length information for weighting
+Y-Bus Matrix
+    Extract the sparse admittance matrix for power flow calculations
+Incidence Matrix
+    Get the bus-branch incidence matrix for network analysis
+Laplacian Matrix
+    Calculate the network Laplacian with various weight types (length, resistance distance, delay)
+Bus Mapping
+    Map bus numbers to matrix indices
+Branch Lengths
+    Extract branch length information for weighting
 
 Example:
 
 .. code-block:: python
 
-    # Extract system matrices
-    Y = wb.ybus()                          # Admittance matrix
-    A = wb.network.incidence()             # Incidence matrix
-    L = wb.network.laplacian(weights="LENGTH")  # Laplacian with length weighting
-    
-    # Get bus-to-index mapping
+    Y = wb.ybus()
+    A = wb.network.incidence()
+    L = wb.network.laplacian(weights="LENGTH")
     busmap = wb.network.busmap()
-    
-    # Calculate branch lengths
     lengths = wb.network.lengths()
 
 .. currentmodule:: esapp.apps
@@ -58,10 +58,14 @@ due to geomagnetic disturbances, which is critical for power grid resilience stu
 
 Key Features:
 
-- **Uniform Field Modeling**: Model uniform electric field effects across the grid
-- **Transformer GIC**: Calculate neutral currents induced in power transformers
-- **System-Wide Assessment**: Evaluate GIC impact across the entire power system
-- **Field Orientation**: Vary geomagnetic field direction for comprehensive analysis
+Uniform Field Modeling
+    Model uniform electric field effects across the grid
+Transformer GIC
+    Calculate neutral currents induced in power transformers
+System-Wide Assessment
+    Evaluate GIC impact across the entire power system
+Field Orientation
+    Vary geomagnetic field direction for comprehensive analysis
 
 Example:
 
@@ -69,13 +73,8 @@ Example:
 
     from esapp.grid import GICXFormer
     
-    # Calculate GIC for a uniform electric field
     wb.calculate_gic(max_field=1.0, direction=90.0)
-    
-    # Retrieve transformer GIC results
     gic_results = wb[GICXFormer, ["BusNum", "GICXFNeutralAmps"]]
-    
-    # Find maximum GIC
     max_gic = gic_results["GICXFNeutralAmps"].max()
 
 .. automodule:: esapp.apps.gic
@@ -85,18 +84,27 @@ Additional Apps
 ---------------
 
 The full SAW interface provides access to many additional analysis capabilities beyond Network and GIC.
-These include:
 
-- **Power Flow Analysis** (powerflow.py): Transient and steady-state power flow
-- **Contingency Analysis** (contingency.py): N-1 and multi-element contingency studies  
-- **Optimal Power Flow** (opf.py): Economic dispatch and constrained optimization
-- **Sensitivity Analysis** (sensitivity.py): PTDF, LODF, and other sensitivity factors
-- **Transient Stability** (transient.py): Dynamic stability and critical clearing time calculations
-- **Voltage Analysis** (pv.py, qv.py): P-V and Q-V curve generation
-- **Available Transfer Capability** (atc.py): ATC calculation between areas
-- **Branch Modification** (topology.py): Network topology changes and branch operations
-- **Data Modification** (modify.py): Component parameter updates
-- **Scheduled Operations** (scheduled.py): Time-step simulations and operational planning
+Power Flow Analysis (powerflow.py)
+    Transient and steady-state power flow
+Contingency Analysis (contingency.py)
+    N-1 and multi-element contingency studies
+Optimal Power Flow (opf.py)
+    Economic dispatch and constrained optimization
+Sensitivity Analysis (sensitivity.py)
+    PTDF, LODF, and other sensitivity factors
+Transient Stability (transient.py)
+    Dynamic stability and critical clearing time calculations
+Voltage Analysis (pv.py, qv.py)
+    P-V and Q-V curve generation
+Available Transfer Capability (atc.py)
+    ATC calculation between areas
+Branch Modification (topology.py)
+    Network topology changes and branch operations
+Data Modification (modify.py)
+    Component parameter updates
+Scheduled Operations (scheduled.py)
+    Time-step simulations and operational planning
 
 For direct access to all SAW functionality:
 
