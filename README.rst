@@ -30,11 +30,11 @@ Key Features
 Installation
 ------------
 
-For local development and the latest features, install the package in editable mode from the root directory:
+The ESA++ package is available on `PyPI <https://pypi.org/project/esapp/>`_
 
 .. code-block:: bash
 
-    python -m pip install esapp -e .
+    pip install esapp
 
 
 Documentation
