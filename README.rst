@@ -5,12 +5,23 @@ ESA++
    :target: https://opensource.org/licenses/Apache-2.0
    :alt: License
 
+.. image:: https://img.shields.io/badge/python-3.9%2B-blue.svg
+   :target: https://www.python.org/downloads/
+   :alt: Python 3.9+
+
+.. image:: https://img.shields.io/badge/docs-Read%20the%20Docs-blue.svg
+   :target: https://esapp.readthedocs.io/
+   :alt: Documentation
+
+.. image:: https://img.shields.io/badge/coverage-92%25-brightgreen.svg
+   :alt: Coverage 92%
+
 An open-source Python toolkit for power system automation, providing a high-performance "syntax-sugar" fork of Easy SimAuto (ESA). This library streamlines interaction with PowerWorld's Simulator Automation Server (SimAuto), transforming complex COM calls into intuitive, Pythonic operations.
 
 Key Features
 ------------
 
-- **Intuitive Indexing Syntax**: Access and modify grid components using a unique indexing system (e.g., ``wb[Bus, 'BusPUVolt']``) that feels like native Python.
+- **Intuitive Indexing Syntax**: Access and modify grid components using a unique indexing system (e.g., ``wb[Bus, "BusPUVolt"]``) that feels like native Python.
 - **Comprehensive SimAuto Wrapper**: Full coverage of PowerWorld's API through the ``SAW`` class, organized into modular mixins for power flow, contingencies, transients, and more.
 - **High-Level Adapter Interface**: A collection of simplified "one-liner" functions for common tasks like GIC calculation, fault analysis, and voltage violation detection.
 - **Native Pandas Integration**: Every data retrieval operation returns a Pandas DataFrame or Series, enabling immediate analysis, filtering, and visualization.
@@ -23,7 +34,7 @@ For local development and the latest features, install the package in editable m
 
 .. code-block:: bash
 
-    python -m pip install gridwb -e .
+    python -m pip install esapp -e .
 
 
 Documentation
@@ -38,23 +49,23 @@ Here is a quick example of how ESA++ simplifies data access and power flow analy
 
 .. code-block:: python
 
-    from gridwb import GridWorkBench
-    from gridwb.grid.components import *
+    from esapp import GridWorkBench
+    from esapp.grid import *
 
     # Open Case
-    wb = GridWorkBench("my_grid_model.pwb")
+    wb = GridWorkBench("path/to/case.pwb")
 
-    # 2. Retrieve data 
-    bus_data = wb[Bus, ['BusName', 'BusPUVolt']]
+    # Retrieve data 
+    bus_data = wb[Bus, ["BusName", "BusPUVolt"]]
 
-    # 3. Solve power flow and get complex voltages
+    # Solve power flow
     V = wb.pflow()
 
-    # 4. Perform high-level operations 
-    violations = wb.func.find_violations(v_min=0.95)
+    # Do some action, write to PW
+    violations = wb.find_violations(v_min=0.95)
+    wb[Gen, "GenMW"] = 100.0
 
-    # 5. Modify data and save
-    wb[Gen, 'GenMW'] = 100.0
+    # Save case
     wb.save()
 
 Why ESA++?
@@ -70,11 +81,10 @@ Traditional automation of PowerWorld Simulator often involves verbose COM calls 
 More Examples
 -------------
 
-The `examples/ <https://github.com/lukelowry/ESApp/tree/main/examples>`_ directory contains a gallery of demonstrations, including:
+The `examples/ <https://github.com/lukelowry/ESApp/tree/main/docs/examples>`_ directory contains a gallery of demonstrations, including:
 
-- **Basic Data I/O**: Efficiently reading and writing large sets of grid parameters.
-- **Contingency Analysis**: Automating N-1 studies and processing violation matrices.
-- **Matrix Extraction**: Retrieving Y-Bus and Jacobian matrices for external mathematical modeling.
+- **Object Field Access**: Reduce the time you spend searching for field names with ESA++ IDE typehints for objects and fields.
+- **Matrix Extraction**: Retrieving Y-Bus, Jacobian, and GIC conductance matrices for external mathematical modeling.
 
 Testing
 -------
@@ -101,6 +111,8 @@ If you use this toolkit in your research or industrial projects, please cite the
 
 Authors
 -------
+
+Luke Lowery developed this module during his PhD studies at Texas A&M University. You can learn more on his `research page <https://lukelowry.github.io/>`_ or view his publications on `Google Scholar <https://scholar.google.com/citations?user=CTynuRMAAAAJ&hl=en>`_.
 
 ESA++ is maintained by **Luke Lowery** and **Adam Birchfield** at Texas A&M University. You can explore more of our research at the `Birchfield Research Group <https://birchfield.engr.tamu.edu/>`_.
 

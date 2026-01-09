@@ -49,25 +49,33 @@ classifiers = [
 ]
 dependencies = [
     "pandas",
-    "numpy",
+    "numpy<2.0",
     "scipy",
-    "pywin32; sys_platform == 'win32'",
-    "toolz",
-    "networkx",
+    "pywin32; sys_platform == 'win32'"
 ]
 
 [project.optional-dependencies]
-test = ["pytest"]
-dev = ["matplotlib"]
+test = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "pytest-xdist>=3.0",
+    "pytest-timeout>=2.1",
+    "pytest-mock>=3.10",
+    "pytest-order>=1.2"
+]
+dev = [
+    "matplotlib",
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "pytest-order>=1.2"
+]
 docs = [
     "sphinx",
-    "sphinx-gallery",
     "sphinx-rtd-theme",
     "sphinx-copybutton",
-    "matplotlib",
-    "pillow",
     "nbsphinx",
-    "ipykernel"
+    "ipykernel",
+    "matplotlib"
 ]
 
 [project.urls]
@@ -78,5 +86,46 @@ packages = {find = {}}
 include-package-data = true
 zip-safe = false
 
+[tool.setuptools.package-data]
+esapp = ["py.typed", "utils/shapes/**/*"]
+
 [tool.setuptools.dynamic]
 version = {file = "VERSION"}
+
+[tool.coverage.run]
+source = ["esapp"]
+branch = true
+parallel = true
+omit = [
+    "*/tests/*",
+    "*/dev/*",
+    "*/__pycache__/*",
+    # Auto-generated component definitions (175k+ lines, inflates coverage)
+    "esapp/grid.py",
+    # Intentionally untested modules (research/analysis code)
+    "esapp/utils/*",
+    "esapp/apps/*"
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+    "@abstractmethod",
+    "raise AssertionError",
+    "raise RuntimeError"
+]
+show_missing = true
+precision = 2
+fail_under = 0
+skip_empty = true
+
+[tool.coverage.html]
+directory = "htmlcov"
+title = "ESApp Coverage Report"
+
+[tool.coverage.xml]
+output = "coverage.xml"

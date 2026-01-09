@@ -1,8 +1,17 @@
 Specialized Applications
 ========================
 
-The ``apps`` module contains specialized tools for advanced analysis like GIC, Network topology, and more.
+The ``apps`` package exposes focused helpers (network topology, GIC, etc.) surfaced on ``GridWorkBench``.
+For direct SAW access use ``wb.esa``; for higher-level helpers use the modules below. This page lists the
+API members only.
 
-.. automodule:: gridwb.apps
+.. currentmodule:: esapp.apps
+
+.. automodule:: esapp.apps.network
    :members:
-   :undoc-members:
+
+.. automodule:: esapp.apps.gic
+   :members:
+
+.. automodule:: esapp.apps
+   :members:

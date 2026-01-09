@@ -1,144 +1,149 @@
 Usage Guide
 ===========
 
-This guide covers more advanced usage patterns of the ESA++ toolkit.
+This guide explains the core mechanics of ESA++—how to index, read, and write fields and when to drop down
+to SAW. If you want goal-driven, end-to-end scripts, head to :doc:`examples`. Think of this page as the
+reference for everyday interactions: get data, filter it, push edits back, and call lower-level SAW features
+when you need to.
 
-Indexing with IndexTool
------------------------
-
-The ``IndexTool`` is the heart of ESA++, providing a powerful, Pythonic way to interact with PowerWorld data. Instead of calling verbose SimAuto functions, you use standard Python indexing syntax on the ``GridWorkBench`` object.
-
-Data Retrieval
-~~~~~~~~~~~~~~
-
-Retrieving data is as simple as indexing the workbench with a component class (like ``Bus``, ``Gen``, or ``Line``).
-
-**1. Get Primary Keys**
-
-To get just the primary keys for all objects of a type:
-
-.. code-block:: python
-
-    from gridwb.grid.components import Bus
-    bus_keys = wb[Bus]
-
-**2. Get Specific Fields**
-
-Pass a string or a list of strings to retrieve specific fields:
-
-.. code-block:: python
-
-    # Single field
-    voltages = wb[Bus, 'BusPUVolt']
-
-    # Multiple fields
-    bus_info = wb[Bus, ['BusName', 'BusPUVolt', 'BusAngle']]
-
-**3. Get All Fields**
-
-Use the slice operator ``:`` to retrieve all fields defined for that component:
-
-.. code-block:: python
-
-    all_gen_data = wb[Gen, :]
-
-**4. Using Component Attributes**
-
-For better IDE support and to avoid typos, you can use the attributes defined on the component classes:
-
-.. code-block:: python
-
-    data = wb[Bus, [Bus.BusName, Bus.BusPUVolt]]
-
-Data Modification
-~~~~~~~~~~~~~~~~~
-
-The same indexing syntax is used to update values in the PowerWorld case.
-
-**1. Broadcasting a Scalar**
-
-Set a single value for all objects of a type:
-
-.. code-block:: python
-
-    # Set all bus voltages to 1.05 pu
-    wb[Bus, 'BusPUVolt'] = 1.05
-
-**2. Updating Multiple Fields**
-
-You can update multiple fields at once by passing a list of values:
-
-.. code-block:: python
-
-    # Update MW and MVAR for all generators
-    wb[Gen, ['GenMW', 'GenMVR']] = [100.0, 20.0]
-
-**3. Bulk Update from DataFrame**
-
-If you have a DataFrame containing updated data (including the necessary primary keys), you can perform a bulk update:
-
-.. code-block:: python
-
-    # Assuming 'df' is a DataFrame with 'BusNum' and updated 'BusPUVolt'
-    wb[Bus] = df
-
-
-The Adapter
+Quick start
 -----------
 
-The ``Adapter`` (accessed via ``wb.func``) provides a collection of high-level helper functions for common tasks:
+Create a workbench, import the grid components you care about, and you are ready to query or modify the
+case. Keep paths absolute when launching PowerWorld so SimAuto can resolve the file cleanly.
 
 .. code-block:: python
 
-    # Find voltage violations
-    violations = wb.func.find_violations(v_min=0.95, v_max=1.05)
-    
-    # Calculate PTDF between two areas
-    ptdf_df = wb.func.ptdf('[AREA 1]', '[AREA 2]')
+    from esapp import GridWorkBench
+    from esapp.grid import Bus, Gen, Branch
 
-    # Run a full N-1 contingency analysis
-    wb.func.auto_insert_contingencies()
-    wb.func.solve_contingencies()
-    violations = wb.func.get_contingency_violations()
+    wb = GridWorkBench("path/to/case.pwb")
 
+Indexing basics
+---------------
 
-The App Ecosystem
------------------
+Indexing always follows the same pattern: component class first, then the fields you want. Leaving the
+second slot as ``:`` returns every available field for that component. Use specific fields for small payloads
+and ``:`` when you need the full shape of the object.
 
-ESA++ includes specialized "Apps" for complex analysis. For example, the GIC tool:
+**Primary keys only**
 
 .. code-block:: python
 
-    # Access the GIC application
-    gic_results = wb.app.gic.run_uniform_field(field_mag=1.0, angle=0)
+    bus_keys = wb[Bus]
 
-    # Use the Network app for topology analysis
-    is_connected = wb.app.network.is_connected()
-    islands = wb.app.network.get_islands()
+**Specific fields**
 
+.. code-block:: python
 
-Working with Matrices
+    voltages = wb[Bus, "BusPUVolt"]
+    bus_info = wb[Bus, ["BusName", "BusPUVolt"]]
+    gen_info = wb[Gen, ["GenMW", "GenStatus"]]
+
+**All fields**
+
+.. code-block:: python
+
+    branches = wb[Branch, :]
+
+**Field attributes for autocomplete**
+
+.. code-block:: python
+
+    bus_data = wb[Bus, [Bus.BusName, Bus.BusPUVolt, Bus.BusAngle]]
+
+Filtering and slicing
 ---------------------
 
-ESA++ makes it easy to extract system matrices for mathematical analysis:
+Returned objects are Pandas DataFrames or Series, so filter and slice with normal Pandas operations. Keep
+the heavy lifting in Pandas, then write only the results you need back to PowerWorld.
 
 .. code-block:: python
 
-    # Get the sparse Y-Bus matrix
-    ybus = wb.ybus()
-    
-    # Get the bus-branch incidence matrix
-    incidence = wb.network.incidence()
-    
-    # Get the Power Flow Jacobian
-    jacobian = wb.io.esa.get_jacobian()
+    buses = wb[Bus, ["BusNum", "AreaNum", "BusPUVolt"]]
+    area_1 = buses[buses["AreaNum"] == 1]
+    low_v = buses[buses["BusPUVolt"] < 0.95]
 
+Writing data
+------------
 
-Custom Scripts
---------------
+Writes mirror reads: same indexing form, but assign on the right-hand side. Broadcasting works for scalars;
+bulk operations use DataFrames that include primary keys. Start with small, targeted updates before applying
+wider changes.
 
-You can run raw PowerWorld auxiliary scripts directly:
+**Broadcast a scalar**
 
 .. code-block:: python
 
-    wb.func.command('SolvePowerFlow(RECTNEWT);')
+    wb[Bus, "BusPUVolt"] = 1.05
+    wb[Gen, "GenStatus"] = "Closed"
+
+**Update multiple fields**
+
+.. code-block:: python
+
+    wb[Gen, ["GenMW", "GenMVR"]] = [120.0, 25.0]
+
+**Bulk update with DataFrame**
+
+.. code-block:: python
+
+    import pandas as pd
+
+    updates = pd.DataFrame({
+        "BusNum": [1, 2, 5],
+        "BusPUVolt": [1.02, 1.01, 0.99]
+    })
+
+    wb[Bus] = updates
+
+.. note::
+   Include primary key columns (e.g., ``BusNum``) in bulk updates.
+
+Convenience helpers
+-------------------
+
+Shortcuts for common edits when you do not want to assemble DataFrames or craft SAW calls:
+
+.. code-block:: python
+
+    wb.set_gen(bus=5, id="1", mw=150.0, mvar=40.0, status="Closed")
+    wb.set_load(bus=10, id="1", mw=90.0, mvar=25.0, status="Closed")
+
+    wb.open_branch(from_bus=1, to_bus=2, id="1")
+    wb.close_branch(from_bus=1, to_bus=2, id="1")
+
+    wb.scale_gen(scale_factor=1.05)
+    wb.scale_load(scale_factor=0.95)
+
+Calling SAW directly
+--------------------
+
+Access the full SimAuto interface when you need lower-level operations or features not surfaced on the
+workbench helpers. Prefer the helpers for routine tasks; reach for SAW when you need the complete API.
+
+.. code-block:: python
+
+    saw = wb.esa
+    saw.SolveAC_OPF()
+    saw.RunScriptCommand("SolvePowerFlow(RECTNEWT);")
+
+Matrices and topology
+---------------------
+
+Extract matrices and mappings without building a full study workflow. Use these as building blocks for
+linearized studies, external analytics, or custom contingency logic.
+
+.. code-block:: python
+
+    Y = wb.ybus()
+    A = wb.network.incidence()
+    busmap = wb.network.busmap()
+    from esapp.apps.network import Network
+    L = wb.network.laplacian(weights=Network.BranchType.LENGTH)
+
+Where to go next
+----------------
+- End-to-end scripts: :doc:`examples`
+- Full API reference: :doc:`../api/api`
+- Development and tests: :doc:`../dev/tests`

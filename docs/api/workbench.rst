@@ -1,18 +1,16 @@
 GridWorkBench
 =============
 
-The ``GridWorkBench`` is the central orchestrator of the ESA++ toolkit. It manages the lifecycle of the 
-PowerWorld Simulator instance, handles case loading/saving, and provides the primary interface for 
-data access (via ``IndexTool``) and analysis (via ``Adapter`` and ``Apps``).
+The ``GridWorkBench`` is the high-level entry point for interacting with PowerWorld via ESA++. It wraps
+SimAuto with a Pythonic interface for case management, data access, and analysis helpers. For concepts and
+usage patterns, see :doc:`../guide/usage`. This page lists the full API surface.
 
-.. currentmodule:: gridwb.workbench
+API Documentation
+------------------
 
-.. autoclass:: gridwb.workbench.GridWorkBench
+.. currentmodule:: esapp.workbench
+
+.. autoclass:: GridWorkBench
    :members:
    :undoc-members:
    :show-inheritance:
-   :special-members: __getitem__, __setitem__
-
-.. automodule:: gridwb.indextool
-   :members:
-   :special-members: __getitem__, __setitem__

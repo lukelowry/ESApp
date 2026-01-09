@@ -1,46 +1,45 @@
 Utilities
 =========
+.. currentmodule:: esapp.utils
 
 ESA++ includes a variety of utility modules for mathematical operations, geographic analysis, and debugging.
 
-Mathematical Operators
+Mathematical
 ----------------------
-.. automodule:: gridwb.utils.math
+.. automodule:: esapp.utils.mathtools
    :members:
-   :undoc-members:
 
-Geographic & Graph Analysis
----------------------------
-.. automodule:: gridwb.utils.geograph
-   :members:
-   :undoc-members:
-
-GIC Data Handling (B3D)
+B3D File Tools
 -----------------------
-.. automodule:: gridwb.utils.b3d
+.. automodule:: esapp.utils.b3d
    :members:
-   :undoc-members:
 
 Custom Exceptions
 -----------------
-.. automodule:: gridwb.utils.exceptions
+.. automodule:: esapp.utils.exceptions
    :members:
-   :undoc-members:
 
 Miscellaneous Helpers
 ---------------------
-.. automodule:: gridwb.utils.misc
+.. automodule:: esapp.utils.misc
    :members:
-   :undoc-members:
-
-Debugging Tools
----------------
-.. automodule:: gridwb.utils.debug
-   :members:
-   :undoc-members:
 
 Decorators
 ----------
-.. automodule:: gridwb.utils.decorators
+.. automodule:: esapp.utils.decorators
    :members:
-   :undoc-members:
+
+Mesh Processing
+---------------
+.. automodule:: esapp.utils.mesh
+   :members:
+
+Geographic Mapping
+------------------
+.. automodule:: esapp.utils.map
+   :members:
+
+Wavelet Plotting
+----------------
+.. automodule:: esapp.utils.plotwavelet
+   :members:
