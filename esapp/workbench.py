@@ -1004,10 +1004,10 @@ class GridWorkBench(Indexable):
         --------
         >>> lon, lat = wb.buscoords()
         """
-        A, S = self[Bus, "SubNum"],  self[Substation, ["Longitude", "Latitude"]]
-        LL = A.merge(S, on='SubNum') 
+        A, S = self[Bus, "SubNum"],  self[Substation, ["SubNum", "Longitude", "Latitude"]]
+        LL = A.merge(S, on="SubNum") 
         if astuple:
-            return LL['Longitude'], LL['Latitude']
+            return LL["Longitude"], LL["Latitude"]
         return LL
     
     def write_voltage(self,V):
