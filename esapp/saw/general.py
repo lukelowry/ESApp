@@ -831,7 +831,7 @@ class GeneralMixin:
         file_directory : str
             The directory where the auxiliary files are located.
         filter_string : str, optional
-            A filter string using Windows wildcard patterns (e.g., "*.aux").
+            A filter string using Windows wildcard patterns (e.g., ``*.aux``).
             If not specified, all files in the directory are loaded. Defaults to "".
         create_if_not_found : bool, optional
             If True, objects that cannot be found will be created while reading

@@ -52,13 +52,20 @@ def formatPlot(ax: Axes,
 
 
 def darker_hsv_colormap(scale_factor=0.5):
-    """
-    Creates a modified version of the HSV colormap that is darker in shade.
-    Parameters:
-        scale_factor (float): Factor to scale the value (brightness). Should be between 0 and 1.
-                             1 means no change, 0 means complete darkness.
-    Returns:
-        darker_hsv_cmap: A modified colormap that is a darker version of the original HSV colormap.
+    """Creates a modified version of the HSV colormap that is darker.
+
+    Parameters
+    ----------
+    scale_factor : float, optional
+        Factor to scale the value (brightness), by default 0.5.
+        Should be between 0 and 1. 1 means no change, 0 means
+        complete darkness.
+
+    Returns
+    -------
+    darker_hsv_cmap
+        A modified colormap that is a darker version of the original
+        HSV colormap.
     """
     # Create the HSV colormap in RGB
     hsv_cmap = plt.cm.hsv(np.linspace(0, 1, 256))[:, :3]

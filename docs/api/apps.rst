@@ -15,11 +15,3 @@ API members only.
    esapp.apps.modes
    esapp.apps.network
    esapp.apps.static
-
-.. rubric:: GIC Data Models
-
-.. autosummary::
-   :toctree: generated/
-
-   esapp.apps.gic.GICModel
-   esapp.apps.gic.GICFactory
