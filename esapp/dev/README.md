@@ -53,3 +53,62 @@ How the symbols in **Column 3** combine to form unique keys for common objects:
 * **Integer:** Whole numbers (e.g., Bus Numbers, Status flags).
 * **Real:** Floating-point numbers (e.g., Voltage, MW, Resistance).
 * **String:** Text (e.g., Names, "Yes/No", Labels).
+
+# SubData
+
+SubData sections store nested/hierarchical data that belongs to a parent object. They appear in AUX files immediately after the parent record and are NOT available through CSV exports.
+
+### **1. General SubData Block Structure**
+
+| Component | Format / Syntax | Notes |
+| :--- | :--- | :--- |
+| **Start Tag** | `<SUBDATA ObjectType>` | Case-insensitive; `ObjectType` indicates the class of nested data. |
+| **End Tag** | `</SUBDATA>` | Terminates the block. |
+| **Location** | Immediately follows the parent `DATA` record. | The SubData block belongs to the immediately preceding row in the main `DATA` section. |
+| **Comments** | `// Comment Text` | Supported within the block; parsers should ignore lines starting with `//`. |
+
+### **2. Value Formatting Rules**
+
+**IMPORTANT:** Both formats may appear in the same file. Parsers must detect dynamically.
+
+| Style | Syntax | Detection | Regex Pattern |
+| :--- | :--- | :--- | :--- |
+| **Bracketed** | `[Val1, Val2], [Val3, Val4]` | Line contains `[` | `\[(.*?)\]` |
+| **Space Delimited** | `Val1 Val2 Val3` | No brackets | `(?:[^\s"]|"(?:\\.|[^"])*")+` |
+| **Quoted Strings** | `"Val With Space"` | Quotes preserve whitespace | Strip quotes after parsing |
+
+### **3. Common SubData Types by Parent Object**
+
+| Parent Object | SubData Type | Data Structure | Description |
+| :--- | :--- | :--- | :--- |
+| **Gen** | `BidCurve` | `MW  Price($/MWh)` | Piece-wise linear cost/bid curve |
+| **Gen** | `ReactiveCapability` | `MW  MinMVAR  MaxMVAR` | Reactive capability curve points |
+| **Load** | `BidCurve` | `MW  Price($/MWh)` | Load benefit/bid curve (prices must increase) |
+| **Contingency** | `CTGElement` | `Action  [params...]` | Contingency element definitions |
+| **Contingency** | `LimitViol` | Violation data | Limit violations from contingency analysis |
+| **Interface** | `InterfaceElement` | Element refs + params | Branch/device membership in interface |
+| **Filter** | `Condition` | Filter conditions | Filter definition criteria |
+| **Bus** | `MWMarginalCostValues` | `Value` | OPF MW marginal prices |
+| **Bus** | `MvarMarginalCostValues` | `Value` | OPF Mvar marginal prices |
+| **ColorMap** | `ColorPoint` | `Value  Color  Alpha` | Color contour breakpoints |
+| **SuperArea** | `SuperAreaArea` | `AreaNum  PartFactor` | Areas within super area |
+| **BackgroundLine** | `Line` | `[x, y]` | Polyline coordinates |
+
+### **4. Accessing SubData in ESA++**
+
+```python
+# Get generators with their cost curves and reactive capability
+df = saw.GetSubData("Gen", ["BusNum", "GenID", "GenMW"], ["BidCurve", "ReactiveCapability"])
+
+# SubData columns contain lists of lists
+for _, row in df.iterrows():
+    for mw, price in row["BidCurve"]:       # Each point is [MW, $/MWh]
+        print(f"  {mw} MW @ ${price}/MWh")
+```
+
+### **5. Discovering Available SubData**
+
+To find which SubData sections are available for an object type:
+1. Check Column 2 ("SUBDATA") in `PWRaw.tsv` - objects with `Yes` support SubData
+2. Export the object to AUX format and inspect the file
+3. Refer to PowerWorld's Auxiliary File Format documentation

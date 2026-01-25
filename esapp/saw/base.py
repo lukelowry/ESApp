@@ -314,22 +314,6 @@ class SAWBase(object):
         """Internal helper to directly set a SimAuto COM property."""
         setattr(self._pwcom, property_name, property_value)
 
-    def ChangeParameters(self, ObjectType: str, ParamList: list, Values: list) -> None:
-        """Alias for ChangeParametersSingleElement.
-
-        This method is a direct pass-through to `ChangeParametersSingleElement`.
-
-        Parameters
-        ----------
-        ObjectType : str
-            The PowerWorld object type (e.g., 'Bus', 'Gen').
-        ParamList : List[str]
-            A list of internal field names to modify.
-        Values : List[Any]
-            A list of values corresponding to the parameters in `ParamList`.
-        """
-        return self.ChangeParametersSingleElement(ObjectType, ParamList, Values)
-
     def ChangeParametersSingleElement(self, ObjectType: str, ParamList: list, Values: list) -> None:
         """Modifies parameters for a single object in PowerWorld.
 
@@ -724,26 +708,6 @@ class SAWBase(object):
             return None
         else:
             return result
-
-    def GetParameters(self, ObjectType: str, ParamList: list, Values: list) -> pd.Series:
-        """Alias for GetParametersSingleElement.
-
-        Parameters
-        ----------
-        ObjectType : str
-            The PowerWorld object type.
-        ParamList : List[str]
-            A list of internal field names to retrieve.
-        Values : List[Any]
-            A list containing the primary key values for the object, followed by
-            empty strings or placeholders for other parameters in `ParamList`.
-
-        Returns
-        -------
-        pandas.Series
-            A pandas Series containing the requested data.
-        """
-        return self.GetParametersSingleElement(ObjectType, ParamList, Values)
 
     def GetSpecificFieldList(self, ObjectType: str, FieldList: List[str]) -> pd.DataFrame:
         """Retrieves detailed metadata for a specific subset of fields for a given object type.

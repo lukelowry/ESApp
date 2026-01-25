@@ -12,6 +12,7 @@ API Documentation
 .. currentmodule:: esapp.saw
 
 .. autoclass:: SAW
+   :show-inheritance:
    :members:
    :undoc-members:
 

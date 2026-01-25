@@ -33,7 +33,7 @@ autosectionlabel_prefix_document = True
 
 autoclass_content = "both"
 autodoc_typehints = "none"
-add_module_names = False
+add_module_names = True
 
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),
@@ -73,7 +73,7 @@ exclude_patterns = [
     "**/PWRaw",
 ]
 
-nbsphinx_execute = 'never'
+nbsphinx_execute = 'auto'
 html_sourcelink_suffix = ''
 master_doc = "index"
 

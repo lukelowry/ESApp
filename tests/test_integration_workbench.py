@@ -104,19 +104,29 @@ class TestGridWorkBenchFunctions:
     # -------------------------------------------------------------------------
 
     def test_voltage_retrieval(self, wb):
-        """Tests voltage() and voltages()."""
-        # voltage()
+        """Tests voltage()."""
+        # Test default call (complex, pu)
         v = wb.voltage()
         assert len(v) > 0
-        v_complex = wb.voltage(asComplex=True)
-        # v_complex is a Series, check values
+        assert np.iscomplexobj(v.values)
+
+        # Test complex=True explicitly
+        v_complex = wb.voltage(complex=True)
         assert np.iscomplexobj(v_complex.values)
-        v_mag, v_ang = wb.voltage(asComplex=False)
+
+        # Test complex=False
+        v_mag, v_ang = wb.voltage(complex=False)
+        assert len(v_mag) > 0
         assert len(v_mag) == len(v_ang)
 
-        # voltages()
-        v2 = wb.voltages(pu=True, complex=True)
-        assert len(v2) > 0
+        # Test pu=False
+        v_kv = wb.voltage(pu=False)
+        assert len(v_kv) > 0
+        
+        # Test pu=False and complex=False
+        v_kv_mag, v_kv_ang = wb.voltage(pu=False, complex=False)
+        assert len(v_kv_mag) > 0
+        assert len(v_kv_mag) == len(v_kv_ang)
 
     def test_component_retrieval(self, wb):
         """Tests generations, loads, shunts, lines, transformers, areas, zones."""
@@ -136,7 +146,7 @@ class TestGridWorkBenchFunctions:
     def test_modification(self, wb):
         """Tests set_voltages, branch ops, gen/load ops, create/delete/select."""
         # Set Voltages
-        v = wb.voltages(pu=True, complex=True)
+        v = wb.voltage(complex=True, pu=True)
         wb.set_voltages(v)
         
         # Branch Ops
@@ -204,8 +214,9 @@ class TestGridWorkBenchFunctions:
         assert isinstance(viols, pd.DataFrame)
         
         # Mismatches
-        mis = wb.mismatches()
-        assert not mis.empty
+        mp, mq = wb.mismatch()
+        assert not mp.empty
+        assert not mq.empty
         
         # Islands
         isl = wb.islands()

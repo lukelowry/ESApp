@@ -63,39 +63,39 @@ class GridWorkBench(Indexable):
         self.gic.set_esa(esa)
         self.modes.set_esa(esa)
 
-    def voltage(self, asComplex=False):
+    def voltage(self, complex=True, pu=True):
         """
-        The vector of voltages in PowerWorld.
+        Retrieves bus voltages.
 
         Parameters
         ----------
-        asComplex : bool, optional
-            Whether to return complex values. Defaults to True.
+        complex : bool, optional
+            If True, returns complex numbers. Else tuple of (mag, angle_rad). Defaults to True.
+        pu : bool, optional
+            If True, returns per-unit voltages. Else kV. Defaults to True.
 
         Returns
         -------
-        pd.Series or tuple
-            Series of complex values if asComplex=True, 
-            else tuple of (Vmag, Angle in Radians).
+        Union[pd.Series, Tuple[pd.Series, pd.Series]]
+            The voltage data.
 
         Examples
         --------
-        >>> V = wb.voltage()
-        >>> V_mag, V_ang = wb.voltage(asComplex=False)
+        >>> v_complex = wb.voltage()
         """
-        v_df = self[Bus, ["BusPUVolt", "BusAngle"]] 
-
-        vmag = v_df['BusPUVolt']
-        rad = v_df['BusAngle']*np.pi/180
-
-        if asComplex:
-            return vmag * np.exp(1j * rad)
+        fields = ["BusPUVolt", "BusAngle"] if pu else ["BusKVVolt", "BusAngle"]
+        df = self[Bus, fields]
         
-        return vmag, rad
+        mag = df[fields[0]]
+        ang = df['BusAngle'] * np.pi / 180.0
+
+        if complex:
+            return mag * np.exp(1j * ang)
+        return mag, ang
 
     # --- Simulation Control ---
 
-    def pflow(self, getvolts=True, method="POLARNEWT") -> DataFrame:
+    def pflow(self, getvolts=True, method="POLARNEWT"):
         """
         Solve Power Flow in external system.
         By default bus voltages will be returned.
@@ -108,8 +108,8 @@ class GridWorkBench(Indexable):
 
         Returns
         -------
-        pd.DataFrame or None
-            Dataframe of bus number and voltage if requested.
+        pd.Series or tuple or None
+            Returns the output of the voltage() method if requested.
 
         Examples
         --------
@@ -312,36 +312,6 @@ class GridWorkBench(Indexable):
         >>> wb.load_script("run.pws")
         """
         self.esa.LoadScript(filename)
-
-    def voltages(self, pu=True, complex=True):
-        """
-        Retrieves bus voltages.
-
-        Parameters
-        ----------
-        pu : bool, optional
-            If True, returns per-unit voltages. Else kV. Defaults to True.
-        complex : bool, optional
-            If True, returns complex numbers. Else tuple of (mag, angle_rad). Defaults to True.
-
-        Returns
-        -------
-        Union[pd.Series, Tuple[pd.Series, pd.Series]]
-            The voltage data.
-
-        Examples
-        --------
-        >>> v_complex = wb.voltages()
-        """
-        fields = ["BusPUVolt", "BusAngle"] if pu else ["BusKVVolt", "BusAngle"]
-        df = self[Bus, fields]
-        
-        mag = df[fields[0]]
-        ang = df['BusAngle'] * np.pi / 180.0
-
-        if complex:
-            return mag * np.exp(1j * ang)
-        return mag, ang
 
     def generations(self):
         """
@@ -819,23 +789,47 @@ class GridWorkBench(Indexable):
         >>> v_viols = wb.violations(v_min=0.95, v_max=1.05)
         >>> print(v_viols.head())
         """
-        v = self.voltages(pu=True, complex=False)[0]
+        v = self.voltage(complex=False, pu=True)[0]
         low = v[v < v_min]
         high = v[v > v_max]
         return DataFrame({'Low': low, 'High': high})
 
-    def mismatches(self):
+    def mismatch(self, asComplex=False):
         """Returns bus mismatches."""
         """
         Returns bus mismatches.
 
         Examples
         --------
-        >>> mm = wb.mismatches()
+        >>> mm = wb.mismatch()
         """
         #return self.esa.GetBusMismatches()
-        return self[Bus, ["BusMismatchP", "BusMismatchQ", "BusMismatchS"]]
+        df = self[Bus, ["BusMismatchP", "BusMismatchQ"]]
+        P = df['BusMismatchP']
+        Q = df['BusMismatchQ']
 
+        if asComplex:
+            return P + 1j * Q
+        return P, Q
+
+    def netinj(self, asComplex=False):
+        """
+        Sum of all generator, load, bus shunt, and switched shunt P and Q.
+
+
+
+        Examples
+        --------
+        >>> mm = wb.netinj()
+        """
+        #return self.esa.GetBusMismatches()
+        df = self[Bus,  ['BusNetMW', 'BusNetMVR']]
+        P = df['BusNetMW'].to_numpy()
+        Q = df['BusNetMVR'].to_numpy()
+
+        if asComplex:
+            return P + 1j * Q
+        return P, Q
 
 
     def islands(self):
@@ -1367,14 +1361,38 @@ class GridWorkBench(Indexable):
         self.esa.RunScriptCommand(f"GICLoad3DEfield({file_type}, {filename}, {yn})")
 
 
-    def _set_option(self, key, enable): 
+    def _set_option(self, key: str, enable: bool):
+        """Internal helper to set a Sim_Solution_Options boolean flag."""
         self[Sim_Solution_Options, key] = 'YES' if enable else 'NO'
 
-    def set_do_one_iteration(self, enable=True): self._set_option('DoOneIteration', enable)
-    def set_max_iterations(self, val=250): wb[Sim_Solution_Options, 'MaxItr'] = val
-    def set_disable_angle_rotation(self, enable=True): self._set_option('DisableAngleRotation', enable)
-    def set_disable_opt_mult(self, enable=True): self._set_option('DisableOptMult', enable)
-    def enable_inner_ss_check(self, enable=True): self._set_option('SSContPFInnerLoop', enable)
-    def disable_gen_mvr_check(self, enable=True): self._set_option('DisableGenMVRCheck', enable)
-    def enable_inner_check_gen_vars(self, enable=True): self._set_option('ChkVars', enable)
-    def enable_inner_backoff_gen_vars(self, enable=True): self._set_option('ChkVars:1', enable)
+    def set_do_one_iteration(self, enable: bool = True):
+        """Enable/disable single iteration mode for power flow solutions."""
+        self._set_option('DoOneIteration', enable)
+
+    def set_max_iterations(self, val: int = 250):
+        """Set maximum number of iterations for power flow convergence."""
+        self[Sim_Solution_Options, 'MaxItr'] = val
+
+    def set_disable_angle_rotation(self, enable: bool = True):
+        """Enable/disable angle rotation during power flow."""
+        self._set_option('DisableAngleRotation', enable)
+
+    def set_disable_opt_mult(self, enable: bool = True):
+        """Enable/disable optimal multiplier during power flow."""
+        self._set_option('DisableOptMult', enable)
+
+    def enable_inner_ss_check(self, enable: bool = True):
+        """Enable/disable inner steady-state contingency power flow check."""
+        self._set_option('SSContPFInnerLoop', enable)
+
+    def disable_gen_mvr_check(self, enable: bool = True):
+        """Enable/disable generator MVAR limit checking."""
+        self._set_option('DisableGenMVRCheck', enable)
+
+    def enable_inner_check_gen_vars(self, enable: bool = True):
+        """Enable/disable inner loop generator VAR checking."""
+        self._set_option('ChkVars', enable)
+
+    def enable_inner_backoff_gen_vars(self, enable: bool = True):
+        """Enable/disable inner loop generator VAR backoff."""
+        self._set_option('ChkVars:1', enable)
