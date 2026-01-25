@@ -153,12 +153,6 @@ class TestGridWorkBenchDataRetrieval:
             result = workbench.voltage(asComplex=True)
             assert result is not None
 
-    def test_get_fields(self, workbench):
-        """Test get_fields method."""
-        result = workbench.get_fields("Bus")
-        workbench.esa.GetFieldList.assert_called_once_with("Bus")
-        assert result is not None
-
 
 class TestGridWorkBenchModification:
     """Tests for GridWorkBench modification methods."""

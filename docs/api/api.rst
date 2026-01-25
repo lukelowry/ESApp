@@ -10,3 +10,4 @@ This section provides a detailed reference for the ESA++ API, partitioned by fun
    saw
    apps
    utils
+   comps

@@ -128,9 +128,6 @@ class TestGridWorkBenchFunctions:
         assert not wb.lines().empty
         assert not wb.areas().empty
         assert not wb.zones().empty
-        
-        fields = wb.get_fields("Bus")
-        assert not fields.empty
 
     # -------------------------------------------------------------------------
     # Modification
@@ -184,9 +181,6 @@ class TestGridWorkBenchFunctions:
         wb.energize("Bus", create_object_string("Bus", 1))
         
         wb.radial_paths()
-        
-        dist = wb.path_distance(create_object_string("Bus", 1))
-        assert dist is not None
         
         wb.select("Branch", "BusNum = 1")
         wb.network_cut(create_object_string("Bus", 1), branch_filter="SELECTED")

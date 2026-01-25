@@ -45,21 +45,6 @@ class PowerflowMixin:
         """
         self.RunScriptCommand("ResetToFlatStart();")
 
-    def get_power_flow_results(
-        self, ObjectType: str, additional_fields: Union[None, List[str]] = None
-    ) -> Union[None, pd.DataFrame]:
-        """Get standard power flow results for a given object type."""
-        object_type = ObjectType.lower()
-        try:
-            field_list = self.POWER_FLOW_FIELDS[object_type]
-            if additional_fields:
-                field_list = field_list[:]
-                field_list += additional_fields
-        except KeyError as e:
-            raise ValueError(f"Unsupported ObjectType for power flow results, {ObjectType}.") from e
-
-        return self.GetParametersMultipleElement(ObjectType=object_type, ParamList=field_list)
-
     def SolvePowerFlowWithRetry(self, SolMethod: str = "RECTNEWT") -> None:
         """Run the SolvePowerFlow command, with a retry mechanism.
 
@@ -121,20 +106,6 @@ class PowerflowMixin:
         """
         s = self.GetParametersSingleElement("PWCaseInformation", ["BusPUVolt:1"], [""])
         return float(s.iloc[0])
-
-    def GetBusMismatches(self) -> pd.DataFrame:
-        """Gets the complex power bus mismatches.
-
-        Returns
-        -------
-        pandas.DataFrame
-            A DataFrame with bus identifiers and their P, Q, and S
-            mismatches in MW, Mvar, and MVA.
-        """
-        key_fields = self.get_key_field_list("Bus")
-        return self.GetParametersMultipleElement(
-            "Bus", key_fields + ["BusMismatchP", "BusMismatchQ", "BusMismatchS"]
-        )
 
     def UpdateIslandsAndBusStatus(self):
         """Updates islands and bus status without requiring a power flow solution."""

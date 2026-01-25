@@ -2,12 +2,15 @@ from .apps.gic import GIC
 from .apps.network import Network
 from .apps.modes import ForcedOscillation
 from .indexable import Indexable
-from .grid import Bus, Branch, Gen, Load, Shunt, Area, Zone, Substation
+from .grid import Bus, Branch, Gen, Load, Shunt, Area, Zone, Substation, Sim_Solution_Options
 from .saw import create_object_string
 
 import numpy as np
 from numpy import any as np_any
 from pandas import DataFrame
+import tempfile
+import os
+from scipy.sparse import csr_matrix
 
 class GridWorkBench(Indexable):
     """
@@ -92,7 +95,7 @@ class GridWorkBench(Indexable):
 
     # --- Simulation Control ---
 
-    def pflow(self, getvolts=True) -> DataFrame:
+    def pflow(self, getvolts=True, method="POLARNEWT") -> DataFrame:
         """
         Solve Power Flow in external system.
         By default bus voltages will be returned.
@@ -113,7 +116,7 @@ class GridWorkBench(Indexable):
         >>> wb.pflow()
         """
         # Solve Power Flow through External Tool
-        self.esa.SolvePowerFlow()
+        self.esa.SolvePowerFlow(method)
 
         # Request Voltages if needed
         if getvolts:
@@ -189,6 +192,70 @@ class GridWorkBench(Indexable):
         >>> wb.log("Starting analysis...")
         """
         self.esa.LogAdd(message)
+
+    def print_log(self, clear: bool = False, new_only: bool = False):
+        """
+        Prints the PowerWorld Message Log to the console.
+
+        This function saves the PowerWorld log to a temporary file, reads its
+        contents, and prints them to the console. Useful for debugging and
+        monitoring PowerWorld operations.
+
+        Parameters
+        ----------
+        clear : bool, optional
+            If True, clears the PowerWorld log after printing. Defaults to False.
+        new_only : bool, optional
+            If True, only prints log entries added since the last call to print_log.
+            Defaults to False.
+
+        Returns
+        -------
+        str
+            The log contents that were printed.
+
+        Examples
+        --------
+        >>> wb.pflow()
+        >>> wb.print_log()  # See what PowerWorld reported
+        >>> wb.print_log(clear=True)  # Print and clear the log
+        >>> wb.print_log(new_only=True)  # Only show new entries
+        """
+        # Initialize tracking attribute if needed
+        if not hasattr(self, "_log_last_position"):
+            self._log_last_position = 0
+
+        # Create temp file, save log, read contents
+        tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False)
+        tmp_path = tmp.name
+        tmp.close()
+
+        try:
+            self.esa.LogSave(tmp_path, append=False)
+            with open(tmp_path, "r") as f:
+                content = f.read()
+        finally:
+            os.unlink(tmp_path)
+
+        # Handle new_only mode
+        if new_only:
+            output = content[self._log_last_position:]
+        else:
+            output = content
+
+        # Update position tracker
+        self._log_last_position = len(content)
+
+        # Print to console
+        if output.strip():
+            print(output)
+
+        # Clear log if requested
+        if clear:
+            self.esa.LogClear()
+            self._log_last_position = 0
+
+        return output
 
     def close(self):
         """
@@ -382,26 +449,6 @@ class GridWorkBench(Indexable):
         >>> zones = wb.zones()
         """
         return self[Zone, :]
-
-    def get_fields(self, obj_type):
-        """
-        Returns a DataFrame describing the fields for a given object type.
-
-        Parameters
-        ----------
-        obj_type : str
-            The PowerWorld object type.
-
-        Returns
-        -------
-        pd.DataFrame
-            Field information.
-
-        Examples
-        --------
-        >>> fields = wb.get_fields("Bus")
-        """
-        return self.esa.GetFieldList(obj_type)
 
     # --- Modification ---
 
@@ -786,7 +833,10 @@ class GridWorkBench(Indexable):
         --------
         >>> mm = wb.mismatches()
         """
-        return self.esa.GetBusMismatches()
+        #return self.esa.GetBusMismatches()
+        return self[Bus, ["BusMismatchP", "BusMismatchQ", "BusMismatchS"]]
+
+
 
     def islands(self):
         """
@@ -975,7 +1025,148 @@ class GridWorkBench(Indexable):
         >>> Y = wb.ybus()
         """
         return self.esa.get_ybus(dense)
-        
+
+    def branch_admittance(self):
+        """
+        Calculate the branch admittance matrices, Yf and Yt.
+
+        These matrices describe the relationship between branch currents and bus voltages.
+        Yf relates the current flowing from the 'from' bus to the 'to' bus,
+        and Yt relates the current flowing from the 'to' bus to the 'from' bus.
+
+        Returns
+        -------
+        tuple[csr_matrix, csr_matrix]
+            A tuple containing two SciPy CSR sparse matrices: (Yf, Yt).
+
+        Examples
+        --------
+        >>> Yf, Yt = wb.branch_admittance()
+        """
+        bus_df = self[Bus, ["BusNum"]]
+        branch_df = self[Branch, ["BusNum", "BusNum:1", "LineCircuit",
+                                   "LineR", "LineX", "LineC", "LineTap", "LinePhase"]]
+
+        nb = len(bus_df)
+        nl = len(branch_df)
+
+        Ys = 1 / (branch_df["LineR"].to_numpy() + 1j * branch_df["LineX"].to_numpy())
+        Bc = branch_df["LineC"].to_numpy()
+        tap = branch_df["LineTap"].to_numpy() * np.exp(1j * np.pi / 180 * branch_df["LinePhase"].to_numpy())
+        Ytt = Ys + 1j * Bc / 2
+        Yff = Ytt / (tap * np.conj(tap))
+        Yft = -Ys / np.conj(tap)
+        Ytf = -Ys / tap
+
+        # Build bus number to index mapping
+        bus_to_idx = {bus: idx for idx, bus in enumerate(bus_df["BusNum"])}
+        f = np.array([bus_to_idx[b] for b in branch_df["BusNum"]])
+        t = np.array([bus_to_idx[b] for b in branch_df["BusNum:1"]])
+
+        i = np.r_[range(nl), range(nl)]
+        Yf = csr_matrix((np.hstack([Yff.reshape(-1), Yft.reshape(-1)]), (i, np.hstack([f, t]))), (nl, nb))
+        Yt = csr_matrix((np.hstack([Ytf.reshape(-1), Ytt.reshape(-1)]), (i, np.hstack([f, t]))), (nl, nb))
+        return Yf, Yt
+
+    def shunt_admittance(self):
+        """
+        Calculate the shunt admittance vector, Ysh.
+
+        This vector represents the equivalent admittance to ground for each bus,
+        derived from fixed bus shunts.
+
+        Returns
+        -------
+        np.ndarray
+            A complex-valued NumPy array representing the shunt admittance for each bus.
+
+        Examples
+        --------
+        >>> Ysh = wb.shunt_admittance()
+        """
+        base_df = self[Sim_Solution_Options, ["SBase"]]
+        base = float(base_df["SBase"].iloc[0])
+        bus_df = self[Bus, ["BusNum", "BusSS", "BusSSMW"]]
+        bus_df = bus_df.fillna(0)
+        return (bus_df["BusSSMW"].to_numpy() + 1j * bus_df["BusSS"].to_numpy()) / base
+
+    def incidence_matrix(self):
+        """
+        Calculate the bus-branch incidence matrix.
+
+        The incidence matrix (A) describes the topology of the network.
+        For a system with N buses and L branches, it is an L x N matrix
+        where A[i, j] = 1 if branch i starts at bus j, -1 if branch i
+        ends at bus j, and 0 otherwise.
+
+        Returns
+        -------
+        np.ndarray
+            A NumPy array representing the incidence matrix.
+
+        Examples
+        --------
+        >>> A = wb.incidence_matrix()
+        """
+        branch_df = self[Branch, ["BusNum", "BusNum:1", "LineCircuit"]]
+        bus_df = self[Bus, ["BusNum"]]
+
+        # Build bus number to index mapping
+        bus_to_idx = {bus: idx for idx, bus in enumerate(bus_df["BusNum"])}
+
+        incidence = np.zeros([len(branch_df), len(bus_df)], dtype=int)
+        for i, row in branch_df.iterrows():
+            incidence[i, bus_to_idx[row["BusNum"]]] = 1
+            incidence[i, bus_to_idx[row["BusNum:1"]]] = -1
+        return incidence
+
+    def jacobian(self, dense=False):
+        """
+        Get the power flow Jacobian matrix.
+
+        The Jacobian is crucial for Newton-Raphson power flow solutions
+        and sensitivity analysis.
+
+        Parameters
+        ----------
+        dense : bool, optional
+            If True, returns a dense NumPy array. If False (default), returns a
+            SciPy CSR sparse matrix.
+
+        Returns
+        -------
+        Union[np.ndarray, csr_matrix]
+            The Jacobian matrix.
+
+        Examples
+        --------
+        >>> J = wb.jacobian()
+        """
+        return self.esa.get_jacobian(dense)
+
+    def gmatrix(self, dense=False):
+        """
+        Get the GIC conductance matrix (G).
+
+        The G-matrix relates GIC currents to earth potentials.
+
+        Parameters
+        ----------
+        dense : bool, optional
+            If True, returns a dense NumPy array. If False (default), returns a
+            SciPy CSR sparse matrix.
+
+        Returns
+        -------
+        Union[np.ndarray, csr_matrix]
+            The G-matrix.
+
+        Examples
+        --------
+        >>> G = wb.gmatrix()
+        """
+        return self.esa.get_gmatrix(dense)
+
     ''' LOCATION FUNCTIONS '''
 
     def busmap(self):

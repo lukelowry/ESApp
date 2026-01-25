@@ -5,13 +5,23 @@ The ``apps`` package exposes focused helpers (network topology, GIC, etc.) surfa
 For direct SAW access use ``wb.esa``; for higher-level helpers use the modules below. This page lists the
 API members only.
 
-.. currentmodule:: esapp.apps
+.. rubric:: App Modules
 
-.. automodule:: esapp.apps.network
-   :members:
+.. autosummary::
+   :toctree: generated/
+   :template: module.rst
 
-.. automodule:: esapp.apps.gic
-   :members:
+   esapp.apps.dynamics
+   esapp.apps.gic
+   esapp.apps.modes
+   esapp.apps.network
+   esapp.apps.static
 
-.. automodule:: esapp.apps
-   :members:
+.. rubric:: GIC Data Models
+
+.. autosummary::
+   :toctree: generated/
+   :template: class.rst
+
+   esapp.apps.gic.GICModel
+   esapp.apps.gic.GICFactory

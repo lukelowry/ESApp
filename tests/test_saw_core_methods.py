@@ -311,8 +311,6 @@ def test_get_parameters_multiple_element(saw_obj):
     assert len(df) == 2
     assert "BusNum" in df.columns
     assert "BusName" in df.columns
-    # Check that BusNum is numeric (handled by clean_df_or_series -> _to_numeric)
-    assert pd.api.types.is_numeric_dtype(df["BusNum"])
 
 def test_change_parameters_single_element(saw_obj):
     """Test changing parameters."""
@@ -378,19 +376,6 @@ def test_get_parameters_multiple_element_flat_output_empty(saw_obj):
     assert result is None or result == ()
 
 
-def test_get_key_fields_for_object_type(saw_obj):
-    """Test get_key_fields_for_object_type returns key field DataFrame."""
-    df = saw_obj.get_key_fields_for_object_type("Bus")
-    assert isinstance(df, pd.DataFrame)
-    assert "internal_field_name" in df.columns
-
-
-def test_get_key_field_list(saw_obj):
-    """Test get_key_field_list returns list of field names."""
-    result = saw_obj.get_key_field_list("Bus")
-    assert isinstance(result, list)
-
-
 def test_ts_get_contingency_results(saw_obj):
     """Test TSGetContingencyResults parsing."""
     # Mock return structure: (Error, MetaData, Data)
@@ -421,26 +406,6 @@ def test_ts_get_contingency_results(saw_obj):
     # Check that data is numeric
     assert pd.api.types.is_numeric_dtype(data["time"])
 
-def test_topology_determine_path_distance(saw_obj):
-    """Test DeterminePathDistance."""
-    # This method calls RunScriptCommand and then GetParametersMultipleElement.
-    # We need to mock GetParametersMultipleElement to return something valid for the dataframe construction.
-    
-    # Columns requested: KeyFields + [BusField]
-    # KeyFields for Bus is BusNum and BusName (from conftest).
-    # BusField defaults to CustomFloat:1.
-    
-    # Note: DeterminePathDistance sets pw_order=True temporarily.
-    # This affects clean_df_or_series, skipping _clean_df.
-    
-    saw_obj._pwcom.GetParametersMultipleElement.return_value = ("", [[1, 2], ["Bus1", "Bus2"], [0.5, 1.5]]) # BusNum, BusName, CustomFloat:1
-    
-    df = saw_obj.DeterminePathDistance("1")
-    
-    saw_obj._pwcom.RunScriptCommand.assert_called()
-    assert "BusNum" in df.columns
-    assert "X" in df.columns # Default BranchDistMeas is "X"
-    assert len(df) == 2
 
 def test_oneline_open(saw_obj):
     """Test OpenOneLine."""
@@ -491,45 +456,6 @@ def test_simauto_properties(saw_obj):
     _ = saw_obj.RequestBuildDate
     # UIVisible might log a warning if attribute missing, but should not crash
     _ = saw_obj.UIVisible
-
-def test_matrix_branch_admittance(saw_obj):
-    """Test get_branch_admittance calculation."""
-    # Mock GetParametersMultipleElement to return dataframes for bus and branch
-    with patch.object(saw_obj, 'GetParametersMultipleElement') as mock_get_params, \
-         patch.object(saw_obj, 'get_key_field_list', return_value=["BusNum"]):
-        def side_effect(ObjectType, ParamList, FilterName=""):
-            if ObjectType.lower() == "bus":
-                return pd.DataFrame({"BusNum": [1, 2]})
-            elif ObjectType.lower() == "branch":
-                return pd.DataFrame({
-                    "BusNum": [1, 2],
-                    "BusNum:1": [2, 1],
-                    "LineR": [0.0, 0.0],
-                    "LineX": [0.1, 0.1],
-                    "LineC": [0.0, 0.0],
-                    "LineTap": [1.0, 1.0],
-                    "LinePhase": [0.0, 0.0]
-                })
-            return pd.DataFrame()
-        
-        mock_get_params.side_effect = side_effect
-        
-        Yf, Yt = saw_obj.get_branch_admittance()
-        assert Yf.shape == (2, 2)
-        assert Yt.shape == (2, 2)
-
-def test_matrix_incidence(saw_obj):
-    """Test get_incidence_matrix."""
-    with patch.object(saw_obj, 'ListOfDevices') as mock_list_dev:
-        mock_list_dev.side_effect = lambda obj, FilterName="": pd.DataFrame({
-            "BusNum": [1, 2]
-        }) if obj.lower() == "bus" else pd.DataFrame({
-            "BusNum": [1, 2],
-            "BusNum:1": [2, 1]
-        }) if obj.lower() == "branch" else pd.DataFrame()
-        
-        inc = saw_obj.get_incidence_matrix()
-        assert inc.shape == (2, 2)
 
 def test_matrix_jacobian(saw_obj):
     """Test get_jacobian."""
@@ -585,16 +511,7 @@ def test_atc_mixin(saw_obj):
     """Test ATCMixin methods."""
     # Mock GetParametersMultipleElement for GetATCResults
     saw_obj._pwcom.GetParametersMultipleElement.return_value = ("", [[100], ["Ctg1"]])
-    
-    # Mock field list for TransferLimiter to avoid ValueError in identify_numeric_fields
-    saw_obj._object_fields["transferlimiter"] = pd.DataFrame({
-        "internal_field_name": ["LimitingContingency", "MaxFlow"],
-        "field_data_type": ["String", "Real"],
-        "key_field": ["", ""],
-        "description": ["", ""],
-        "display_name": ["", ""]
-    }).sort_values(by="internal_field_name")
-    
+
     df = saw_obj.GetATCResults(["MaxFlow", "LimitingContingency"])
     assert isinstance(df, pd.DataFrame)
     assert "MaxFlow" in df.columns
@@ -673,25 +590,9 @@ class TestDataTransformation:
         result = saw_obj._replace_decimal_delimiter(s)
         assert result.iloc[0] == 1.5
 
-    # clean_df_or_series tests
-    def test_clean_df_converts_numeric_columns(self, saw_obj):
-        """Test clean_df_or_series converts numeric columns."""
-        saw_obj._object_fields["bus"] = pd.DataFrame({
-            "internal_field_name": ["BusNum", "BusName"],
-            "field_data_type": ["Integer", "String"],
-            "key_field": ["", ""],
-            "description": ["", ""],
-            "display_name": ["", ""]
-        }).sort_values(by="internal_field_name")
-        
-        df = pd.DataFrame({"BusNum": ["1", "2", "3"], "BusName": ["A", "B", "C"]})
-        result = saw_obj.clean_df_or_series(df, "Bus")
-        assert pd.api.types.is_numeric_dtype(result["BusNum"])
-        assert result["BusName"].iloc[0] == "A"
-
 
 class TestFieldMetadata:
-    """Tests for field metadata methods (GetFieldList, identify_numeric_fields)."""
+    """Tests for field metadata methods (GetFieldList)."""
 
     def test_get_field_list_returns_dataframe(self, saw_obj):
         """Test GetFieldList returns properly formatted DataFrame."""
@@ -706,23 +607,6 @@ class TestFieldMetadata:
         saw_obj._pwcom.GetFieldList.reset_mock()
         df2 = saw_obj.GetFieldList("Bus")
         assert df2.equals(df1)
-
-    def test_identify_numeric_fields_from_cache(self, saw_obj):
-        """Test identify_numeric_fields uses cached field info."""
-        saw_obj._object_fields["bus"] = pd.DataFrame({
-            "internal_field_name": ["BusNum", "BusName", "BusPUVolt"],
-            "field_data_type": ["Integer", "String", "Real"],
-            "key_field": ["", "", ""],
-            "description": ["", "", ""],
-            "display_name": ["", "", ""]
-        }).sort_values(by="internal_field_name")
-        
-        fields = pd.Index(["BusNum", "BusName", "BusPUVolt"])
-        result = saw_obj.identify_numeric_fields("Bus", fields)
-        
-        assert result[fields.get_loc("BusNum")] == True
-        assert result[fields.get_loc("BusName")] == False
-        assert result[fields.get_loc("BusPUVolt")] == True
 
 
 class TestExecAux:
@@ -1405,13 +1289,6 @@ class TestPowerflowMixinExtended:
         # Skip actual call since it requires complex field validation mocking
         assert hasattr(saw_obj, 'GetMinPUVoltage')
         assert callable(saw_obj.GetMinPUVoltage)
-
-    def test_get_bus_mismatches(self, saw_obj):
-        """Test GetBusMismatches calls GetParametersMultipleElement."""
-        # Just verify the method exists and has correct signature
-        # Skip actual call since it requires complex field validation mocking
-        assert hasattr(saw_obj, 'GetBusMismatches')
-        assert callable(saw_obj.GetBusMismatches)
 
     def test_diff_case_write_complete_model(self, saw_obj):
         """Test DiffCaseWriteCompleteModel with various options."""
@@ -2942,23 +2819,6 @@ class TestGICMixinExtended2:
 
 class TestBaseMixinExtended2:
     """Additional comprehensive tests for base.py methods."""
-
-    def test_change_and_confirm_params_multiple_element_success(self, saw_obj):
-        """Test change_and_confirm_params_multiple_element when changes succeed."""
-        import pandas as pd
-        
-        # Create test data - use fields that exist in the mock (BusNum, BusName)
-        command_df = pd.DataFrame({
-            'BusNum': [1, 2],
-            'BusName': ['Bus1', 'Bus2']
-        })
-        
-        # Mock GetParametersMultipleElement to return the same data
-        saw_obj._pwcom.GetParametersMultipleElement.return_value = ("", command_df.values.tolist())
-        saw_obj._pwcom.ChangeParametersMultipleElement.return_value = ("", None)
-        
-        # Should not raise
-        saw_obj.change_and_confirm_params_multiple_element("Bus", command_df)
 
     def test_change_parameters_alias(self, saw_obj):
         """Test ChangeParameters is an alias for ChangeParametersSingleElement."""

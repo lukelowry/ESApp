@@ -32,17 +32,7 @@ class TopologyMixin:
         pd.DataFrame
             DataFrame containing BusNum and the calculated distance.
         """
-        original = self.pw_order
-        self.pw_order = True
-        statement = f"DeterminePathDistance({start}, {BranchDistMeas}, {BranchFilter}, {BusField});"
-        self.RunScriptCommand(statement)
-        key = self.get_key_field_list("Bus")
-        df = self.GetParametersMultipleElement("Bus", key + [BusField])
-        df.rename(columns={BusField: BranchDistMeas}, inplace=True)
-        df["BusNum"] = df["BusNum"].astype(int)
-        df[BranchDistMeas] = df[BranchDistMeas].astype(float)
-        self.pw_order = original
-        return df
+        self.RunScriptCommand(f"DeterminePathDistance({start}, {BranchDistMeas}, {BranchFilter}, {BusField});")
 
     def DetermineBranchesThatCreateIslands(
         self, Filter: str = "ALL", StoreBuses: str = "YES", SetSelectedOnLines: str = "NO"

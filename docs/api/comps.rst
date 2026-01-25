@@ -1,8 +1,15 @@
 Objects & Fields
-========================
+================
 
-All objects and fields along with descriptions.
+The ``esapp.gobject`` module provides the base classes for defining grid component schemas.
 
-The fields are available through an IDE via type hinting, and are excluded due to the sheer quantity of classes and members.
+.. automodule:: esapp.gobject
 
-.. automodule:: esapp.grid
+.. rubric:: Classes
+
+.. autosummary::
+   :toctree: generated/
+   :template: class.rst
+
+   esapp.gobject.GObject
+   esapp.gobject.FieldPriority

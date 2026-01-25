@@ -18,119 +18,28 @@ API Documentation
 Mixin Modules
 --------------
 
-Power Flow
-~~~~~~~~~~
+.. autosummary::
+   :toctree: generated/
+   :template: module.rst
 
-.. automodule:: esapp.saw.powerflow
-   :members:
-
-Contingency Analysis
-~~~~~~~~~~~~~~~~~~~~~
-
-.. automodule:: esapp.saw.contingency
-   :members:
-
-Optimal Power Flow
-~~~~~~~~~~~~~~~~~~~
-
-.. automodule:: esapp.saw.opf
-   :members:
-
-Sensitivity Analysis
-~~~~~~~~~~~~~~~~~~~~~
-
-.. automodule:: esapp.saw.sensitivity
-   :members:
-
-Transient Stability
-~~~~~~~~~~~~~~~~~~~~
-
-.. automodule:: esapp.saw.transient
-   :members:
-
-GIC Analysis
-~~~~~~~~~~~~
-
-.. automodule:: esapp.saw.gic
-   :members:
-
-Available Transfer Capability
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. automodule:: esapp.saw.atc
-   :members:
-
-Network Topology
-~~~~~~~~~~~~~~~~
-
-.. automodule:: esapp.saw.topology
-   :members:
-
-Branch Operations
-~~~~~~~~~~~~~~~~~
-
-.. automodule:: esapp.saw.modify
-   :members:
-
-Case Management
-~~~~~~~~~~~~~~~
-
-.. automodule:: esapp.saw.case_actions
-   :members:
-
-Base Operations
-~~~~~~~~~~~~~~~
-
-.. automodule:: esapp.saw.base
-   :members:
-
-Voltage Analysis
-~~~~~~~~~~~~~~~~
-
-.. automodule:: esapp.saw.pv
-   :members:
-
-.. automodule:: esapp.saw.qv
-   :members:
-
-Matrix Operations
-~~~~~~~~~~~~~~~~~
-
-.. automodule:: esapp.saw.matrices
-   :members:
-
-One-Line Diagram
-~~~~~~~~~~~~~~~~
-
-.. automodule:: esapp.saw.oneline
-   :members:
-
-General Utilities
-~~~~~~~~~~~~~~~~~
-
-.. automodule:: esapp.saw.general
-   :members:
-
-Regional Analysis
-~~~~~~~~~~~~~~~~~
-
-.. automodule:: esapp.saw.regions
-   :members:
-
-Scheduled Operations
-~~~~~~~~~~~~~~~~~~~~
-
-.. automodule:: esapp.saw.scheduled
-   :members:
-
-Weather Effects
-~~~~~~~~~~~~~~~
-
-.. automodule:: esapp.saw.weather
-   :members:
-
-Time-Step Analysis
-~~~~~~~~~~~~~~~~~~~
-
-.. automodule:: esapp.saw.timestep
-   :members:
+   esapp.saw.atc
+   esapp.saw.base
+   esapp.saw.case_actions
+   esapp.saw.contingency
+   esapp.saw.fault
+   esapp.saw.general
+   esapp.saw.gic
+   esapp.saw.matrices
+   esapp.saw.modify
+   esapp.saw.oneline
+   esapp.saw.opf
+   esapp.saw.powerflow
+   esapp.saw.pv
+   esapp.saw.qv
+   esapp.saw.regions
+   esapp.saw.scheduled
+   esapp.saw.sensitivity
+   esapp.saw.timestep
+   esapp.saw.topology
+   esapp.saw.transient
+   esapp.saw.weather

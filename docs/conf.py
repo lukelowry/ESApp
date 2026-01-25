@@ -7,7 +7,7 @@ sys.path.insert(0, os.path.abspath(".."))
 
 extensions = [
     "sphinx.ext.autodoc",
-    "sphinx.ext.autosummary", # Re-enabled to allow automatic class listing
+    "sphinx.ext.autosummary",
     "sphinx.ext.viewcode",
     "sphinx.ext.todo",
     "sphinx.ext.mathjax",
@@ -19,9 +19,11 @@ extensions = [
     "nbsphinx",
 ]
 
-autosummary_generate = True  
+autosummary_generate = True
 
 autodoc_default_options = {
+    "members": True,
+    "undoc-members": True,
     "member-order": "groupwise",
 }
 
@@ -34,9 +36,9 @@ autodoc_typehints = "none"
 add_module_names = False
 
 intersphinx_mapping = {
-    "python": ("docs.python.org", None),
-    "numpy": ("numpy.org", None),
-    "scipy": ("docs.scipy.org", None),
+    "python": ("https://docs.python.org/3", None),
+    "numpy": ("https://numpy.org/doc/stable", None),
+    "scipy": ("https://docs.scipy.org/doc/scipy/reference", None),
 }
 
 napoleon_google_docstring = False
@@ -52,6 +54,11 @@ napoleon_type_aliases = {
     "pd.DataFrame": "~pandas.DataFrame",
     "optional": "typing.Optional",
     "union": "typing.Union",
+    "list": "list",
+    "dict": "dict",
+    "bool": "bool",
+    "int": "int",
+    "float": "float",
 }
 
 exclude_patterns = [

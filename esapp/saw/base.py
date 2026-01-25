@@ -31,12 +31,6 @@ locale.setlocale(locale.LC_ALL, "")
 
 logging.basicConfig(format="%(asctime)s [%(levelname)s] [%(name)s]: %(message)s", datefmt="%H:%M:%S", level=logging.INFO)
 
-# Listing of PowerWorld data types. I guess 'real' means float?
-DATA_TYPES = ["Integer", "Real", "String"]
-# Hard-code based on indices.
-NUMERIC_TYPES = DATA_TYPES[:2]
-
-
 # noinspection PyPep8Naming
 class SAWBase(object):
     """Base class for the SimAuto Wrapper, containing core COM functionality."""
@@ -173,7 +167,6 @@ class SAWBase(object):
 
         self.lodf = None
         self._object_fields = {}
-        self._object_key_fields = {}
 
     def change_and_confirm_params_multiple_element(self, ObjectType: str, command_df: pd.DataFrame) -> None:
         """Modifies parameters for multiple elements and verifies the change was successfully applied in PowerWorld.
@@ -201,29 +194,31 @@ class SAWBase(object):
             ObjectType=ObjectType, command_df=command_df
         )
         df = self.GetParametersMultipleElement(ObjectType=ObjectType, ParamList=cleaned_df.columns.tolist())
-        
+
+        # Get key field names from GetFieldList
+        field_list = self.GetFieldList(ObjectType=ObjectType, copy=False)
+        key_field_mask = field_list["key_field"].str.match(r"\*[0-9]+[A-Z]*\*").to_numpy()
+        key_field_names = field_list.loc[key_field_mask, "internal_field_name"].tolist()
+
         # Verify changes by merging on key fields and comparing values
-        kf = self.get_key_fields_for_object_type(ObjectType=ObjectType)
         merged = pd.merge(
             left=cleaned_df,
             right=df,
             how="inner",
-            on=kf["internal_field_name"].tolist(),
+            on=key_field_names,
             suffixes=("_in", "_out"),
             copy=False,
         )
-        
+
         cols_in = merged.columns[merged.columns.str.endswith("_in")]
         cols_out = merged.columns[merged.columns.str.endswith("_out")]
-        cols = cols_in.str.replace("_in", "")
-        numeric_cols = self.identify_numeric_fields(ObjectType=ObjectType, fields=cols)
-        str_cols = ~numeric_cols
-        
-        eq = np.allclose(
-            merged[cols_in[numeric_cols]].to_numpy(),
-            merged[cols_out[numeric_cols]].to_numpy(),
-        ) and np.array_equal(merged[cols_in[str_cols]].to_numpy(), merged[cols_out[str_cols]].to_numpy())
-        
+
+        # Simple string comparison (PowerWorld returns strings anyway)
+        eq = np.array_equal(
+            merged[cols_in].astype(str).to_numpy(),
+            merged[cols_out].astype(str).to_numpy()
+        )
+
         if not eq:
             m = (
                 "After calling ChangeParametersMultipleElement, not all parameters were actually changed "
@@ -231,64 +226,6 @@ class SAWBase(object):
                 "instead of GenRegPUVolt)."
             )
             raise CommandNotRespectedError(m)
-
-    def clean_df_or_series(
-        self, obj: Union[pd.DataFrame, pd.Series], ObjectType: str
-    ) -> Union[pd.DataFrame, pd.Series]:
-        """Standardizes data types and formatting for data retrieved from PowerWorld.
-
-        This internal helper converts numeric fields to appropriate Python numeric types
-        and strips whitespace from string fields, based on PowerWorld's field metadata.
-
-        Parameters
-        ----------
-        obj : Union[pandas.DataFrame, pandas.Series]
-            The DataFrame or Series object to clean.
-        ObjectType : str
-            The PowerWorld object type associated with the data (e.g., 'Bus', 'Gen').
-            Used to look up field metadata.
-
-        Returns
-        -------
-        Union[pandas.DataFrame, pandas.Series]
-            The cleaned object with proper numeric types and stripped strings.
-
-        Raises
-        ------
-        TypeError
-            If `obj` is not a pandas DataFrame or Series.
-        """
-        if isinstance(obj, pd.DataFrame):
-            df_flag = True
-            fields = obj.columns.to_numpy()
-        elif isinstance(obj, pd.Series):
-            df_flag = False
-            fields = obj.index.to_numpy()
-        else:
-            raise TypeError("The given object is not a DataFrame or Series!")
-
-        if not self.pw_order:
-            self._clean_df(ObjectType, fields, obj, df_flag)
-        return obj
-
-    def _clean_df(self, ObjectType, fields, obj, df_flag):
-        numeric = self.identify_numeric_fields(ObjectType=ObjectType, fields=fields)
-        numeric_fields = fields[numeric]
-        obj[numeric_fields] = self._to_numeric(obj[numeric_fields])
-
-        nn_cols = fields[~numeric]
-        obj[nn_cols] = obj[nn_cols].astype(str)
-        obj[nn_cols] = (
-            obj[nn_cols].apply(lambda x: x.str.strip()) if df_flag else obj[nn_cols].str.strip()
-        )
-
-        if df_flag:
-            try:
-                obj.sort_values(by="BusNum", axis=0, inplace=True)
-            except KeyError:
-                pass
-            else:
-                obj.index = np.arange(start=0, stop=obj.shape[0])
 
     def exit(self):
         """Closes the PowerWorld case, deletes temporary files, and releases the COM object.
@@ -302,78 +239,6 @@ class SAWBase(object):
         self._pwcom = None
         pythoncom.CoUninitialize()
         return None
-
-    def get_key_fields_for_object_type(self, ObjectType: str) -> pd.DataFrame:
-        """Retrieves metadata about the primary key fields for a specific PowerWorld object type.
-
-        This method identifies which fields uniquely identify an object of the given type
-        and caches this information for future use.
-
-        Parameters
-        ----------
-        ObjectType : str
-            The PowerWorld object type (e.g., 'Bus', 'Gen').
-
-        Returns
-        -------
-        pandas.DataFrame
-            A DataFrame containing key field names, their data types, descriptions,
-            and their 0-based index within the object's key field list.
-        """
-        obj_type = ObjectType.lower()
-        try:
-            return self._object_key_fields[obj_type]
-        except KeyError:
-            pass
-
-        field_list = self.GetFieldList(ObjectType=obj_type, copy=False)
-        key_field_mask = field_list["key_field"].str.match(r"\*[0-9]+[A-Z]*\*").to_numpy()
-        key_field_df = field_list.loc[key_field_mask].copy()
-        key_field_df["key_field"] = key_field_df["key_field"].str.replace(r"\*", "", regex=True)
-        key_field_df["key_field"] = key_field_df["key_field"].str.replace("[A-Z]*", "", regex=True)
-        
-        # Convert to numeric, handling locale if needed
-        key_field_series = key_field_df["key_field"]
-        if self.decimal_delimiter != ".":
-            try:
-                key_field_series = key_field_series.str.replace(self.decimal_delimiter, ".")
-            except AttributeError:
-                pass
-        key_field_df["key_field_index"] = pd.to_numeric(key_field_series, errors='coerce').fillna(key_field_df["key_field"]) - 1
-        key_field_df.drop("key_field", axis=1, inplace=True)
-        key_field_df.set_index(keys="key_field_index", drop=True, verify_integrity=True, inplace=True)
-        key_field_df.sort_index(axis=0, inplace=True)
-
-        assert np.array_equal(
-            key_field_df.index.to_numpy(),
-            np.arange(0, key_field_df.index.to_numpy()[-1] + 1),
-        )
-
-        self._object_key_fields[obj_type] = key_field_df
-        return key_field_df
-
-    def get_key_field_list(self, ObjectType: str) -> List[str]:
-        """Returns a list of internal field names that serve as primary keys for a given object type.
-
-        This is a convenience method that extracts just the field names from the
-        key field metadata.
-
-        Parameters
-        ----------
-        ObjectType : str
-            The PowerWorld object type (e.g., 'Bus', 'Gen').
-
-        Returns
-        -------
-        List[str]
-            A list of strings representing the internal field names that are primary keys.
-        """
-        obj_type = ObjectType.lower()
-        try:
-            key_field_df = self._object_key_fields[obj_type]
-        except KeyError:
-            key_field_df = self.get_key_fields_for_object_type(obj_type)
-        return key_field_df["internal_field_name"].tolist()
 
     def get_version_and_builddate(self) -> tuple:
         """Retrieves the PowerWorld Simulator version string and executable build date.
@@ -394,43 +259,6 @@ class SAWBase(object):
             convert_list_to_variant(["Version", "ExeBuildDate"]),
             convert_list_to_variant(["", ""]),
         )
-
-    def identify_numeric_fields(self, ObjectType: str, fields: Union[List, np.ndarray]) -> np.ndarray:
-        """Determines which of the given fields are numeric based on PowerWorld's metadata.
-
-        This method queries the field list for the specified object type to identify
-        fields classified as 'Integer' or 'Real'.
-
-        Parameters
-        ----------
-        ObjectType : str
-            The PowerWorld object type (e.g., 'Bus', 'Gen').
-        fields : Union[List[str], numpy.ndarray]
-            A list or NumPy array of internal field names to check.
-
-        Returns
-        -------
-        numpy.ndarray
-            A boolean NumPy array where True indicates a numeric field (Integer or Real)
-            at the corresponding position in the input `fields` list.
-
-        Raises
-        ------
-        ValueError
-            If any field name in `fields` is not recognized for the specified `ObjectType`.
-        """
-        field_list = self.GetFieldList(ObjectType=ObjectType, copy=False)
-        idx = field_list["internal_field_name"].to_numpy().searchsorted(fields)
-
-        try:
-            ifn = field_list["internal_field_name"].to_numpy()[idx]
-            if set(ifn) != set(fields):
-                raise ValueError("The given object has fields which do not match a PowerWorld internal field name!")
-        except IndexError as e:
-            raise ValueError("The given object has fields which do not match a PowerWorld internal field name!") from e
-
-        data_types = field_list["field_data_type"].to_numpy()[idx]
-        return np.isin(data_types, NUMERIC_TYPES)
 
     def set_simauto_property(self, property_name: str, property_value: Union[str, bool]):
         """Sets a property on the underlying SimAuto COM object.
@@ -775,18 +603,7 @@ class SAWBase(object):
             convert_list_to_variant(Values),
         )
 
-        s = pd.Series(output, index=ParamList)
-        
-        # Clean data if not using PowerWorld ordering
-        if not self.pw_order:
-            numeric = self.identify_numeric_fields(ObjectType=ObjectType, fields=s.index.to_numpy())
-            numeric_fields = s.index.to_numpy()[numeric]
-            for field in numeric_fields:
-                s[field] = pd.to_numeric(s[field], errors='coerce')
-            nn_fields = s.index.to_numpy()[~numeric]
-            s[nn_fields] = s[nn_fields].astype(str).str.strip()
-        
-        return s
+        return pd.Series(output, index=ParamList)
 
     def GetParametersMultipleElement(
         self, ObjectType: str, ParamList: list, FilterName: str = ""
@@ -826,25 +643,7 @@ class SAWBase(object):
         if output is None:
             return output
 
-        df = pd.DataFrame(np.array(output).transpose(), columns=ParamList)
-        
-        # Clean data if not using PowerWorld ordering
-        if not self.pw_order:
-            numeric = self.identify_numeric_fields(ObjectType=ObjectType, fields=df.columns.to_numpy())
-            numeric_fields = df.columns.to_numpy()[numeric]
-            # Convert numeric fields - use coerce to turn errors into NaN, then fillna for originals
-            for field in numeric_fields:
-                df[field] = pd.to_numeric(df[field], errors='coerce')
-            nn_fields = df.columns.to_numpy()[~numeric]
-            df[nn_fields] = df[nn_fields].astype(str).apply(lambda x: x.str.strip())
-            try:
-                df.sort_values(by="BusNum", axis=0, inplace=True)
-                df.reset_index(drop=True, inplace=True)
-            except (KeyError, TypeError):
-                # KeyError if BusNum doesn't exist, TypeError if can't sort mixed types
-                pass
-        
-        return df
+        return pd.DataFrame(np.array(output).transpose(), columns=ParamList)
 
     def GetParamsRectTyped(
         self, ObjectType: str, ParamList: list, FilterName: str = ""
@@ -1040,7 +839,22 @@ class SAWBase(object):
         PowerWorldError
             If the SimAuto call fails.
         """
-        kf = self.get_key_fields_for_object_type(ObjType)
+        # Get key field metadata to know column names
+        field_list = self.GetFieldList(ObjectType=ObjType, copy=False)
+        key_field_mask = field_list["key_field"].str.match(r"\*[0-9]+[A-Z]*\*").to_numpy()
+        key_field_df = field_list.loc[key_field_mask].copy()
+        key_field_df["key_field"] = key_field_df["key_field"].str.replace(r"\*", "", regex=True)
+        key_field_df["key_field"] = key_field_df["key_field"].str.replace("[A-Z]*", "", regex=True)
+        key_field_series = key_field_df["key_field"]
+        if self.decimal_delimiter != ".":
+            try:
+                key_field_series = key_field_series.str.replace(self.decimal_delimiter, ".")
+            except AttributeError:
+                pass
+        key_field_df["key_field_index"] = pd.to_numeric(key_field_series, errors='coerce').fillna(key_field_df["key_field"]) - 1
+        key_field_df.sort_values(by="key_field_index", inplace=True)
+        column_names = key_field_df["internal_field_name"].to_numpy()
+
         output = self._call_simauto("ListOfDevices", ObjType, FilterName)
 
         all_none = all(i is None for i in output)
@@ -1049,22 +863,8 @@ class SAWBase(object):
             return None
 
         df = pd.DataFrame(output).transpose()
-        df.columns = kf["internal_field_name"].to_numpy()
-        
-        # Clean data if not using PowerWorld ordering
-        if not self.pw_order:
-            numeric = self.identify_numeric_fields(ObjectType=ObjType, fields=df.columns.to_numpy())
-            numeric_fields = df.columns.to_numpy()[numeric]
-            for field in numeric_fields:
-                df[field] = pd.to_numeric(df[field], errors='coerce')
-            nn_fields = df.columns.to_numpy()[~numeric]
-            df[nn_fields] = df[nn_fields].astype(str).apply(lambda x: x.str.strip())
-            try:
-                df.sort_values(by="BusNum", axis=0, inplace=True)
-                df.reset_index(drop=True, inplace=True)
-            except (KeyError, TypeError):
-                pass
-        
+        df.columns = column_names
+
         return df
 
     def ListOfDevicesAsVariantStrings(self, ObjType: str, FilterName="") -> tuple:
@@ -1444,21 +1244,7 @@ class SAWBase(object):
             The cleaned DataFrame that was sent to PowerWorld.
         """
         cleaned_df = command_df.copy()
-        
-        # Clean data if not using PowerWorld ordering
-        if not self.pw_order:
-            numeric = self.identify_numeric_fields(ObjectType=ObjectType, fields=cleaned_df.columns.to_numpy())
-            numeric_fields = cleaned_df.columns.to_numpy()[numeric]
-            for field in numeric_fields:
-                cleaned_df[field] = pd.to_numeric(cleaned_df[field], errors='coerce')
-            nn_fields = cleaned_df.columns.to_numpy()[~numeric]
-            cleaned_df[nn_fields] = cleaned_df[nn_fields].astype(str).apply(lambda x: x.str.strip())
-            try:
-                cleaned_df.sort_values(by="BusNum", axis=0, inplace=True)
-                cleaned_df.reset_index(drop=True, inplace=True)
-            except (KeyError, TypeError):
-                pass
-        
+
         self.ChangeParametersMultipleElement(
             ObjectType=ObjectType,
             ParamList=cleaned_df.columns.tolist(),
