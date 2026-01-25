@@ -9,7 +9,6 @@ API members only.
 
 .. autosummary::
    :toctree: generated/
-   :template: module.rst
 
    esapp.apps.dynamics
    esapp.apps.gic
@@ -21,7 +20,6 @@ API members only.
 
 .. autosummary::
    :toctree: generated/
-   :template: class.rst
 
    esapp.apps.gic.GICModel
    esapp.apps.gic.GICFactory

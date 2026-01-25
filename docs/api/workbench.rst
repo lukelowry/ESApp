@@ -13,7 +13,6 @@ usage patterns, see :doc:`../guide/usage`. This page lists the full API surface.
 
 .. autosummary::
    :toctree: generated/
-   :template: method.rst
 
    ~GridWorkBench.areas
    ~GridWorkBench.auto_insert_contingencies

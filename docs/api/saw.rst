@@ -20,7 +20,6 @@ Mixin Modules
 
 .. autosummary::
    :toctree: generated/
-   :template: module.rst
 
    esapp.saw.atc
    esapp.saw.base

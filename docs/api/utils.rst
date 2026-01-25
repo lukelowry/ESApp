@@ -5,7 +5,6 @@ ESA++ includes a variety of utility modules for mathematical operations, geograp
 
 .. autosummary::
    :toctree: generated/
-   :template: module.rst
 
    esapp.utils.b3d
    esapp.utils.decorators
