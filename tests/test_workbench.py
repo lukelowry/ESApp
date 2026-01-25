@@ -91,9 +91,9 @@ class TestGridWorkBenchSimulation:
         workbench.esa.SolvePowerFlow.assert_called_once()
         assert result is None
 
-    def test_reset(self, workbench):
-        """Test reset method."""
-        workbench.reset()
+    def test_flatstart(self, workbench):
+        """Test flatstart method."""
+        workbench.flatstart()
         workbench.esa.ResetToFlatStart.assert_called_once()
 
     def test_save_with_filename(self, workbench):
@@ -121,9 +121,9 @@ class TestGridWorkBenchSimulation:
         workbench.close()
         workbench.esa.CloseCase.assert_called_once()
 
-    def test_mode(self, workbench):
-        """Test mode method."""
-        workbench.mode("EDIT")
+    def test_edit_mode(self, workbench):
+        """Test edit_mode method."""
+        workbench.edit_mode()
         workbench.esa.EnterMode.assert_called_once_with("EDIT")
 
 
@@ -389,9 +389,9 @@ class TestGridWorkBenchAdvancedMethods:
         args = workbench.esa.ChangeParametersSingleElement.call_args[0]
         assert "2" in args[2]
 
-    def test_mode_run(self, workbench):
-        """Test mode method with RUN."""
-        workbench.mode("RUN")
+    def test_run_mode(self, workbench):
+        """Test run_mode method."""
+        workbench.run_mode()
         workbench.esa.EnterMode.assert_called_with("RUN")
 
     def test_save_no_filename(self, workbench):

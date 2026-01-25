@@ -66,8 +66,8 @@ class TestGridWorkBenchFunctions:
     # -------------------------------------------------------------------------
 
     def test_simulation_control(self, wb, temp_file):
-        """Tests reset, pflow, save, log, command, mode."""
-        wb.reset()
+        """Tests flatstart, pflow, save, log, command, mode."""
+        wb.flatstart()
         
         # Power Flow
         res = wb.pflow(getvolts=True)
@@ -84,8 +84,8 @@ class TestGridWorkBenchFunctions:
         wb.command('LogAdd("Command Test");')
         
         # Modes
-        wb.mode("EDIT")
-        wb.mode("RUN")
+        wb.edit_mode()
+        wb.run_mode()
 
     def test_file_operations(self, wb, temp_file):
         """Tests load_aux, load_script."""
@@ -152,14 +152,15 @@ class TestGridWorkBenchFunctions:
         # Gen Ops
         gens = wb.generations()
         if not gens.empty:
-            # Fetch keys to be safe
-            g_keys = wb[Gen].iloc[0]
+            # Fetch keys (BusNum is PRIMARY, GenID is SECONDARY so must be requested explicitly)
+            g_keys = wb[Gen, ["BusNum", "GenID"]].iloc[0]
             wb.set_gen(g_keys['BusNum'], g_keys['GenID'], mw=10.0, status="Closed")
-            
+
         # Load Ops
         loads = wb.loads()
         if not loads.empty:
-            l_keys = wb[Load].iloc[0]
+            # Fetch keys (BusNum is PRIMARY, LoadID is SECONDARY so must be requested explicitly)
+            l_keys = wb[Load, ["BusNum", "LoadID"]].iloc[0]
             wb.set_load(l_keys['BusNum'], l_keys['LoadID'], mw=5.0, status="Closed")
             
         wb.scale_load(1.0)

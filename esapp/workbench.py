@@ -60,7 +60,7 @@ class GridWorkBench(Indexable):
         self.gic.set_esa(esa)
         self.modes.set_esa(esa)
 
-    def voltage(self, asComplex=True):
+    def voltage(self, asComplex=False):
         """
         The vector of voltages in PowerWorld.
 
@@ -120,15 +120,25 @@ class GridWorkBench(Indexable):
             return self.voltage()
 
 
-    def reset(self):
+    def flatstart(self):
         """
         Resets the case to a flat start (1.0 pu voltage, 0.0 angle).
 
         Examples
         --------
-        >>> wb.reset()
+        >>> wb.flatstart()
         """
         self.esa.ResetToFlatStart()
+
+    def reset(self):
+        """
+        Alias for flatstart(). Resets the case to a flat start (1.0 pu voltage, 0.0 angle).
+
+        Examples
+        --------
+        >>> wb.reset()
+        """
+        self.flatstart()
 
     def save(self, filename=None):
         """
@@ -190,20 +200,19 @@ class GridWorkBench(Indexable):
         """
         self.esa.CloseCase()
 
-    def mode(self, mode: str):
-        """
-        Enters RUN or EDIT mode.
+    def edit_mode(self):
+        '''
+        Description:
+            Enters PowerWorld into EDIT mode.
+        '''
+        self.esa.EnterMode("EDIT")
 
-        Parameters
-        ----------
-        mode : str
-            The mode to enter ('RUN' or 'EDIT').
-
-        Examples
-        --------
-        >>> wb.mode("EDIT")
-        """
-        self.esa.EnterMode(mode)
+    def run_mode(self):
+        '''
+        Description:
+            Enters PowerWorld into RUN mode.
+        '''
+        self.esa.EnterMode("RUN")
 
     # --- File Operations ---
 

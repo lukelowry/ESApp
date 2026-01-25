@@ -74,6 +74,50 @@ def test_gobject_keys_are_collected(test_gobject_class):
     expected_keys = ['id', 'duplicate_key']
     assert test_gobject_class.keys == expected_keys
 
+
+def test_gobject_editable_fields_are_collected(test_gobject_class):
+    """Tests that EDITABLE fields are collected in the .editable property."""
+    expected_editable = ['value']
+    assert test_gobject_class.editable == expected_editable
+
+
+def test_gobject_secondary_fields_are_collected(test_gobject_class):
+    """Tests that SECONDARY fields are collected in the .secondary property."""
+    # NAME is SECONDARY, DUPLICATE_KEY is both PRIMARY and SECONDARY
+    expected_secondary = ['name', 'duplicate_key']
+    assert test_gobject_class.secondary == expected_secondary
+
+
+def test_gobject_identifiers(test_gobject_class):
+    """Tests that identifiers returns primary + secondary keys."""
+    # id and duplicate_key are PRIMARY, name and duplicate_key are SECONDARY
+    expected_identifiers = {'id', 'name', 'duplicate_key'}
+    assert test_gobject_class.identifiers == expected_identifiers
+
+
+def test_gobject_settable_fields(test_gobject_class):
+    """Tests that settable returns identifiers (primary + secondary) + editable fields."""
+    # identifiers: id, name, duplicate_key; editable: value
+    expected_settable = {'id', 'name', 'duplicate_key', 'value'}
+    assert test_gobject_class.settable == expected_settable
+
+
+def test_gobject_is_editable(test_gobject_class):
+    """Tests is_editable() helper method."""
+    assert test_gobject_class.is_editable('value') is True
+    assert test_gobject_class.is_editable('id') is False
+    assert test_gobject_class.is_editable('name') is False
+    assert test_gobject_class.is_editable('nonexistent') is False
+
+
+def test_gobject_is_settable(test_gobject_class):
+    """Tests is_settable() helper method."""
+    assert test_gobject_class.is_settable('value') is True  # Editable
+    assert test_gobject_class.is_settable('id') is True  # Primary key
+    assert test_gobject_class.is_settable('duplicate_key') is True  # Primary + Secondary key
+    assert test_gobject_class.is_settable('name') is True  # Secondary key (identifier)
+    assert test_gobject_class.is_settable('nonexistent') is False
+
 @pytest.mark.parametrize("member, expected_value", [
     ("ID", (1, 'id', int, grid.FieldPriority.PRIMARY)),
     ("NAME", (2, 'name', str, grid.FieldPriority.SECONDARY | grid.FieldPriority.REQUIRED)),
@@ -116,10 +160,12 @@ def test_gobject_empty_object():
     """Tests GObject subclass with no fields."""
     class EmptyObject(grid.GObject):
         ObjectString = "EmptyObject"
-    
+
     assert EmptyObject.TYPE == "EmptyObject"
     assert EmptyObject.fields == []
     assert EmptyObject.keys == []
+    assert EmptyObject.editable == []
+    assert EmptyObject.settable == set()
 
 # --- Parametrized tests for all GObject subclasses in components.py ---
 
@@ -135,13 +181,24 @@ def test_real_gobject_subclass_is_well_formed(g_object_class: Type[grid.GObject]
     assert isinstance(g_object_class.fields, list)
     assert hasattr(g_object_class, '_KEYS'), f"{g_object_class.__name__} is missing _KEYS."
     assert isinstance(g_object_class.keys, list)
+    assert hasattr(g_object_class, '_EDITABLE'), f"{g_object_class.__name__} is missing _EDITABLE."
+    assert isinstance(g_object_class.editable, list)
     assert set(g_object_class.keys).issubset(set(g_object_class.fields)), \
         f"Not all keys in {g_object_class.__name__} are in its fields list."
+    assert set(g_object_class.editable).issubset(set(g_object_class.fields)), \
+        f"Not all editable fields in {g_object_class.__name__} are in its fields list."
+    assert set(g_object_class.secondary).issubset(set(g_object_class.fields)), \
+        f"Not all secondary fields in {g_object_class.__name__} are in its fields list."
 
-    # Check for duplicate keys (informational - not a hard failure)
-    if len(g_object_class.keys) != len(set(g_object_class.keys)):
-        # Duplicate keys occur when fields are marked as both PRIMARY and SECONDARY
-        pass
+    # Verify identifiers is the union of keys and secondary
+    expected_identifiers = set(g_object_class.keys) | set(g_object_class.secondary)
+    assert g_object_class.identifiers == expected_identifiers, \
+        f"Identifiers mismatch in {g_object_class.__name__}"
+
+    # Verify settable is the union of identifiers and editable
+    expected_settable = expected_identifiers | set(g_object_class.editable)
+    assert g_object_class.settable == expected_settable, \
+        f"Settable mismatch in {g_object_class.__name__}"
 
 
 @pytest.mark.parametrize("g_object_class", get_all_gobject_subclasses())
@@ -157,26 +214,31 @@ def test_gobject_field_types(g_object_class: Type[grid.GObject]):
                 f"{g_object_class.__name__}.{member.name} has invalid type: {field_type}"
 
 
-@pytest.mark.parametrize("g_object_class", get_all_gobject_subclasses())
-def test_gobject_has_docstrings(g_object_class: Type[grid.GObject]):
+def test_documentation_coverage_summary():
     """
-    Tests that GObject subclasses have field docstrings where available.
-    This helps ensure generated code includes documentation.
+    Reports overall field documentation coverage across all GObject subclasses.
+    This is an informational test that doesn't fail - it summarizes docstring coverage.
     """
-    # Skip if no members (empty object)
-    if not list(g_object_class):
-        pytest.skip(f"{g_object_class.__name__} has no fields")
-    
-    # Check if at least one field has a docstring
-    has_docs = False
-    for member in g_object_class:
-        if member.__doc__ and member.__doc__.strip():
-            has_docs = True
-            break
-    
-    # This is informational - not all objects may have docs
-    if not has_docs:
-        pytest.skip(f"{g_object_class.__name__} has no field docstrings")
+    all_classes = get_all_gobject_subclasses()
+    documented = 0
+    undocumented = []
+
+    for cls in all_classes:
+        members = list(cls)
+        if not members:
+            continue
+        if any(m.__doc__ and m.__doc__.strip() for m in members):
+            documented += 1
+        else:
+            undocumented.append(cls.__name__)
+
+    total = len(all_classes)
+    coverage = documented / total if total > 0 else 0
+
+    # Print summary (visible with pytest -v or pytest -s)
+    print(f"\n{'='*60}")
+    print(f"GObject Documentation Coverage: {coverage:.1%} ({documented}/{total} components)")
+    print(f"{'='*60}")
 
 
 @pytest.mark.parametrize("g_object_class", get_all_gobject_subclasses())

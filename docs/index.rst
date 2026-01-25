@@ -9,7 +9,7 @@ ESA++ Documentation
 What is ESA++?
 ==============
 
-**ESA++** (Electric Systems Analysis Plus Plus) is a comprehensive Python toolkit for power systems analysis built on top of PowerWorld Simulator. It provides an intuitive, Pythonic interface to PowerWorld's automation capabilities, enabling researchers, engineers, and analysts to conduct power flow analysis, contingency studies, optimization, and other grid operations programmatically.
+**ESA++** (Easy SimAuto Plus Plus) is a comprehensive Python toolkit for power systems analysis built on top of PowerWorld Simulator. It provides an intuitive, Pythonic interface to PowerWorld's automation capabilities, enabling researchers, engineers, and analysts to conduct power flow analysis, contingency studies, optimization, and other grid operations programmatically.
 
 Key Features
 ~~~~~~~~~~~~
@@ -20,7 +20,7 @@ Simple Data Access
     Use NumPy-style indexing (e.g., ``wb[Bus, "BusPUVolt"]``) to read and write power system data
 High Coverage
     Full access to PowerWorld's SimAuto API via the SAW class with high reliability.
-Prandas Integration
+Pandas Integration
     All data retrievals return Pandas DataFrames or Series for easy analysis and manipulation
 
 .. important::
@@ -47,10 +47,3 @@ Prandas Integration
 
    dev/components 
    dev/tests
-
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`

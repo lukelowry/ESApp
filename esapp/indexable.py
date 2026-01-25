@@ -1,4 +1,4 @@
-from .saw import SAW
+from .saw import SAW, PowerWorldPrerequisiteError
 from .gobject import GObject
 from .utils import timing
 from typing import Type, Optional
@@ -31,7 +31,7 @@ class Indexable:
         esa : SAW
             An initialized SAW instance.
         """
-        self.esa = esa
+        self.esa: SAW = esa
 
     @timing
     def open(self):
@@ -169,10 +169,36 @@ class Indexable:
         df : pandas.DataFrame
             The DataFrame containing object data. Columns must match PowerWorld
             field names, including primary keys.
+
+        Raises
+        ------
+        TypeError
+            If value is not a DataFrame.
+        ValueError
+            If any column is not settable (keys or editable fields).
         """
         if not isinstance(df, DataFrame):
             raise TypeError("A DataFrame is required for bulk updates.")
-        self.esa.ChangeParametersMultipleElementRect(gtype.TYPE, df.columns.tolist(), df)
+
+        # Validate that all columns are settable (keys or editable)
+        non_settable = [c for c in df.columns if not gtype.is_settable(c)]
+        if non_settable:
+            raise ValueError(
+                f"Cannot set read-only field(s) on {gtype.TYPE}: {non_settable}"
+            )
+
+        try:
+            self.esa.ChangeParametersMultipleElementRect(gtype.TYPE, df.columns.tolist(), df)
+        except PowerWorldPrerequisiteError as e:
+            # If objects not found, check if missing identifiers could be the cause
+            if "not found" in str(e).lower():
+                missing_identifiers = gtype.identifiers - set(df.columns)
+                if missing_identifiers:
+                    raise ValueError(
+                        f"Missing required identifier field(s) for {gtype.TYPE}: {missing_identifiers}. "
+                        f"All identifiers (primary and secondary keys) must be included to create new objects."
+                    ) from e
+            raise
 
     def _broadcast_update_to_fields(self, gtype: Type[GObject], fields: list[str], value):
         """Modifies specific fields for existing objects by broadcasting a value.
@@ -192,8 +218,15 @@ class Indexable:
         Raises
         ------
         ValueError
-            If value length doesn't match field length for keyless objects.
+            If value length doesn't match field length for keyless objects,
+            or if any specified field is not editable (excluding key fields).
         """
+        # Validate all fields are settable (keys or editable)
+        non_settable = [f for f in fields if not gtype.is_settable(f)]
+        if non_settable:
+            raise ValueError(
+                f"Cannot set read-only field(s) on {gtype.TYPE}: {non_settable}"
+            )
         # For objects without keys (e.g., Sim_Solution_Options), we construct
         # the change DataFrame directly without reading from PowerWorld first.
         if not gtype.keys:

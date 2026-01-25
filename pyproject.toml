@@ -51,8 +51,8 @@ dependencies = [
     "pandas",
     "numpy<2.0",
     "scipy",
-    "pywin32; sys_platform == 'win32'"
-    "geopandas"
+    "pywin32; sys_platform == 'win32'",
+    "geopandas",
     "matplotlib" 
 ]
 

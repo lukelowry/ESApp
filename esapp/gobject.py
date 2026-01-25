@@ -58,11 +58,15 @@ class GObject(Enum):
     # Called when each field of a subclass is parsed by python
     def __new__(cls, *args):
         """Dynamically construct Enum members to build a class-level schema."""
-        # Initialize _FIELDS and _KEYS lists if they don't exist on the class itself
+        # Initialize _FIELDS, _KEYS, _SECONDARY, and _EDITABLE lists if they don't exist on the class itself
         if '_FIELDS' not in cls.__dict__:
             cls._FIELDS = []
         if '_KEYS' not in cls.__dict__:
             cls._KEYS = []
+        if '_SECONDARY' not in cls.__dict__:
+            cls._SECONDARY = []
+        if '_EDITABLE' not in cls.__dict__:
+            cls._EDITABLE = []
         
         # The object type string name is the only argument for this member
         if len(args) == 1:
@@ -86,10 +90,18 @@ class GObject(Enum):
 
             # Add to appropriate Lists
             cls._FIELDS.append(field_name_str)
-            
+
             # A field is a key if it's PRIMARY.
             if field_priority & FieldPriority.PRIMARY == FieldPriority.PRIMARY:
                 cls._KEYS.append(field_name_str)
+
+            # A field is a secondary identifier if it's SECONDARY.
+            if field_priority & FieldPriority.SECONDARY == FieldPriority.SECONDARY:
+                cls._SECONDARY.append(field_name_str)
+
+            # A field is editable if it has the EDITABLE flag.
+            if field_priority & FieldPriority.EDITABLE == FieldPriority.EDITABLE:
+                cls._EDITABLE.append(field_name_str)
 
             return obj
     
@@ -116,7 +128,40 @@ class GObject(Enum):
     @property
     def fields(cls):
         return getattr(cls, '_FIELDS', [])
-    
+
+    @classmethod
+    @property
+    def secondary(cls):
+        """Secondary identifier fields (used with primary keys to identify records)."""
+        return getattr(cls, '_SECONDARY', [])
+
+    @classmethod
+    @property
+    def editable(cls):
+        return getattr(cls, '_EDITABLE', [])
+
+    @classmethod
+    @property
+    def identifiers(cls):
+        """All identifier fields: primary keys + secondary keys."""
+        return set(getattr(cls, '_KEYS', [])) | set(getattr(cls, '_SECONDARY', []))
+
+    @classmethod
+    @property
+    def settable(cls):
+        """Fields that can be set: identifiers (primary + secondary keys) + editable fields."""
+        return cls.identifiers | set(getattr(cls, '_EDITABLE', []))
+
+    @classmethod
+    def is_editable(cls, field_name: str) -> bool:
+        """Check if a field is user-modifiable."""
+        return field_name in getattr(cls, '_EDITABLE', [])
+
+    @classmethod
+    def is_settable(cls, field_name: str) -> bool:
+        """Check if a field can be set (either a key or editable)."""
+        return field_name in cls.settable
+
     @classmethod
     @property
     def TYPE(cls):
