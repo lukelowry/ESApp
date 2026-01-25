@@ -186,7 +186,7 @@ class Network(Indexable):
 
         # Assume XFMR 10 meter long
         else:
-            ell.loc[ell==0] = 0.1
+            ell.loc[ell==0] = 0.01
 
         return ell
     
