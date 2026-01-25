@@ -101,3 +101,12 @@ autodoc_mock_imports = [
     "fiona",
     "pyproj",
 ]
+
+latex_elements = {
+    "preamble": r"""
+\usepackage{mathrsfs}
+\usepackage{breakurl}
+\usepackage{xltxtra}
+\sloppy
+""",
+}
