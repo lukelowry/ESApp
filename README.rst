@@ -13,8 +13,8 @@ ESA++
    :target: https://esapp.readthedocs.io/
    :alt: Documentation
 
-.. image:: https://img.shields.io/badge/coverage-92%25-brightgreen.svg
-   :alt: Coverage 92%
+.. image:: https://img.shields.io/badge/coverage-90%25-brightgreen.svg
+   :alt: Coverage 90%
 
 An open-source Python toolkit for power system automation, providing a high-performance "syntax-sugar" fork of Easy SimAuto (ESA). This library streamlines interaction with PowerWorld's Simulator Automation Server (SimAuto), transforming complex COM calls into intuitive, Pythonic operations.
 

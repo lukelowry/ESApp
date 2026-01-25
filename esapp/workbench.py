@@ -1365,3 +1365,16 @@ class GridWorkBench(Indexable):
         """
         yn = "YES" if setup_on_load else "NO"
         self.esa.RunScriptCommand(f"GICLoad3DEfield({file_type}, {filename}, {yn})")
+
+
+    def _set_option(self, key, enable): 
+        self[Sim_Solution_Options, key] = 'YES' if enable else 'NO'
+
+    def set_do_one_iteration(self, enable=True): self._set_option('DoOneIteration', enable)
+    def set_max_iterations(self, val=250): wb[Sim_Solution_Options, 'MaxItr'] = val
+    def set_disable_angle_rotation(self, enable=True): self._set_option('DisableAngleRotation', enable)
+    def set_disable_opt_mult(self, enable=True): self._set_option('DisableOptMult', enable)
+    def enable_inner_ss_check(self, enable=True): self._set_option('SSContPFInnerLoop', enable)
+    def disable_gen_mvr_check(self, enable=True): self._set_option('DisableGenMVRCheck', enable)
+    def enable_inner_check_gen_vars(self, enable=True): self._set_option('ChkVars', enable)
+    def enable_inner_backoff_gen_vars(self, enable=True): self._set_option('ChkVars:1', enable)
