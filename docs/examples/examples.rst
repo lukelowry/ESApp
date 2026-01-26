@@ -15,4 +15,3 @@ This section provides a gallery of examples for common use cases of ESA++.
    07_network_expansion.ipynb
    08_scopf_analysis.ipynb
    09_atc_analysis.ipynb
-   10_transient_stability_cct.ipynb

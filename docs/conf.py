@@ -106,7 +106,9 @@ latex_elements = {
     "preamble": r"""
 \usepackage{mathrsfs}
 \usepackage{breakurl}
-\usepackage{xltxtra}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{multirow}
 \sloppy
 """,
 }
