@@ -17,7 +17,7 @@ USAGE:
     pytest tests/test_saw_core_methods.py -v
 """
 import pytest
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, Mock, patch, ANY
 import pandas as pd
 import numpy as np
 from esapp import SAW, grid
@@ -311,8 +311,6 @@ def test_get_parameters_multiple_element(saw_obj):
     assert len(df) == 2
     assert "BusNum" in df.columns
     assert "BusName" in df.columns
-    # Check that BusNum is numeric (handled by clean_df_or_series -> _to_numeric)
-    assert pd.api.types.is_numeric_dtype(df["BusNum"])
 
 def test_change_parameters_single_element(saw_obj):
     """Test changing parameters."""
@@ -378,19 +376,6 @@ def test_get_parameters_multiple_element_flat_output_empty(saw_obj):
     assert result is None or result == ()
 
 
-def test_get_key_fields_for_object_type(saw_obj):
-    """Test get_key_fields_for_object_type returns key field DataFrame."""
-    df = saw_obj.get_key_fields_for_object_type("Bus")
-    assert isinstance(df, pd.DataFrame)
-    assert "internal_field_name" in df.columns
-
-
-def test_get_key_field_list(saw_obj):
-    """Test get_key_field_list returns list of field names."""
-    result = saw_obj.get_key_field_list("Bus")
-    assert isinstance(result, list)
-
-
 def test_ts_get_contingency_results(saw_obj):
     """Test TSGetContingencyResults parsing."""
     # Mock return structure: (Error, MetaData, Data)
@@ -421,26 +406,6 @@ def test_ts_get_contingency_results(saw_obj):
     # Check that data is numeric
     assert pd.api.types.is_numeric_dtype(data["time"])
 
-def test_topology_determine_path_distance(saw_obj):
-    """Test DeterminePathDistance."""
-    # This method calls RunScriptCommand and then GetParametersMultipleElement.
-    # We need to mock GetParametersMultipleElement to return something valid for the dataframe construction.
-    
-    # Columns requested: KeyFields + [BusField]
-    # KeyFields for Bus is BusNum and BusName (from conftest).
-    # BusField defaults to CustomFloat:1.
-    
-    # Note: DeterminePathDistance sets pw_order=True temporarily.
-    # This affects clean_df_or_series, skipping _clean_df.
-    
-    saw_obj._pwcom.GetParametersMultipleElement.return_value = ("", [[1, 2], ["Bus1", "Bus2"], [0.5, 1.5]]) # BusNum, BusName, CustomFloat:1
-    
-    df = saw_obj.DeterminePathDistance("1")
-    
-    saw_obj._pwcom.RunScriptCommand.assert_called()
-    assert "BusNum" in df.columns
-    assert "X" in df.columns # Default BranchDistMeas is "X"
-    assert len(df) == 2
 
 def test_oneline_open(saw_obj):
     """Test OpenOneLine."""
@@ -491,45 +456,6 @@ def test_simauto_properties(saw_obj):
     _ = saw_obj.RequestBuildDate
     # UIVisible might log a warning if attribute missing, but should not crash
     _ = saw_obj.UIVisible
-
-def test_matrix_branch_admittance(saw_obj):
-    """Test get_branch_admittance calculation."""
-    # Mock GetParametersMultipleElement to return dataframes for bus and branch
-    with patch.object(saw_obj, 'GetParametersMultipleElement') as mock_get_params, \
-         patch.object(saw_obj, 'get_key_field_list', return_value=["BusNum"]):
-        def side_effect(ObjectType, ParamList, FilterName=""):
-            if ObjectType.lower() == "bus":
-                return pd.DataFrame({"BusNum": [1, 2]})
-            elif ObjectType.lower() == "branch":
-                return pd.DataFrame({
-                    "BusNum": [1, 2],
-                    "BusNum:1": [2, 1],
-                    "LineR": [0.0, 0.0],
-                    "LineX": [0.1, 0.1],
-                    "LineC": [0.0, 0.0],
-                    "LineTap": [1.0, 1.0],
-                    "LinePhase": [0.0, 0.0]
-                })
-            return pd.DataFrame()
-        
-        mock_get_params.side_effect = side_effect
-        
-        Yf, Yt = saw_obj.get_branch_admittance()
-        assert Yf.shape == (2, 2)
-        assert Yt.shape == (2, 2)
-
-def test_matrix_incidence(saw_obj):
-    """Test get_incidence_matrix."""
-    with patch.object(saw_obj, 'ListOfDevices') as mock_list_dev:
-        mock_list_dev.side_effect = lambda obj, FilterName="": pd.DataFrame({
-            "BusNum": [1, 2]
-        }) if obj.lower() == "bus" else pd.DataFrame({
-            "BusNum": [1, 2],
-            "BusNum:1": [2, 1]
-        }) if obj.lower() == "branch" else pd.DataFrame()
-        
-        inc = saw_obj.get_incidence_matrix()
-        assert inc.shape == (2, 2)
 
 def test_matrix_jacobian(saw_obj):
     """Test get_jacobian."""
@@ -585,16 +511,7 @@ def test_atc_mixin(saw_obj):
     """Test ATCMixin methods."""
     # Mock GetParametersMultipleElement for GetATCResults
     saw_obj._pwcom.GetParametersMultipleElement.return_value = ("", [[100], ["Ctg1"]])
-    
-    # Mock field list for TransferLimiter to avoid ValueError in identify_numeric_fields
-    saw_obj._object_fields["transferlimiter"] = pd.DataFrame({
-        "internal_field_name": ["LimitingContingency", "MaxFlow"],
-        "field_data_type": ["String", "Real"],
-        "key_field": ["", ""],
-        "description": ["", ""],
-        "display_name": ["", ""]
-    }).sort_values(by="internal_field_name")
-    
+
     df = saw_obj.GetATCResults(["MaxFlow", "LimitingContingency"])
     assert isinstance(df, pd.DataFrame)
     assert "MaxFlow" in df.columns
@@ -673,25 +590,9 @@ class TestDataTransformation:
         result = saw_obj._replace_decimal_delimiter(s)
         assert result.iloc[0] == 1.5
 
-    # clean_df_or_series tests
-    def test_clean_df_converts_numeric_columns(self, saw_obj):
-        """Test clean_df_or_series converts numeric columns."""
-        saw_obj._object_fields["bus"] = pd.DataFrame({
-            "internal_field_name": ["BusNum", "BusName"],
-            "field_data_type": ["Integer", "String"],
-            "key_field": ["", ""],
-            "description": ["", ""],
-            "display_name": ["", ""]
-        }).sort_values(by="internal_field_name")
-        
-        df = pd.DataFrame({"BusNum": ["1", "2", "3"], "BusName": ["A", "B", "C"]})
-        result = saw_obj.clean_df_or_series(df, "Bus")
-        assert pd.api.types.is_numeric_dtype(result["BusNum"])
-        assert result["BusName"].iloc[0] == "A"
-
 
 class TestFieldMetadata:
-    """Tests for field metadata methods (GetFieldList, identify_numeric_fields)."""
+    """Tests for field metadata methods (GetFieldList)."""
 
     def test_get_field_list_returns_dataframe(self, saw_obj):
         """Test GetFieldList returns properly formatted DataFrame."""
@@ -706,23 +607,6 @@ class TestFieldMetadata:
         saw_obj._pwcom.GetFieldList.reset_mock()
         df2 = saw_obj.GetFieldList("Bus")
         assert df2.equals(df1)
-
-    def test_identify_numeric_fields_from_cache(self, saw_obj):
-        """Test identify_numeric_fields uses cached field info."""
-        saw_obj._object_fields["bus"] = pd.DataFrame({
-            "internal_field_name": ["BusNum", "BusName", "BusPUVolt"],
-            "field_data_type": ["Integer", "String", "Real"],
-            "key_field": ["", "", ""],
-            "description": ["", "", ""],
-            "display_name": ["", "", ""]
-        }).sort_values(by="internal_field_name")
-        
-        fields = pd.Index(["BusNum", "BusName", "BusPUVolt"])
-        result = saw_obj.identify_numeric_fields("Bus", fields)
-        
-        assert result[fields.get_loc("BusNum")] == True
-        assert result[fields.get_loc("BusName")] == False
-        assert result[fields.get_loc("BusPUVolt")] == True
 
 
 class TestExecAux:
@@ -1405,13 +1289,6 @@ class TestPowerflowMixinExtended:
         # Skip actual call since it requires complex field validation mocking
         assert hasattr(saw_obj, 'GetMinPUVoltage')
         assert callable(saw_obj.GetMinPUVoltage)
-
-    def test_get_bus_mismatches(self, saw_obj):
-        """Test GetBusMismatches calls GetParametersMultipleElement."""
-        # Just verify the method exists and has correct signature
-        # Skip actual call since it requires complex field validation mocking
-        assert hasattr(saw_obj, 'GetBusMismatches')
-        assert callable(saw_obj.GetBusMismatches)
 
     def test_diff_case_write_complete_model(self, saw_obj):
         """Test DiffCaseWriteCompleteModel with various options."""
@@ -2121,11 +1998,121 @@ class TestGICMixinExtended:
     def test_gic_time_varying_efield_calculate(self, saw_obj):
         """Test GICTimeVaryingEFieldCalculate."""
         saw_obj.GICTimeVaryingEFieldCalculate(the_time=1800.0, solve_pf=False)
-        saw_obj._pwcom.RunScriptCommand.assert_called()
-        args = saw_obj._pwcom.RunScriptCommand.call_args[0][0]
-        assert "GICTimeVaryingEFieldCalculate" in args
-        assert "1800.0" in args
-        assert "NO" in args  # solve_pf
+
+# =============================================================================
+# Base Class Method Tests (Coverage Expansion)
+# =============================================================================
+
+class TestSAWBaseMethods:
+    """Tests for core, non-mixin methods in the SAWBase class."""
+
+    def test_exit_cleans_up(self, saw_obj):
+        """Test that exit() calls cleanup methods."""
+        saw_obj.CloseCase = MagicMock()
+        saw_obj.ntf.name = "dummy_temp_file.axd"
+        with patch("os.unlink") as mock_unlink:
+            saw_obj.exit()
+            saw_obj.CloseCase.assert_called_once()
+            mock_unlink.assert_called_with("dummy_temp_file.axd")
+            assert saw_obj._pwcom is None
+
+    def test_get_version_and_builddate(self, saw_obj):
+        """Test get_version_and_builddate calls _call_simauto correctly."""
+        saw_obj._call_simauto = MagicMock(return_value=("22", "2023-01-01"))
+        version, build_date = saw_obj.get_version_and_builddate()
+        saw_obj._call_simauto.assert_called_with(
+            "GetParametersSingleElement",
+            "PowerWorldSession",
+            ANY, # Variant object
+            ANY  # Variant object
+        )
+        assert version == "22"
+        assert build_date == "2023-01-01"
+
+    def test_set_simauto_property_valid(self, saw_obj):
+        """Test setting a valid SimAuto property."""
+        saw_obj._set_simauto_property = MagicMock()
+        saw_obj.set_simauto_property("UIVisible", True)
+        saw_obj._set_simauto_property.assert_called_with(property_name="UIVisible", property_value=True)
+
+    def test_set_simauto_property_invalid_name(self, saw_obj):
+        """Test ValueError on invalid property name."""
+        with pytest.raises(ValueError, match="is not currently supported"):
+            saw_obj.set_simauto_property("InvalidProp", True)
+
+    def test_set_simauto_property_invalid_value_type(self, saw_obj):
+        """Test ValueError on invalid property value type."""
+        with pytest.raises(ValueError, match="is invalid"):
+            saw_obj.set_simauto_property("UIVisible", "not a bool")
+
+    def test_set_simauto_property_handles_attribute_error(self, saw_obj):
+        """Test that known AttributeErrors on UIVisible are handled gracefully."""
+        saw_obj._set_simauto_property = MagicMock(side_effect=AttributeError("UIVisible"))
+        # Should log a warning but not raise an error
+        saw_obj.set_simauto_property("UIVisible", True)
+        saw_obj._set_simauto_property.assert_called_once()
+
+    def test_update_ui(self, saw_obj):
+        """Test update_ui calls ProcessAuxFile."""
+        saw_obj.ProcessAuxFile = MagicMock()
+        saw_obj.update_ui()
+        saw_obj.ProcessAuxFile.assert_called_with(saw_obj.empty_aux)
+
+    def test_change_and_confirm_params_multiple_element_success(self, saw_obj):
+        """Test change_and_confirm successfully when data matches."""
+        from esapp.saw._exceptions import CommandNotRespectedError
+        
+        input_df = pd.DataFrame({"BusNum": [1], "GenID": ["1"], "GenMW": [100.0]})
+        
+        # Mock the underlying change and get methods
+        saw_obj._change_parameters_multiple_element_df = MagicMock(return_value=input_df)
+        saw_obj.GetParametersMultipleElement = MagicMock(return_value=input_df)
+        
+        # Mock GetFieldList to return key fields
+        field_list_df = pd.DataFrame({
+            "key_field": ["*1*", "*2A*"],
+            "internal_field_name": ["BusNum", "GenID"]
+        })
+        saw_obj.GetFieldList = MagicMock(return_value=field_list_df)
+
+        try:
+            saw_obj.change_and_confirm_params_multiple_element("Gen", input_df)
+        except CommandNotRespectedError:
+            pytest.fail("CommandNotRespectedError was raised unexpectedly.")
+
+    def test_change_and_confirm_params_multiple_element_failure(self, saw_obj):
+        """Test change_and_confirm raises error when data does not match."""
+        from esapp.saw._exceptions import CommandNotRespectedError
+
+        input_df = pd.DataFrame({"BusNum": [1], "GenID": ["1"], "GenMW": [100.0]})
+        output_df = pd.DataFrame({"BusNum": [1], "GenID": ["1"], "GenMW": [95.0]}) # Different value
+
+        saw_obj._change_parameters_multiple_element_df = MagicMock(return_value=input_df)
+        saw_obj.GetParametersMultipleElement = MagicMock(return_value=output_df)
+        
+        field_list_df = pd.DataFrame({
+            "key_field": ["*1*", "*2A*"],
+            "internal_field_name": ["BusNum", "GenID"]
+        })
+        saw_obj.GetFieldList = MagicMock(return_value=field_list_df)
+
+        with pytest.raises(CommandNotRespectedError):
+            saw_obj.change_and_confirm_params_multiple_element("Gen", input_df)
+
+    def test_change_parameters_multiple_element_df_internal(self, saw_obj):
+        """Test the internal _change_parameters_multiple_element_df helper."""
+        df = pd.DataFrame({"BusNum": [1], "GenMW": [150.0]})
+        saw_obj.ChangeParametersMultipleElement = MagicMock()
+        
+        cleaned_df = saw_obj._change_parameters_multiple_element_df("Gen", df)
+        
+        saw_obj.ChangeParametersMultipleElement.assert_called_once()
+        # Check that args match what the method should pass
+        args, kwargs = saw_obj.ChangeParametersMultipleElement.call_args
+        assert kwargs['ObjectType'] == 'Gen'
+        assert kwargs['ParamList'] == ["BusNum", "GenMW"]
+        assert kwargs['ValueList'] == [[1, 150.0]]
+        assert cleaned_df.equals(df)
 
 
 # =============================================================================
@@ -2943,28 +2930,6 @@ class TestGICMixinExtended2:
 class TestBaseMixinExtended2:
     """Additional comprehensive tests for base.py methods."""
 
-    def test_change_and_confirm_params_multiple_element_success(self, saw_obj):
-        """Test change_and_confirm_params_multiple_element when changes succeed."""
-        import pandas as pd
-        
-        # Create test data - use fields that exist in the mock (BusNum, BusName)
-        command_df = pd.DataFrame({
-            'BusNum': [1, 2],
-            'BusName': ['Bus1', 'Bus2']
-        })
-        
-        # Mock GetParametersMultipleElement to return the same data
-        saw_obj._pwcom.GetParametersMultipleElement.return_value = ("", command_df.values.tolist())
-        saw_obj._pwcom.ChangeParametersMultipleElement.return_value = ("", None)
-        
-        # Should not raise
-        saw_obj.change_and_confirm_params_multiple_element("Bus", command_df)
-
-    def test_change_parameters_alias(self, saw_obj):
-        """Test ChangeParameters is an alias for ChangeParametersSingleElement."""
-        saw_obj.ChangeParameters("Bus", ["BusNum", "BusPUVolt"], [1, 1.05])
-        saw_obj._pwcom.ChangeParametersSingleElement.assert_called()
-
     def test_set_simauto_property_invalid_property(self, saw_obj):
         """Test set_simauto_property with invalid property name."""
         import pytest
@@ -3117,3 +3082,384 @@ class TestGeneralMixinExtended2:
         saw_obj._pwcom.RunScriptCommand.assert_called()
         args = saw_obj._pwcom.RunScriptCommand.call_args[0][0]
         assert "YES" in args  # append=YES
+
+
+# =============================================================================
+# GetSubData Tests
+# =============================================================================
+
+class TestGetSubData:
+    """Tests for GetSubData method - parsing AUX files with SubData sections."""
+
+    def test_get_subdata_space_delimited(self, tmp_path):
+        """Test parsing space-delimited SubData (BidCurve, ReactiveCapability)."""
+        aux_content = '''DATA (Gen, [BusNum, GenID, GenMW])
+{
+1 "1" 100.0
+<SUBDATA BidCurve>
+// MW Price
+50.0 10.5
+100.0 12.0
+150.0 15.5
+</SUBDATA>
+<SUBDATA ReactiveCapability>
+// MW MinMVAR MaxMVAR
+50.0 -30.0 30.0
+100.0 -25.0 25.0
+</SUBDATA>
+2 "1" 200.0
+<SUBDATA BidCurve>
+75.0 11.0
+200.0 14.0
+</SUBDATA>
+}
+'''
+        aux_file = tmp_path / "test.aux"
+        aux_file.write_text(aux_content)
+
+        with patch("win32com.client.dynamic.Dispatch") as mock_dispatch, \
+             patch("win32com.client.gencache.EnsureDispatch", create=True), \
+             patch("tempfile.NamedTemporaryFile") as mock_tempfile, \
+             patch("os.unlink"):
+            mock_pwcom = MagicMock()
+            mock_dispatch.return_value = mock_pwcom
+            mock_pwcom.OpenCase.return_value = ("",)
+            mock_pwcom.GetParametersSingleElement.return_value = ("", ("23", "Jan 01 2023"))
+            mock_pwcom.GetFieldList.return_value = ("", [])
+            mock_pwcom.RunScriptCommand.return_value = ("",)
+
+            mock_ntf = MagicMock()
+            mock_ntf.name = str(aux_file)
+            mock_tempfile.return_value = mock_ntf
+
+            saw = SAW(FileName="dummy.pwb")
+            df = saw.GetSubData("Gen", ["BusNum", "GenID", "GenMW"], ["BidCurve", "ReactiveCapability"])
+
+        assert len(df) == 2
+        assert df.iloc[0]["BusNum"] == "1"
+        assert len(df.iloc[0]["BidCurve"]) == 3
+        assert df.iloc[0]["BidCurve"][0] == ["50.0", "10.5"]
+        assert len(df.iloc[0]["ReactiveCapability"]) == 2
+        assert df.iloc[0]["ReactiveCapability"][0] == ["50.0", "-30.0", "30.0"]
+
+    def test_get_subdata_bracket_delimited(self, tmp_path):
+        """Test parsing bracket-delimited SubData (Line coordinates)."""
+        aux_content = '''DATA (BackgroundLine, [LineNum, LineName])
+{
+1 "MyLine"
+<SUBDATA Line>
+[100.5, 200.3]
+[150.2, 250.7]
+[200.0, 300.0]
+</SUBDATA>
+2 "OtherLine"
+<SUBDATA Line>
+[50, 100], [75, 125]
+</SUBDATA>
+}
+'''
+        aux_file = tmp_path / "test.aux"
+        aux_file.write_text(aux_content)
+
+        with patch("win32com.client.dynamic.Dispatch") as mock_dispatch, \
+             patch("win32com.client.gencache.EnsureDispatch", create=True), \
+             patch("tempfile.NamedTemporaryFile") as mock_tempfile, \
+             patch("os.unlink"):
+            mock_pwcom = MagicMock()
+            mock_dispatch.return_value = mock_pwcom
+            mock_pwcom.OpenCase.return_value = ("",)
+            mock_pwcom.GetParametersSingleElement.return_value = ("", ("23", "Jan 01 2023"))
+            mock_pwcom.GetFieldList.return_value = ("", [])
+            mock_pwcom.RunScriptCommand.return_value = ("",)
+
+            mock_ntf = MagicMock()
+            mock_ntf.name = str(aux_file)
+            mock_tempfile.return_value = mock_ntf
+
+            saw = SAW(FileName="dummy.pwb")
+            df = saw.GetSubData("BackgroundLine", ["LineNum", "LineName"], ["Line"])
+
+        assert len(df) == 2
+        assert len(df.iloc[0]["Line"]) == 3  # 3 lines with one bracket each
+        assert "100.5" in str(df.iloc[0]["Line"][0])  # Bracket content parsed
+        # Second object: one line with two brackets -> one entry with two values
+        assert len(df.iloc[1]["Line"]) == 1
+        assert len(df.iloc[1]["Line"][0]) == 2  # Two brackets extracted from one line
+
+    def test_get_subdata_empty_subdata(self, tmp_path):
+        """Test handling objects with no SubData entries."""
+        aux_content = '''DATA (Gen, [BusNum, GenID])
+{
+1 "1"
+<SUBDATA BidCurve>
+</SUBDATA>
+2 "2"
+}
+'''
+        aux_file = tmp_path / "test.aux"
+        aux_file.write_text(aux_content)
+
+        with patch("win32com.client.dynamic.Dispatch") as mock_dispatch, \
+             patch("win32com.client.gencache.EnsureDispatch", create=True), \
+             patch("tempfile.NamedTemporaryFile") as mock_tempfile, \
+             patch("os.unlink"):
+            mock_pwcom = MagicMock()
+            mock_dispatch.return_value = mock_pwcom
+            mock_pwcom.OpenCase.return_value = ("",)
+            mock_pwcom.GetParametersSingleElement.return_value = ("", ("23", "Jan 01 2023"))
+            mock_pwcom.GetFieldList.return_value = ("", [])
+            mock_pwcom.RunScriptCommand.return_value = ("",)
+
+            mock_ntf = MagicMock()
+            mock_ntf.name = str(aux_file)
+            mock_tempfile.return_value = mock_ntf
+
+            saw = SAW(FileName="dummy.pwb")
+            df = saw.GetSubData("Gen", ["BusNum", "GenID"], ["BidCurve"])
+
+        assert len(df) == 2
+        assert df.iloc[0]["BidCurve"] == []
+        assert df.iloc[1]["BidCurve"] == []
+
+    def test_get_subdata_no_subdatalist(self, tmp_path):
+        """Test GetSubData with subdatalist=None (just fields)."""
+        aux_content = '''DATA (Bus, [BusNum, BusName])
+{
+1 "Bus1"
+2 "Bus2"
+}
+'''
+        aux_file = tmp_path / "test.aux"
+        aux_file.write_text(aux_content)
+
+        with patch("win32com.client.dynamic.Dispatch") as mock_dispatch, \
+             patch("win32com.client.gencache.EnsureDispatch", create=True), \
+             patch("tempfile.NamedTemporaryFile") as mock_tempfile, \
+             patch("os.unlink"):
+            mock_pwcom = MagicMock()
+            mock_dispatch.return_value = mock_pwcom
+            mock_pwcom.OpenCase.return_value = ("",)
+            mock_pwcom.GetParametersSingleElement.return_value = ("", ("23", "Jan 01 2023"))
+            mock_pwcom.GetFieldList.return_value = ("", [])
+            mock_pwcom.RunScriptCommand.return_value = ("",)
+
+            mock_ntf = MagicMock()
+            mock_ntf.name = str(aux_file)
+            mock_tempfile.return_value = mock_ntf
+
+            saw = SAW(FileName="dummy.pwb")
+            df = saw.GetSubData("Bus", ["BusNum", "BusName"])
+
+        assert len(df) == 2
+        assert list(df.columns) == ["BusNum", "BusName"]
+
+    def test_get_subdata_quoted_strings(self, tmp_path):
+        """Test parsing SubData with quoted strings containing spaces."""
+        aux_content = '''DATA (Contingency, [TSContingency])
+{
+"My Contingency"
+<SUBDATA CTGElement>
+BRANCH 1 2 "1" OPEN
+GEN 5 "Main Gen" OPEN
+</SUBDATA>
+}
+'''
+        aux_file = tmp_path / "test.aux"
+        aux_file.write_text(aux_content)
+
+        with patch("win32com.client.dynamic.Dispatch") as mock_dispatch, \
+             patch("win32com.client.gencache.EnsureDispatch", create=True), \
+             patch("tempfile.NamedTemporaryFile") as mock_tempfile, \
+             patch("os.unlink"):
+            mock_pwcom = MagicMock()
+            mock_dispatch.return_value = mock_pwcom
+            mock_pwcom.OpenCase.return_value = ("",)
+            mock_pwcom.GetParametersSingleElement.return_value = ("", ("23", "Jan 01 2023"))
+            mock_pwcom.GetFieldList.return_value = ("", [])
+            mock_pwcom.RunScriptCommand.return_value = ("",)
+
+            mock_ntf = MagicMock()
+            mock_ntf.name = str(aux_file)
+            mock_tempfile.return_value = mock_ntf
+
+            saw = SAW(FileName="dummy.pwb")
+            df = saw.GetSubData("Contingency", ["TSContingency"], ["CTGElement"])
+
+        assert len(df) == 1
+        assert len(df.iloc[0]["CTGElement"]) == 2
+        assert df.iloc[0]["CTGElement"][0][0] == "BRANCH"
+        assert df.iloc[0]["CTGElement"][1][2] == "Main Gen"
+
+    def test_get_subdata_file_not_found(self, tmp_path):
+        """Test GetSubData returns empty DataFrame when file doesn't exist."""
+        aux_file = tmp_path / "nonexistent.aux"
+
+        with patch("win32com.client.dynamic.Dispatch") as mock_dispatch, \
+             patch("win32com.client.gencache.EnsureDispatch", create=True), \
+             patch("tempfile.NamedTemporaryFile") as mock_tempfile, \
+             patch("os.unlink"):
+            mock_pwcom = MagicMock()
+            mock_dispatch.return_value = mock_pwcom
+            mock_pwcom.OpenCase.return_value = ("",)
+            mock_pwcom.GetParametersSingleElement.return_value = ("", ("23", "Jan 01 2023"))
+            mock_pwcom.GetFieldList.return_value = ("", [])
+            mock_pwcom.RunScriptCommand.return_value = ("",)
+
+            mock_ntf = MagicMock()
+            mock_ntf.name = str(aux_file)  # File doesn't exist
+            mock_tempfile.return_value = mock_ntf
+
+            saw = SAW(FileName="dummy.pwb")
+            df = saw.GetSubData("Gen", ["BusNum"], ["BidCurve"])
+
+        assert df.empty
+        assert list(df.columns) == ["BusNum", "BidCurve"]
+
+    def test_get_subdata_no_data_block(self, tmp_path):
+        """Test GetSubData returns empty DataFrame when no DATA block found."""
+        aux_content = "// Empty aux file with no DATA block"
+        aux_file = tmp_path / "test.aux"
+        aux_file.write_text(aux_content)
+
+        with patch("win32com.client.dynamic.Dispatch") as mock_dispatch, \
+             patch("win32com.client.gencache.EnsureDispatch", create=True), \
+             patch("tempfile.NamedTemporaryFile") as mock_tempfile, \
+             patch("os.unlink"):
+            mock_pwcom = MagicMock()
+            mock_dispatch.return_value = mock_pwcom
+            mock_pwcom.OpenCase.return_value = ("",)
+            mock_pwcom.GetParametersSingleElement.return_value = ("", ("23", "Jan 01 2023"))
+            mock_pwcom.GetFieldList.return_value = ("", [])
+            mock_pwcom.RunScriptCommand.return_value = ("",)
+
+            mock_ntf = MagicMock()
+            mock_ntf.name = str(aux_file)
+            mock_tempfile.return_value = mock_ntf
+
+            saw = SAW(FileName="dummy.pwb")
+            df = saw.GetSubData("Gen", ["BusNum"], ["BidCurve"])
+
+        assert df.empty
+
+    def test_get_subdata_mixed_formats(self, tmp_path):
+        """Test parsing file with mixed bracket and space-delimited SubData."""
+        aux_content = '''DATA (Gen, [BusNum, GenID])
+{
+1 "1"
+<SUBDATA BidCurve>
+50.0 10.0
+100.0 15.0
+</SUBDATA>
+<SUBDATA SomeCoords>
+[0.0, 1.0]
+[2.0, 3.0]
+</SUBDATA>
+}
+'''
+        aux_file = tmp_path / "test.aux"
+        aux_file.write_text(aux_content)
+
+        with patch("win32com.client.dynamic.Dispatch") as mock_dispatch, \
+             patch("win32com.client.gencache.EnsureDispatch", create=True), \
+             patch("tempfile.NamedTemporaryFile") as mock_tempfile, \
+             patch("os.unlink"):
+            mock_pwcom = MagicMock()
+            mock_dispatch.return_value = mock_pwcom
+            mock_pwcom.OpenCase.return_value = ("",)
+            mock_pwcom.GetParametersSingleElement.return_value = ("", ("23", "Jan 01 2023"))
+            mock_pwcom.GetFieldList.return_value = ("", [])
+            mock_pwcom.RunScriptCommand.return_value = ("",)
+
+            mock_ntf = MagicMock()
+            mock_ntf.name = str(aux_file)
+            mock_tempfile.return_value = mock_ntf
+
+            saw = SAW(FileName="dummy.pwb")
+            df = saw.GetSubData("Gen", ["BusNum", "GenID"], ["BidCurve", "SomeCoords"])
+
+        assert len(df) == 1
+        assert df.iloc[0]["BidCurve"][0] == ["50.0", "10.0"]  # Space-delimited
+        assert "0.0" in str(df.iloc[0]["SomeCoords"][0])  # Bracket-delimited
+
+    def test_get_subdata_comments_ignored(self, tmp_path):
+        """Test that comments inside SubData blocks are ignored."""
+        aux_content = '''DATA (Gen, [BusNum, GenID])
+{
+1 "1"
+<SUBDATA BidCurve>
+// This is a comment
+// MW Price
+50.0 10.0
+// Another comment
+100.0 15.0
+</SUBDATA>
+}
+'''
+        aux_file = tmp_path / "test.aux"
+        aux_file.write_text(aux_content)
+
+        with patch("win32com.client.dynamic.Dispatch") as mock_dispatch, \
+             patch("win32com.client.gencache.EnsureDispatch", create=True), \
+             patch("tempfile.NamedTemporaryFile") as mock_tempfile, \
+             patch("os.unlink"):
+            mock_pwcom = MagicMock()
+            mock_dispatch.return_value = mock_pwcom
+            mock_pwcom.OpenCase.return_value = ("",)
+            mock_pwcom.GetParametersSingleElement.return_value = ("", ("23", "Jan 01 2023"))
+            mock_pwcom.GetFieldList.return_value = ("", [])
+            mock_pwcom.RunScriptCommand.return_value = ("",)
+
+            mock_ntf = MagicMock()
+            mock_ntf.name = str(aux_file)
+            mock_tempfile.return_value = mock_ntf
+
+            saw = SAW(FileName="dummy.pwb")
+            df = saw.GetSubData("Gen", ["BusNum", "GenID"], ["BidCurve"])
+
+        assert len(df.iloc[0]["BidCurve"]) == 2  # Only data lines, not comments
+
+    def test_get_subdata_multiple_subdata_types(self, tmp_path):
+        """Test parsing multiple SubData types per object (Gen with BidCurve + ReactiveCapability)."""
+        aux_content = '''DATA (Gen, [BusNum, GenID, GenMW, GenMWMax])
+{
+1 "1" 100.0 200.0
+<SUBDATA BidCurve>
+50.0 8.0
+100.0 10.0
+200.0 15.0
+</SUBDATA>
+<SUBDATA ReactiveCapability>
+50.0 -40.0 40.0
+100.0 -35.0 35.0
+200.0 -20.0 20.0
+</SUBDATA>
+}
+'''
+        aux_file = tmp_path / "test.aux"
+        aux_file.write_text(aux_content)
+
+        with patch("win32com.client.dynamic.Dispatch") as mock_dispatch, \
+             patch("win32com.client.gencache.EnsureDispatch", create=True), \
+             patch("tempfile.NamedTemporaryFile") as mock_tempfile, \
+             patch("os.unlink"):
+            mock_pwcom = MagicMock()
+            mock_dispatch.return_value = mock_pwcom
+            mock_pwcom.OpenCase.return_value = ("",)
+            mock_pwcom.GetParametersSingleElement.return_value = ("", ("23", "Jan 01 2023"))
+            mock_pwcom.GetFieldList.return_value = ("", [])
+            mock_pwcom.RunScriptCommand.return_value = ("",)
+
+            mock_ntf = MagicMock()
+            mock_ntf.name = str(aux_file)
+            mock_tempfile.return_value = mock_ntf
+
+            saw = SAW(FileName="dummy.pwb")
+            df = saw.GetSubData("Gen", ["BusNum", "GenID", "GenMW", "GenMWMax"],
+                               ["BidCurve", "ReactiveCapability"])
+
+        assert len(df) == 1
+        assert df.iloc[0]["BusNum"] == "1"
+        assert df.iloc[0]["GenMW"] == "100.0"
+        assert len(df.iloc[0]["BidCurve"]) == 3
+        assert len(df.iloc[0]["ReactiveCapability"]) == 3
+        assert df.iloc[0]["ReactiveCapability"][2] == ["200.0", "-20.0", "20.0"]

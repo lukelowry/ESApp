@@ -74,90 +74,6 @@ class MatrixMixin:
         )
         return sparse_matrix.toarray() if full else sparse_matrix
 
-    def get_branch_admittance(self):
-        """Calculate the branch admittance matrices, Yf and Yt.
-
-        These matrices describe the relationship between branch currents and bus voltages.
-        `Yf` relates the current flowing *from* the 'from' bus of a branch to the 'to' bus,
-        and `Yt` relates the current flowing *from* the 'to' bus of a branch to the 'from' bus.
-        This method calculates them based on branch parameters retrieved from the current case.
-
-        Returns
-        -------
-        Tuple[scipy.sparse.csr_matrix, scipy.sparse.csr_matrix]
-            A tuple containing two SciPy CSR sparse matrices: (Yf, Yt).
-
-        Raises
-        ------
-        PowerWorldError
-            If data retrieval from SimAuto fails.
-        ValueError
-            If bus numbers cannot be mapped to matrix indices.
-        """
-        key = self.get_key_field_list("bus")
-        df = self.GetParametersMultipleElement("bus", key)
-
-        branch = self.GetParametersMultipleElement(
-            "branch",
-            self.get_key_field_list("branch") + ["LineR", "LineX", "LineC", "LineTap", "LinePhase"],
-        )
-        branch["LineR"] = branch["LineR"].astype(float)
-        branch["LineX"] = branch["LineX"].astype(float)
-        branch["LineC"] = branch["LineC"].astype(float)
-        branch["LineTap"] = branch["LineTap"].astype(float)
-        branch["LinePhase"] = branch["LinePhase"].astype(float)
-
-        nb = df.shape[0]
-        nl = branch.shape[0]
-
-        Ys = 1 / (branch["LineR"].to_numpy() + 1j * branch["LineX"].to_numpy())
-        Bc = branch["LineC"].to_numpy()
-        tap = branch["LineTap"].to_numpy() * np.exp(1j * np.pi / 180 * branch["LinePhase"].to_numpy())
-        Ytt = Ys + 1j * Bc / 2
-        Yff = Ytt / (tap * np.conj(tap))
-        Yft = -Ys / np.conj(tap)
-        Ytf = -Ys / tap
-
-        def loop_translate(a, d):
-            n = np.ndarray(a.shape, dtype=int)
-            for k, v in d.items():
-                n[a == k] = v
-            return n
-
-        d = {value: index for index, value in df["BusNum"].items()}
-        f = loop_translate(branch["BusNum"].to_numpy(dtype=int).reshape(-1), d)
-        t = loop_translate(branch["BusNum:1"].to_numpy(dtype=int).reshape(-1), d)
-
-        i = np.r_[range(nl), range(nl)]
-        Yf = csr_matrix((np.hstack([Yff.reshape(-1), Yft.reshape(-1)]), (i, np.hstack([f, t]))), (nl, nb))
-        Yt = csr_matrix((np.hstack([Ytf.reshape(-1), Ytt.reshape(-1)]), (i, np.hstack([f, t]))), (nl, nb))
-        return Yf, Yt
-
-    def get_shunt_admittance(self):
-        """Calculate the shunt admittance vector, Ysh.
-
-        This vector represents the equivalent admittance to ground for each bus,
-        derived from fixed bus shunts and constant impedance loads.
-
-        Returns
-        -------
-        numpy.ndarray
-            A NumPy array (complex-valued) representing the shunt admittance for each bus.
-            The order of elements corresponds to the bus order in `self.ListOfDevices("bus")`.
-
-        Raises
-        ------
-        PowerWorldError
-            If data retrieval from SimAuto fails.
-        """
-        base = self.GetParametersMultipleElement("Sim_Solution_Options", ["SBase"]).to_numpy(float).ravel()
-        key = self.get_key_field_list("bus")
-        df = self.GetParametersMultipleElement("bus", key + ["BusSS", "BusSSMW"])
-        df["BusSS"] = df["BusSS"].astype(float)
-        df["BusSSMW"] = df["BusSSMW"].astype(float)
-        df.fillna(0, inplace=True)
-        return (df["BusSSMW"].to_numpy() + 1j * df["BusSS"].to_numpy()) / base
-
     def get_gmatrix(self, full: bool = False) -> Union[np.ndarray, csr_matrix]:
         """Get the GIC conductance matrix (G).
 
@@ -233,32 +149,6 @@ class MatrixMixin:
         finally:
             os.unlink(jac_file_path)
             os.unlink(id_file_path)
-
-    def get_incidence_matrix(self):
-        """Calculate the bus-branch incidence matrix.
-
-        The incidence matrix (A) describes the topology of the network.
-        For a system with `N` buses and `L` branches, it is an `L x N` matrix
-        where `A[i, j] = 1` if branch `i` starts at bus `j`, `-1` if branch `i`
-        ends at bus `j`, and `0` otherwise.
-
-        Returns
-        -------
-        numpy.ndarray
-            A NumPy array representing the incidence matrix.
-
-        Raises
-        ------
-        PowerWorldError
-            If data retrieval from SimAuto fails.
-        """
-        branch = self.ListOfDevices("branch")
-        bus = self.ListOfDevices("bus")
-        incidence = np.zeros([branch.shape[0], bus.shape[0]], dtype=int)
-        for i, row in branch.iterrows():
-            incidence[i, row["BusNum"] - 1] = 1
-            incidence[i, row["BusNum:1"] - 1] = -1
-        return incidence
 
     def _make_temp_matrix_files(self):
         """Internal helper to create temporary files for matrix export.

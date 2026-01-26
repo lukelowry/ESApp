@@ -23,21 +23,45 @@ def get_shapeobj(shape='Texas'):
     return shapeobj
 
 def scatter_map(values, long, lat, shape='Texas', ax:Axes=None, title='Texas Contour', usecbar=True, interp=300, cmap='plasma', norm=None, highlight=None, hlMarker='go', radians=False, method='nearest', extrap=(0,0,0,0)):
-    '''Plot Spatial data with a country or state border
-    
-    '
-    cmap:
-        Good Cmaps: Rocket, Twilight
+    """Plot Spatial data with a country or state border.
 
-    interpolator:
-        - 'linear' or 'nearest'
-
-    shape:
-        - 'Texas'
-        - 'US'
-    extrap:
-        (xleft, xright, ydown, yup) percents to extend
-    '''
+    Parameters
+    ----------
+    values : array_like
+        The values to plot.
+    long : array_like
+        The longitude values.
+    lat : array_like
+        The latitude values.
+    shape : str, optional
+        The shape to use for the border, by default 'Texas'.
+        Can be 'Texas' or 'US'.
+    ax : Axes, optional
+        The matplotlib axes to plot on, by default None.
+    title : str, optional
+        The title of the plot, by default 'Texas Contour'.
+    usecbar : bool, optional
+        Whether to use a colorbar, by default True.
+    interp : int, optional
+        The interpolation resolution, by default 300.
+    cmap : str, optional
+        The colormap to use, by default 'plasma'.
+        Good cmaps include 'Rocket' and 'Twilight'.
+    norm : Normalize, optional
+        The normalization for the colormap, by default None.
+    highlight : int, optional
+        The index of a point to highlight, by default None.
+    hlMarker : str, optional
+        The marker for the highlighted point, by default 'go'.
+    radians : bool, optional
+        Whether the values are in radians, by default False.
+    method : str, optional
+        The interpolation method, by default 'nearest'.
+        Can be 'linear', 'nearest', or 'cl'.
+    extrap : tuple, optional
+        The percentage to extend the plot in each direction
+        (xleft, xright, ydown, yup), by default (0,0,0,0).
+    """
 
     cmap = mpl.colormaps[cmap] 
 

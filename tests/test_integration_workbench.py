@@ -66,8 +66,8 @@ class TestGridWorkBenchFunctions:
     # -------------------------------------------------------------------------
 
     def test_simulation_control(self, wb, temp_file):
-        """Tests reset, pflow, save, log, command, mode."""
-        wb.reset()
+        """Tests flatstart, pflow, save, log, command, mode."""
+        wb.flatstart()
         
         # Power Flow
         res = wb.pflow(getvolts=True)
@@ -84,8 +84,8 @@ class TestGridWorkBenchFunctions:
         wb.command('LogAdd("Command Test");')
         
         # Modes
-        wb.mode("EDIT")
-        wb.mode("RUN")
+        wb.edit_mode()
+        wb.run_mode()
 
     def test_file_operations(self, wb, temp_file):
         """Tests load_aux, load_script."""
@@ -104,19 +104,29 @@ class TestGridWorkBenchFunctions:
     # -------------------------------------------------------------------------
 
     def test_voltage_retrieval(self, wb):
-        """Tests voltage() and voltages()."""
-        # voltage()
+        """Tests voltage()."""
+        # Test default call (complex, pu)
         v = wb.voltage()
         assert len(v) > 0
-        v_complex = wb.voltage(asComplex=True)
-        # v_complex is a Series, check values
+        assert np.iscomplexobj(v.values)
+
+        # Test complex=True explicitly
+        v_complex = wb.voltage(complex=True)
         assert np.iscomplexobj(v_complex.values)
-        v_mag, v_ang = wb.voltage(asComplex=False)
+
+        # Test complex=False
+        v_mag, v_ang = wb.voltage(complex=False)
+        assert len(v_mag) > 0
         assert len(v_mag) == len(v_ang)
 
-        # voltages()
-        v2 = wb.voltages(pu=True, complex=True)
-        assert len(v2) > 0
+        # Test pu=False
+        v_kv = wb.voltage(pu=False)
+        assert len(v_kv) > 0
+        
+        # Test pu=False and complex=False
+        v_kv_mag, v_kv_ang = wb.voltage(pu=False, complex=False)
+        assert len(v_kv_mag) > 0
+        assert len(v_kv_mag) == len(v_kv_ang)
 
     def test_component_retrieval(self, wb):
         """Tests generations, loads, shunts, lines, transformers, areas, zones."""
@@ -128,9 +138,6 @@ class TestGridWorkBenchFunctions:
         assert not wb.lines().empty
         assert not wb.areas().empty
         assert not wb.zones().empty
-        
-        fields = wb.get_fields("Bus")
-        assert not fields.empty
 
     # -------------------------------------------------------------------------
     # Modification
@@ -139,7 +146,7 @@ class TestGridWorkBenchFunctions:
     def test_modification(self, wb):
         """Tests set_voltages, branch ops, gen/load ops, create/delete/select."""
         # Set Voltages
-        v = wb.voltages(pu=True, complex=True)
+        v = wb.voltage(complex=True, pu=True)
         wb.set_voltages(v)
         
         # Branch Ops
@@ -152,14 +159,15 @@ class TestGridWorkBenchFunctions:
         # Gen Ops
         gens = wb.generations()
         if not gens.empty:
-            # Fetch keys to be safe
-            g_keys = wb[Gen].iloc[0]
+            # Fetch keys (BusNum is PRIMARY, GenID is SECONDARY so must be requested explicitly)
+            g_keys = wb[Gen, ["BusNum", "GenID"]].iloc[0]
             wb.set_gen(g_keys['BusNum'], g_keys['GenID'], mw=10.0, status="Closed")
-            
+
         # Load Ops
         loads = wb.loads()
         if not loads.empty:
-            l_keys = wb[Load].iloc[0]
+            # Fetch keys (BusNum is PRIMARY, LoadID is SECONDARY so must be requested explicitly)
+            l_keys = wb[Load, ["BusNum", "LoadID"]].iloc[0]
             wb.set_load(l_keys['BusNum'], l_keys['LoadID'], mw=5.0, status="Closed")
             
         wb.scale_load(1.0)
@@ -184,9 +192,6 @@ class TestGridWorkBenchFunctions:
         
         wb.radial_paths()
         
-        dist = wb.path_distance(create_object_string("Bus", 1))
-        assert dist is not None
-        
         wb.select("Branch", "BusNum = 1")
         wb.network_cut(create_object_string("Bus", 1), branch_filter="SELECTED")
 
@@ -209,8 +214,9 @@ class TestGridWorkBenchFunctions:
         assert isinstance(viols, pd.DataFrame)
         
         # Mismatches
-        mis = wb.mismatches()
-        assert not mis.empty
+        mp, mq = wb.mismatch()
+        assert not mp.empty
+        assert not mq.empty
         
         # Islands
         isl = wb.islands()

@@ -380,13 +380,11 @@ class CaseActionsMixin:
         based_on : str
             The scaling basis ("MW" for absolute MW/MVAR values, or "FACTOR" for a multiplier).
         parameters : List[float]
-            A list of values for scaling.
-            - If `based_on` is "MW":
-                - For LOAD/INJECTIONGROUP: `[MW, MVAR]` or `[MW]` (for constant power factor).
-                - For GEN: `[MW]`.
-                - For BUSSHUNT: `[GMW, BCAPMVAR, BREAMVAR]`.
-            - If `based_on` is "FACTOR": `[Factor]`.
-            - Can also be a field variable name to use values from another field.
+            A list of values for scaling. If `based_on` is "MW", this can be
+            `[MW, MVAR]` or `[MW]` for LOAD/INJECTIONGROUP, `[MW]` for GEN, or
+            `[GMW, BCAPMVAR, BREAMVAR]` for BUSSHUNT. If `based_on` is "FACTOR",
+            this is `[Factor]`. Can also be a field variable name to use
+            values from another field.
         scale_marker : str
             The scope of the scaling ("BUS", "AREA", "ZONE", "OWNER", or "SYSTEM").
 

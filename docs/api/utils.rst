@@ -1,45 +1,16 @@
 Utilities
 =========
-.. currentmodule:: esapp.utils
 
 ESA++ includes a variety of utility modules for mathematical operations, geographic analysis, and debugging.
 
-Mathematical
-----------------------
-.. automodule:: esapp.utils.mathtools
-   :members:
+.. autosummary::
+   :toctree: generated/
 
-B3D File Tools
------------------------
-.. automodule:: esapp.utils.b3d
-   :members:
-
-Custom Exceptions
------------------
-.. automodule:: esapp.utils.exceptions
-   :members:
-
-Miscellaneous Helpers
----------------------
-.. automodule:: esapp.utils.misc
-   :members:
-
-Decorators
-----------
-.. automodule:: esapp.utils.decorators
-   :members:
-
-Mesh Processing
----------------
-.. automodule:: esapp.utils.mesh
-   :members:
-
-Geographic Mapping
-------------------
-.. automodule:: esapp.utils.map
-   :members:
-
-Wavelet Plotting
-----------------
-.. automodule:: esapp.utils.plotwavelet
-   :members:
+   esapp.utils.b3d
+   esapp.utils.decorators
+   esapp.utils.exceptions
+   esapp.utils.map
+   esapp.utils.mathtools
+   esapp.utils.mesh
+   esapp.utils.misc
+   esapp.utils.plotwavelet

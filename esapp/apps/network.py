@@ -34,7 +34,7 @@ class Network(Indexable):
             Mapping from BusNum to matrix index.
         '''
         busNums = self[Bus]
-        return Series(busNums.index, busNums['BusNum'])
+        return Series(busNums.index, busNums["BusNum"])
 
     def incidence(self, remake=True, hvdc=False):
         '''
@@ -60,7 +60,7 @@ class Network(Indexable):
 
 
         # Retrieve
-        fields = ['BusNum', 'BusNum:1']
+        fields = ["BusNum", "BusNum:1"]
         branches = self[Branch][fields]
 
         if hvdc:
@@ -69,8 +69,8 @@ class Network(Indexable):
 
         # Column Positions 
         bmap    = self.busmap()
-        fromBus = branches['BusNum'].map(bmap).to_numpy()
-        toBus   = branches['BusNum:1'].map(bmap).to_numpy()
+        fromBus = branches["BusNum"].map(bmap).to_numpy()
+        toBus   = branches["BusNum:1"].map(bmap).to_numpy()
 
         # Lengths and indexers
         nbranches = len(branches)
@@ -148,30 +148,30 @@ class Network(Indexable):
         # This is distance in kilometers
         # Just found out that this can be EITHER?? so have to figure 
         # out which to use. Porbably prefer first field
-        field = ['LineLengthByParameters', 'LineLengthByParameters:2']
+        field = ["LineLengthByParameters", "LineLengthByParameters:2"]
         ell = self[Branch,field][field]
 
-        ell_user = ell['LineLengthByParameters']
-        ell.loc[ell_user>0,'LineLengthByParameters:2'] = ell.loc[ell_user>0,'LineLengthByParameters']
-        ell = ell['LineLengthByParameters:2']
+        ell_user = ell["LineLengthByParameters"]
+        ell.loc[ell_user>0,"LineLengthByParameters:2"] = ell.loc[ell_user>0,"LineLengthByParameters"]
+        ell = ell["LineLengthByParameters:2"]
 
         if hvdc:
-            field = 'LineLengthByParameters'
+            field = "LineLengthByParameters"
             hvdc_ell = self[DCTransmissionLine,field][field]
             ell = concat([ell, hvdc_ell], ignore_index=True)
 
         # Calculate the equivilent distance if same admittance of a line
         if longer_xfmr_lens:
 
-            fields = ['LineX:2', 'LineR:2']
+            fields = ["LineX:2", "LineR:2"]
             branches = self[Branch, fields][fields]
 
             isLongLine = ell > length_thresh_km
             lines = branches.loc[isLongLine]
             xfmrs = branches.loc[~isLongLine]
 
-            lineZ = np.abs(lines['LineR:2'] + 1j*lines['LineX:2'])
-            xfmrZ = np.abs(xfmrs['LineR:2'] + 1j*xfmrs['LineX:2'])
+            lineZ = np.abs(lines["LineR:2"] + 1j*lines["LineX:2"])
+            xfmrZ = np.abs(xfmrs["LineR:2"] + 1j*xfmrs["LineX:2"])
 
             # Average Ohms per km for lines
             ZperKM = (lineZ/ell).mean()
@@ -186,7 +186,7 @@ class Network(Indexable):
 
         # Assume XFMR 10 meter long
         else:
-            ell.loc[ell==0] = 0.1
+            ell.loc[ell==0] = 0.01
 
         return ell
     
@@ -225,12 +225,12 @@ class Network(Indexable):
             Complex admittance or impedance.
         '''
 
-        branches = self[Branch, ['LineR:2', 'LineX:2']]
+        branches = self[Branch, ["LineR:2", "LineX:2"]]
 
 
 
-        R = branches['LineR:2']
-        X = branches['LineX:2']
+        R = branches["LineR:2"]
+        X = branches["LineX:2"]
         Z = R + 1j*X 
 
         if hvdc: # Just add small impedence for HVDC
@@ -253,9 +253,9 @@ class Network(Indexable):
             Complex shunt admittance.
         '''
 
-        branches = self[Branch, ['LineG', 'LineC']]
-        G = branches['LineG']
-        B = branches['LineC']
+        branches = self[Branch, ["LineG", "LineC"]]
+        G = branches["LineG"]
+        B = branches["LineC"]
  
         return G + 1j*B
 

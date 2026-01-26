@@ -1,5 +1,7 @@
 """General script commands and data interaction functions."""
 from typing import List
+import tempfile, os, re, uuid
+import pandas as pd
 
 
 class GeneralMixin:
@@ -542,6 +544,81 @@ class GeneralMixin:
         values = "[" + ", ".join([str(v) for v in valuelist]) + "]"
         return self.RunScriptCommand(f"CreateData({objecttype}, {fields}, {values});")
 
+    def GetSubData(self, objecttype: str, fieldlist: List[str], subdatalist: List[str] = None, filter_name: str = "") -> pd.DataFrame:
+        """Retrieves object data including nested SubData sections as a DataFrame.
+
+        SubData sections contain structured data like cost curves, reactive capability,
+        or contingency elements that aren't available through standard CSV exports.
+
+        Parameters
+        ----------
+        objecttype : str
+            The PowerWorld object type (e.g., "Gen", "Load", "Contingency").
+        fieldlist : List[str]
+            A list of standard field names to retrieve.
+        subdatalist : List[str], optional
+            SubData section names to include (e.g., ["BidCurve", "ReactiveCapability"]).
+            Defaults to None (no SubData).
+        filter_name : str, optional
+            A PowerWorld filter name to apply. Defaults to "" (all objects).
+
+        Returns
+        -------
+        pd.DataFrame
+            DataFrame where standard fields are scalar columns and SubData fields
+            contain lists of lists (each inner list is one row from the SubData section).
+
+        Examples
+        --------
+        >>> df = saw.GetSubData("Gen", ["BusNum", "GenID"], ["BidCurve"])
+        >>> for _, row in df.iterrows():
+        ...     print(f"Gen {row['BusNum']}: {len(row['BidCurve'])} bid points")
+        """
+        subdatalist = subdatalist or []
+        tmp = tempfile.NamedTemporaryFile(suffix=".aux", delete=False)
+        tmp.close()
+
+        def parse_line(line: str) -> List[str]:
+            """Parse a line detecting bracket [x,y] or space-delimited format."""
+            line = line.strip()
+            if '[' in line:  # Bracket format: [x, y], [a, b] or [x, y] [a, b]
+                return [m.group(1).strip() for m in re.finditer(r'\[(.*?)\]', line)]
+            else:  # Space-delimited: val1 val2 "val 3"
+                return [x.replace('"', '') for x in re.findall(r'(?:[^\s"]|"(?:\\.|[^"])*")+', line)]
+
+        try:
+            self.SaveData(tmp.name, "AUX", objecttype, fieldlist, subdatalist, filter_name, append=False)
+
+            if not os.path.exists(tmp.name): return pd.DataFrame(columns=fieldlist + subdatalist)
+            with open(tmp.name, 'r') as f: content = f.read()
+
+            match = re.search(r'DATA\s*\(\w+,\s*\[(.*?)\]\)\s*\{(.*)\}', content, re.DOTALL | re.IGNORECASE)
+            if not match: return pd.DataFrame(columns=fieldlist + subdatalist)
+
+            records, curr, sub_key = [], {}, None
+            splitter = re.compile(r'(?:[^\s"]|"(?:\\.|[^"])*")+')
+
+            for line in match.group(2).strip().split('\n'):
+                line = line.strip()
+                if not line or line.startswith('//'): continue
+
+                if line.upper().startswith('<SUBDATA'):
+                    sub_key = re.search(r'<SUBDATA\s+(\w+)>', line, re.IGNORECASE).group(1)
+                elif line.upper().startswith('</SUBDATA>'):
+                    sub_key = None
+                elif sub_key:
+                    curr.setdefault(sub_key, []).append(parse_line(line))
+                else:
+                    if curr: records.append(curr)
+                    curr = {k: v.replace('"', '') for k, v in zip(fieldlist, splitter.findall(line))}
+                    for s in subdatalist: curr[s] = []
+
+            if curr: records.append(curr)
+            return pd.DataFrame(records)
+
+        finally:
+            if os.path.exists(tmp.name): os.remove(tmp.name)
+
     def SaveObjectFields(self, filename: str, objecttype: str, fieldlist: List[str]):
         """Saves a list of fields available for the specified objecttype to a file.
 
@@ -754,7 +831,7 @@ class GeneralMixin:
         file_directory : str
             The directory where the auxiliary files are located.
         filter_string : str, optional
-            A filter string using Windows wildcard patterns (e.g., "*.aux").
+            A filter string using Windows wildcard patterns (e.g., ``*.aux``).
             If not specified, all files in the directory are loaded. Defaults to "".
         create_if_not_found : bool, optional
             If True, objects that cannot be found will be created while reading

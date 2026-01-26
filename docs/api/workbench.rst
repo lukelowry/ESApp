@@ -5,12 +5,7 @@ The ``GridWorkBench`` is the high-level entry point for interacting with PowerWo
 SimAuto with a Pythonic interface for case management, data access, and analysis helpers. For concepts and
 usage patterns, see :doc:`../guide/usage`. This page lists the full API surface.
 
-API Documentation
-------------------
-
 .. currentmodule:: esapp.workbench
 
 .. autoclass:: GridWorkBench
    :members:
-   :undoc-members:
-   :show-inheritance:

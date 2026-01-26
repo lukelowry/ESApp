@@ -55,21 +55,10 @@ class TestPowerFlow:
         saw_instance.SetDoOneIteration(False)
         saw_instance.SetInnerLoopCheckMVars(False)
 
-    @pytest.mark.order(14)
-    def test_powerflow_get_results(self, saw_instance):
-        df = saw_instance.get_power_flow_results("Bus")
-        assert df is not None
-        assert "BusPUVolt" in df.columns
-
     @pytest.mark.order(15)
     def test_powerflow_min_pu_volt(self, saw_instance):
         v = saw_instance.GetMinPUVoltage()
         assert isinstance(v, float)
-
-    @pytest.mark.order(16)
-    def test_powerflow_mismatches(self, saw_instance):
-        df = saw_instance.GetBusMismatches()
-        assert df is not None
 
     @pytest.mark.order(17)
     def test_powerflow_update_islands(self, saw_instance):
@@ -136,22 +125,6 @@ class TestMatrices:
     def test_matrix_jacobian(self, saw_instance):
         jac = saw_instance.get_jacobian()
         assert jac is not None
-
-    @pytest.mark.order(33)
-    def test_matrix_incidence(self, saw_instance):
-        inc = saw_instance.get_incidence_matrix()
-        assert inc is not None
-
-    @pytest.mark.order(34)
-    def test_matrix_branch_admittance(self, saw_instance):
-        yf, yt = saw_instance.get_branch_admittance()
-        assert yf is not None
-        assert yt is not None
-
-    @pytest.mark.order(35)
-    def test_matrix_shunt_admittance(self, saw_instance):
-        ysh = saw_instance.get_shunt_admittance()
-        assert ysh is not None
 
 
 class TestSensitivity:
@@ -288,14 +261,6 @@ class TestSensitivity:
 class TestTopology:
     """Tests for topology analysis operations."""
 
-    @pytest.mark.order(46)
-    def test_topology_path_distance(self, saw_instance):
-        buses = saw_instance.GetParametersMultipleElement("Bus", ["BusNum"])
-        if buses is not None and not buses.empty:
-            bus_str = create_object_string("Bus", buses.iloc[0]["BusNum"])
-            df = saw_instance.DeterminePathDistance(bus_str)
-            assert df is not None
-            assert isinstance(df, pd.DataFrame)
 
     @pytest.mark.order(47)
     def test_topology_islands(self, saw_instance):
@@ -332,25 +297,3 @@ class TestPowerFlowAdvanced:
         if areas is not None and not areas.empty:
             area_str = create_object_string("Area", areas.iloc[0]["AreaNum"])
             saw_instance.SetParticipationFactors("CONSTANT", 1.0, area_str)
-
-    @pytest.mark.order(28)
-    def test_powerflow_results_structure(self, saw_instance):
-        """Test power flow results have expected structure."""
-        df = saw_instance.get_power_flow_results("Bus")
-        assert df is not None
-        assert not df.empty
-        # Check essential columns exist
-        expected_cols = ["BusNum", "BusPUVolt"]
-        for col in expected_cols:
-            assert col in df.columns, f"Missing column: {col}"
-        # Verify voltage values are reasonable (0.5 to 1.5 pu)
-        assert (df["BusPUVolt"] > 0.5).all(), "Voltage below 0.5 pu detected"
-        assert (df["BusPUVolt"] < 1.5).all(), "Voltage above 1.5 pu detected"
-
-    @pytest.mark.order(29)
-    def test_powerflow_gen_results(self, saw_instance):
-        """Test generator power flow results."""
-        df = saw_instance.get_power_flow_results("Gen")
-        if df is not None and not df.empty:
-            assert "GenMW" in df.columns or "BusNum" in df.columns
-

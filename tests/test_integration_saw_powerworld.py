@@ -71,7 +71,7 @@ class TestBaseSAW:
             check = saw_instance.GetParametersSingleElement("Bus", ["BusNum", "BusName"], [bus_num, ""])
             assert check["BusName"] == new_name
             
-            saw_instance.ChangeParameters("Bus", ["BusNum", "BusName"], [bus_num, original_name])
+            saw_instance.ChangeParametersSingleElement("Bus", ["BusNum", "BusName"], [bus_num, original_name])
 
     @pytest.mark.order(4)
     def test_base_get_parameters(self, saw_instance):
@@ -88,15 +88,6 @@ class TestBaseSAW:
         df = saw_instance.ListOfDevices("Bus")
         assert df is not None
         assert not df.empty
-
-    @pytest.mark.order(6)
-    def test_base_properties(self, saw_instance):
-        _ = saw_instance.CreateIfNotFound
-        _ = saw_instance.CurrentDir
-        _ = saw_instance.ProcessID
-        _ = saw_instance.RequestBuildDate
-        _ = saw_instance.UIVisible
-        _ = saw_instance.ProgramInformation
 
     @pytest.mark.order(7)
     def test_base_state(self, saw_instance):
@@ -146,11 +137,6 @@ class TestGeneralSAW:
         saw_instance.DeleteFile(tmp3)
         assert not os.path.exists(tmp3)
 
-    @pytest.mark.order(97)
-    def test_general_mode(self, saw_instance):
-        saw_instance.EnterMode("EDIT")
-        saw_instance.EnterMode("RUN")
-
     @pytest.mark.order(98)
     def test_general_aux(self, saw_instance, temp_file):
         tmp_aux = temp_file(".aux")
@@ -183,72 +169,6 @@ class TestModifySAW:
         dummy_bus = 99999
         saw_instance.CreateData("Bus", ["BusNum", "BusName"], [dummy_bus, "SAW_TEST"])
         saw_instance.Delete("Bus", f"BusNum = {dummy_bus}")
-
-    @pytest.mark.order(121)
-    def test_modify_auto(self, saw_instance):
-        saw_instance.AutoInsertTieLineTransactions()
-
-    @pytest.mark.order(122)
-    def test_modify_branch(self, saw_instance):
-        saw_instance.BranchMVALimitReorder()
-
-    @pytest.mark.order(123)
-    def test_modify_calc(self, saw_instance):
-        try:
-            saw_instance.CalculateRXBGFromLengthConfigCondType()
-        except PowerWorldAddonError:
-            pytest.skip("TransLineCalc not registered")
-
-    @pytest.mark.order(124)
-    def test_modify_base(self, saw_instance):
-        saw_instance.ChangeSystemMVABase(100.0)
-
-    @pytest.mark.order(125)
-    def test_modify_islands(self, saw_instance):
-        saw_instance.ClearSmallIslands()
-
-    @pytest.mark.order(126)
-    def test_modify_gen(self, saw_instance):
-        saw_instance.InitializeGenMvarLimits()
-        saw_instance.SetGenPMaxFromReactiveCapabilityCurve()
-
-    @pytest.mark.order(127)
-    def test_modify_inj(self, saw_instance):
-        saw_instance.InjectionGroupsAutoInsert()
-        saw_instance.InjectionGroupCreate("TestIG", "Gen", 1.0, "")
-        saw_instance.RenameInjectionGroup("TestIG", "TestIG_Renamed")
-
-    @pytest.mark.order(128)
-    def test_modify_interface(self, saw_instance):
-        saw_instance.InterfacesAutoInsert("AREA")
-        saw_instance.InterfaceCreate("TestInterface", True, "Branch", "SELECTED")
-        saw_instance.SetInterfaceLimitToMonitoredElementLimitSum()
-
-    @pytest.mark.order(129)
-    def test_modify_reassign(self, saw_instance):
-        saw_instance.ReassignIDs("Load", "BusName")
-
-    @pytest.mark.order(130)
-    def test_modify_remove(self, saw_instance):
-        saw_instance.Remove3WXformerContainer()
-
-    @pytest.mark.order(131)
-    def test_modify_rotate(self, saw_instance):
-        buses = saw_instance.GetParametersMultipleElement("Bus", ["BusNum"])
-        if buses is not None and not buses.empty:
-            bus_str = create_object_string("Bus", buses.iloc[0]["BusNum"])
-            saw_instance.RotateBusAnglesInIsland(bus_str, 0.0)
-
-    @pytest.mark.order(132)
-    def test_modify_part(self, saw_instance):
-        saw_instance.SetParticipationFactors("CONSTANT", 1.0, "SYSTEM")
-
-    @pytest.mark.order(133)
-    def test_modify_volt(self, saw_instance):
-        buses = saw_instance.GetParametersMultipleElement("Bus", ["BusNum"])
-        if buses is not None and not buses.empty:
-            bus_str = create_object_string("Bus", buses.iloc[0]["BusNum"])
-            saw_instance.SetScheduledVoltageForABus(bus_str, 1.0)
 
     @pytest.mark.order(134)
     def test_modify_superarea(self, saw_instance):
@@ -325,6 +245,97 @@ class TestCaseActionsSAW:
         saw_instance.RenumberSubs()
         saw_instance.RenumberZones()
         saw_instance.RenumberCase()
+
+
+class TestGetSubData:
+    """Integration tests for GetSubData - retrieving nested SubData from AUX exports."""
+
+    @pytest.mark.order(400)
+    def test_get_subdata_gen_fields_only(self, saw_instance):
+        """Test GetSubData with generators, no SubData requested."""
+        df = saw_instance.GetSubData("Gen", ["BusNum", "GenID", "GenMW"])
+        assert df is not None
+        assert "BusNum" in df.columns
+        assert "GenID" in df.columns
+        assert "GenMW" in df.columns
+
+    @pytest.mark.order(401)
+    def test_get_subdata_gen_with_bidcurve(self, saw_instance):
+        """Test GetSubData retrieves BidCurve SubData for generators."""
+        df = saw_instance.GetSubData("Gen", ["BusNum", "GenID"], ["BidCurve"])
+        assert df is not None
+        assert "BidCurve" in df.columns
+        # BidCurve column should contain lists (even if empty)
+        for bc in df["BidCurve"]:
+            assert isinstance(bc, list)
+
+    @pytest.mark.order(402)
+    def test_get_subdata_gen_with_reactive_capability(self, saw_instance):
+        """Test GetSubData retrieves ReactiveCapability SubData."""
+        df = saw_instance.GetSubData("Gen", ["BusNum", "GenID"], ["ReactiveCapability"])
+        assert df is not None
+        assert "ReactiveCapability" in df.columns
+        for rc in df["ReactiveCapability"]:
+            assert isinstance(rc, list)
+
+    @pytest.mark.order(403)
+    def test_get_subdata_gen_multiple_subdata(self, saw_instance):
+        """Test GetSubData with multiple SubData types."""
+        df = saw_instance.GetSubData("Gen", ["BusNum", "GenID", "GenMW"],
+                                     ["BidCurve", "ReactiveCapability"])
+        assert df is not None
+        assert "BidCurve" in df.columns
+        assert "ReactiveCapability" in df.columns
+
+    @pytest.mark.order(404)
+    def test_get_subdata_load_bidcurve(self, saw_instance):
+        """Test GetSubData retrieves Load BidCurve (benefit curves)."""
+        df = saw_instance.GetSubData("Load", ["BusNum", "LoadID", "LoadMW"], ["BidCurve"])
+        assert df is not None
+        assert "BidCurve" in df.columns
+
+    @pytest.mark.order(405)
+    def test_get_subdata_contingency_elements(self, saw_instance):
+        """Test GetSubData retrieves CTGElement for contingencies."""
+        df = saw_instance.GetSubData("Contingency", ["TSContingency"], ["CTGElement"])
+        assert df is not None
+        if not df.empty:
+            assert "CTGElement" in df.columns
+            # CTGElement should be a list of element definitions
+            for ctg in df["CTGElement"]:
+                assert isinstance(ctg, list)
+
+    @pytest.mark.order(406)
+    def test_get_subdata_interface_elements(self, saw_instance):
+        """Test GetSubData retrieves InterfaceElement for interfaces."""
+        df = saw_instance.GetSubData("Interface", ["InterfaceName"], ["InterfaceElement"])
+        assert df is not None
+        if not df.empty:
+            assert "InterfaceElement" in df.columns
+
+    @pytest.mark.order(407)
+    def test_get_subdata_with_filter(self, saw_instance):
+        """Test GetSubData with a filter applied."""
+        # Get all generators first
+        df_all = saw_instance.GetSubData("Gen", ["BusNum", "GenID"])
+        # Try with a filter (may return fewer or same depending on case)
+        df_filtered = saw_instance.GetSubData("Gen", ["BusNum", "GenID"], filter_name="GenStatus=Closed")
+        assert df_filtered is not None
+        assert len(df_filtered) <= len(df_all)
+
+    @pytest.mark.order(408)
+    def test_get_subdata_empty_object_type(self, saw_instance):
+        """Test GetSubData with an object type that may have no entries."""
+        # SuperArea may not exist in all cases
+        df = saw_instance.GetSubData("SuperArea", ["SuperAreaName"], ["SuperAreaArea"])
+        assert df is not None  # Should return empty DataFrame, not error
+
+    @pytest.mark.order(409)
+    def test_get_subdata_bus_marginal_costs(self, saw_instance):
+        """Test GetSubData for Bus marginal cost SubData (from OPF)."""
+        df = saw_instance.GetSubData("Bus", ["BusNum", "BusName"], ["MWMarginalCostValues"])
+        assert df is not None
+        assert "MWMarginalCostValues" in df.columns
 
 
 if __name__ == "__main__":
