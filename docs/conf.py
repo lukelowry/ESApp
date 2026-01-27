@@ -2,8 +2,9 @@ import os
 import sys
 import importlib.metadata
 
-# Ensure the project root is in the path
+# Ensure the project root and extensions dir are in the path
 sys.path.insert(0, os.path.abspath(".."))
+sys.path.insert(0, os.path.abspath("_ext"))
 
 extensions = [
     "sphinx.ext.autodoc",
@@ -17,6 +18,7 @@ extensions = [
     "sphinx.ext.napoleon",
     "sphinx_copybutton",
     "nbsphinx",
+    "grid_list",
 ]
 
 autosummary_generate = True
@@ -111,6 +113,10 @@ latex_documents = [
 
 latex_elements = {
     "pointsize": "10pt",
+    "fncychap": r"\usepackage[Sonny]{fncychap}",
+    "fontpkg": r"""
+\usepackage{lmodern}
+""",
     "preamble": r"""
 \usepackage{mathrsfs}
 \usepackage{breakurl}
@@ -118,10 +124,32 @@ latex_elements = {
 \usepackage{longtable}
 \usepackage{multirow}
 \usepackage{enumitem}
-\sphinxsetup{verbatimwithframe=false}
+\usepackage{microtype}
+\usepackage{xcolor}
+
+% Sphinx code-block styling
+\sphinxsetup{
+    verbatimwithframe=false,
+    VerbatimColor={RGB}{248,248,248},
+    VerbatimBorderColor={RGB}{200,200,200},
+    InnerLinkColor={RGB}{50,50,150},
+    OuterLinkColor={RGB}{50,50,150}
+}
+
+% Compact lists
 \setlist{nosep}
 \setlength{\parskip}{0.3em}
 \setlength{\parindent}{0pt}
+
+% Modern header/footer
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\nouppercase{\leftmark}}
+\fancyhead[R]{\thepage}
+\fancyfoot[C]{\small ESA++ Documentation}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0.2pt}
 """,
     "figure_align": "H",
 }
