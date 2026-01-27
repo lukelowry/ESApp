@@ -79,7 +79,7 @@ def create_object_string(object_type: str, *keys) -> str:
     """
     Helper to format a PowerWorld object string identifier.
 
-    This function creates strings formatted like '[BUS 1]' or '[BRANCH 1 2 "1"]'
+    This function creates strings formatted like ``[BUS 1]`` or ``[BRANCH 1 2 1]``
     which are used to identify objects in SimAuto script commands.
 
     Parameters
@@ -87,23 +87,15 @@ def create_object_string(object_type: str, *keys) -> str:
     object_type : str
         The type of object (e.g. "Bus", "Gen", "Branch").
     *keys : Any
-        The key values identifying the object. Strings will be automatically
-        enclosed in double quotes if they are not already quoted.
+        The key values identifying the object.
 
     Returns
     -------
     str
-        Formatted string like '[ObjectType key1 key2 ...]'.
+        Formatted string like ``[ObjectType key1 key2 ...]``.
     """
     parts = [object_type.upper()]
     for key in keys:
-        if isinstance(key, str):
-            # Check if already quoted with " or '
-            if (len(key) >= 2) and ((key.startswith('"') and key.endswith('"')) or (key.startswith("'") and key.endswith("'"))):
-                parts.append(key)
-            else:
-                parts.append(f'"{key}"')
-        else:
-            parts.append(str(key))
-    
+        parts.append(str(key))
+
     return f"[{' '.join(parts)}]"

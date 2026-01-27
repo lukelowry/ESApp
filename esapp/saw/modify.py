@@ -845,7 +845,7 @@ class ModifyMixin:
         Parameters
         ----------
         element : str
-            The transmission line identifier string (e.g., '[BRANCH 1 2 1]').
+            The transmission line identifier string (e.g., ``[BRANCH 1 2 1]``).
         pos_along_line : float
             The position along the line (0-100%) where the tap is made.
         new_bus_number : int
@@ -870,8 +870,8 @@ class ModifyMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        ms = "YES" if treat_as_ms_line else "NO"
-        uo = "YES" if update_onelines else "NO"
+        ms = 'YES' if treat_as_ms_line else 'NO'
+        uo = 'YES' if update_onelines else 'NO'
         return self.RunScriptCommand(
-            f'TapTransmissionLine({element}, {pos_along_line}, {new_bus_number}, {shunt_model}, {ms}, {uo}, "{new_bus_name}");'
+            f'TapTransmissionLine({element}, {pos_along_line}, {new_bus_number}, {shunt_model}, {ms}, {uo}, {new_bus_name});'
         )

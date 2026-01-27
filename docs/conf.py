@@ -31,7 +31,7 @@ autodoc_preserve_defaults = True
 todo_include_todos = True
 autosectionlabel_prefix_document = True
 
-autoclass_content = "both"
+autoclass_content = "init"
 autodoc_typehints = "none"
 add_module_names = False
 
@@ -44,8 +44,8 @@ intersphinx_mapping = {
 napoleon_google_docstring = False
 napoleon_numpy_docstring = True
 napoleon_include_init_with_doc = False
-napoleon_use_param = True
-napoleon_use_rtype = True
+napoleon_use_param = False
+napoleon_use_rtype = False
 napoleon_preprocess_types = True
 napoleon_type_aliases = {
     "np": "numpy",
@@ -92,6 +92,8 @@ html_theme = "sphinx_rtd_theme"
 html_theme_options = {
     "navigation_depth": 2,
 }
+html_static_path = ["_static"]
+html_css_files = ["custom.css"]
 
 autodoc_mock_imports = [
     "win32com", 
@@ -108,14 +110,18 @@ latex_documents = [
 ]
 
 latex_elements = {
+    "pointsize": "10pt",
     "preamble": r"""
 \usepackage{mathrsfs}
 \usepackage{breakurl}
 \usepackage{booktabs}
 \usepackage{longtable}
 \usepackage{multirow}
+\usepackage{enumitem}
 \sphinxsetup{verbatimwithframe=false}
-\sloppy
+\setlist{nosep}
+\setlength{\parskip}{0.3em}
+\setlength{\parindent}{0pt}
 """,
     "figure_align": "H",
 }
