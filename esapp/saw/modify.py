@@ -778,6 +778,7 @@ class ModifyMixin:
         """
         tie = "YES" if insert_tie else "NO"
         open_line = "YES" if line_open else "NO"
+        new_bus_number = int(new_bus_number.iloc[0]) if hasattr(new_bus_number, 'iloc') else int(new_bus_number)
         return self.RunScriptCommand(
             f'SplitBus({element}, {new_bus_number}, {tie}, {open_line}, "{branch_device_type}");'
         )
@@ -872,6 +873,7 @@ class ModifyMixin:
         """
         ms = 'YES' if treat_as_ms_line else 'NO'
         uo = 'YES' if update_onelines else 'NO'
+        new_bus_number = int(new_bus_number.iloc[0]) if hasattr(new_bus_number, 'iloc') else int(new_bus_number)
         return self.RunScriptCommand(
             f'TapTransmissionLine({element}, {pos_along_line}, {new_bus_number}, {shunt_model}, {ms}, {uo}, {new_bus_name});'
         )
