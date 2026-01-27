@@ -30,19 +30,6 @@ class Dynamics(Indexable):
         ctgs["EndTime"] = sec
         self[TSContingency] = ctgs
 
-    # Create 'SimOnly' contingency if it does not exist
-    # TODO Add TSCtgElement that closes an already closed gen at t=0
-    def simonly(self):
-        try:
-            self.esa.change_and_confirm_params_multiple_element(
-                ObjectType="TSContingency",
-                command_df=DataFrame({"TSCTGName": ["SimOnly"]}),
-            )
-        except CommandNotRespectedError:
-            print("Failure to create 'SimOnly' Contingency")
-        else:
-            print("Contingency 'SimOnly' Initialized")
-
     def solve(self, ctgs: list[str] = None):
         # Unique List of Fields to Request From PW
 

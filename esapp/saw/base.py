@@ -168,64 +168,6 @@ class SAWBase(object):
         self.lodf = None
         self._object_fields = {}
 
-    def change_and_confirm_params_multiple_element(self, ObjectType: str, command_df: pd.DataFrame) -> None:
-        """Modifies parameters for multiple elements and verifies the change was successfully applied in PowerWorld.
-
-        This method first attempts to change parameters using `ChangeParametersMultipleElement`,
-        then immediately retrieves the same parameters from PowerWorld to confirm the changes.
-
-        Parameters
-        ----------
-        ObjectType : str
-            The PowerWorld object type (e.g., 'Bus', 'Gen').
-        command_df : pandas.DataFrame
-            A DataFrame where columns are field names and rows are object data.
-            It must include the primary key fields for the specified `ObjectType`.
-
-        Raises
-        ------
-        CommandNotRespectedError
-            If the values in PowerWorld after the call do not match the `command_df`,
-            indicating that the change was not fully accepted by PowerWorld.
-        PowerWorldError
-            If the underlying SimAuto call fails.
-        """
-        cleaned_df = self._change_parameters_multiple_element_df(
-            ObjectType=ObjectType, command_df=command_df
-        )
-        df = self.GetParametersMultipleElement(ObjectType=ObjectType, ParamList=cleaned_df.columns.tolist())
-
-        # Get key field names from GetFieldList
-        field_list = self.GetFieldList(ObjectType=ObjectType, copy=False)
-        key_field_mask = field_list["key_field"].str.match(r"\*[0-9]+[A-Z]*\*").to_numpy()
-        key_field_names = field_list.loc[key_field_mask, "internal_field_name"].tolist()
-
-        # Verify changes by merging on key fields and comparing values
-        merged = pd.merge(
-            left=cleaned_df,
-            right=df,
-            how="inner",
-            on=key_field_names,
-            suffixes=("_in", "_out"),
-            copy=False,
-        )
-
-        cols_in = merged.columns[merged.columns.str.endswith("_in")]
-        cols_out = merged.columns[merged.columns.str.endswith("_out")]
-
-        # Simple string comparison (PowerWorld returns strings anyway)
-        eq = np.array_equal(
-            merged[cols_in].astype(str).to_numpy(),
-            merged[cols_out].astype(str).to_numpy()
-        )
-
-        if not eq:
-            m = (
-                "After calling ChangeParametersMultipleElement, not all parameters were actually changed "
-                "within PowerWorld. Try again with a different parameter (e.g. use GenVoltSet "
-                "instead of GenRegPUVolt)."
-            )
-            raise CommandNotRespectedError(m)
 
     def exit(self):
         """Closes the PowerWorld case, deletes temporary files, and releases the COM object.

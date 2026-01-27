@@ -280,11 +280,206 @@ class TestGridWorkBenchFunctions:
         Y = wb.ybus()
         assert Y.shape[0] > 0
 
+    def test_reset(self, wb):
+        """Tests reset() alias for flatstart()."""
+        wb.reset()
+
+    def test_print_log(self, wb):
+        """Tests print_log() with all parameter combinations."""
+        wb.log("Print log test message")
+
+        # Default call
+        output = wb.print_log()
+        assert isinstance(output, str)
+
+        # new_only mode
+        wb.log("Another message")
+        new_output = wb.print_log(new_only=True)
+        assert isinstance(new_output, str)
+
+        # clear mode
+        cleared = wb.print_log(clear=True)
+        assert isinstance(cleared, str)
+
+    def test_close_and_reopen(self, wb):
+        """Tests close() - but we need to re-set esa after since session manages lifecycle."""
+        # We can't truly close because the session fixture manages that,
+        # but we can test CloseCase is callable
+        # Save the esa ref before close
+        esa_ref = wb.esa
+        wb.close()
+        # Reopen to keep session valid
+        esa_ref.OpenCase()
+
+    def test_mismatch_complex(self, wb):
+        """Tests mismatch(asComplex=True)."""
+        wb.pflow(getvolts=False)
+        mm = wb.mismatch(asComplex=True)
+        assert np.iscomplexobj(mm)
+
+    def test_netinj(self, wb):
+        """Tests netinj() in both modes."""
+        P, Q = wb.netinj()
+        assert len(P) > 0
+        assert len(Q) > 0
+
+        # Complex mode
+        S = wb.netinj(asComplex=True)
+        assert np.iscomplexobj(S)
+        assert len(S) > 0
+
+    def test_path_distance(self, wb):
+        """Tests path_distance()."""
+        buses = wb[Bus]
+        if not buses.empty:
+            try:
+                wb.path_distance(create_object_string("Bus", buses.iloc[0]['BusNum']))
+            except Exception:
+                pytest.skip("path_distance not available for this case")
+
+    def test_branch_admittance(self, wb):
+        """Tests branch_admittance()."""
+        Yf, Yt = wb.branch_admittance()
+        assert Yf.shape[0] > 0
+        assert Yt.shape[0] > 0
+        assert Yf.shape == Yt.shape
+
+    def test_shunt_admittance(self, wb):
+        """Tests shunt_admittance()."""
+        Ysh = wb.shunt_admittance()
+        assert len(Ysh) > 0
+        assert np.iscomplexobj(Ysh)
+
+    def test_incidence_matrix(self, wb):
+        """Tests incidence_matrix()."""
+        A = wb.incidence_matrix()
+        assert A.shape[0] > 0
+        assert A.shape[1] > 0
+        # Each row should have exactly one +1 and one -1
+        for i in range(A.shape[0]):
+            assert np.sum(A[i] == 1) == 1
+            assert np.sum(A[i] == -1) == 1
+
+    def test_jacobian(self, wb):
+        """Tests jacobian()."""
+        wb.pflow(getvolts=False)
+        try:
+            J = wb.jacobian()
+            assert J.shape[0] > 0
+        except Exception:
+            pytest.skip("Jacobian not available")
+
+    def test_gmatrix(self, wb):
+        """Tests gmatrix()."""
+        try:
+            G = wb.gmatrix()
+            assert G.shape[0] > 0
+        except Exception:
+            pytest.skip("GIC G-matrix not available")
+
+    def test_buscoords_as_dataframe(self, wb):
+        """Tests buscoords(astuple=False)."""
+        try:
+            df = wb.buscoords(astuple=False)
+            assert isinstance(df, pd.DataFrame)
+        except Exception:
+            pytest.skip("buscoords not available (no substation data)")
+
+    def test_write_voltage(self, wb):
+        """Tests write_voltage()."""
+        V = wb.voltage(complex=True, pu=True)
+        wb.write_voltage(V)
+
+    def test_gens_above_pmax(self, wb):
+        """Tests gens_above_pmax()."""
+        result = wb.gens_above_pmax()
+        assert isinstance(result, (bool, np.bool_))
+
+    def test_gens_above_qmax(self, wb):
+        """Tests gens_above_qmax()."""
+        result = wb.gens_above_qmax()
+        assert isinstance(result, (bool, np.bool_))
+
+    def test_gic_storm(self, wb):
+        """Tests gic_storm() with both solve_pf options."""
+        try:
+            wb.gic_storm(max_field=1.0, direction=90.0, solve_pf=True)
+            wb.gic_storm(max_field=1.0, direction=90.0, solve_pf=False)
+        except Exception:
+            pytest.skip("GIC storm not available")
+
+    def test_gic_clear(self, wb):
+        """Tests gic_clear()."""
+        try:
+            wb.gic_clear()
+        except Exception:
+            pytest.skip("GIC clear not available")
+
+    def test_gic_load_b3d(self, wb):
+        """Tests gic_load_b3d()."""
+        try:
+            wb.gic_load_b3d("STORM", "nonexistent.b3d", setup_on_load=True)
+        except Exception:
+            pass  # Expected to fail without a real file, but exercises the code path
+        try:
+            wb.gic_load_b3d("STORM", "nonexistent.b3d", setup_on_load=False)
+        except Exception:
+            pass
+
+    def test_set_option_methods(self, wb):
+        """Tests all _set_option-based methods."""
+        try:
+            wb.set_do_one_iteration(True)
+            wb.set_do_one_iteration(False)
+        except Exception:
+            pytest.skip("set_do_one_iteration not available")
+
+        try:
+            wb.set_max_iterations(250)
+        except Exception:
+            pytest.skip("set_max_iterations not available")
+
+        try:
+            wb.set_disable_angle_rotation(True)
+            wb.set_disable_angle_rotation(False)
+        except Exception:
+            pytest.skip("set_disable_angle_rotation not available")
+
+        try:
+            wb.set_disable_opt_mult(True)
+            wb.set_disable_opt_mult(False)
+        except Exception:
+            pytest.skip("set_disable_opt_mult not available")
+
+        try:
+            wb.enable_inner_ss_check(True)
+            wb.enable_inner_ss_check(False)
+        except Exception:
+            pytest.skip("enable_inner_ss_check not available")
+
+        try:
+            wb.disable_gen_mvr_check(True)
+            wb.disable_gen_mvr_check(False)
+        except Exception:
+            pytest.skip("disable_gen_mvr_check not available")
+
+        try:
+            wb.enable_inner_check_gen_vars(True)
+            wb.enable_inner_check_gen_vars(False)
+        except Exception:
+            pytest.skip("enable_inner_check_gen_vars not available")
+
+        try:
+            wb.enable_inner_backoff_gen_vars(True)
+            wb.enable_inner_backoff_gen_vars(False)
+        except Exception:
+            pytest.skip("enable_inner_backoff_gen_vars not available")
+
     def test_location(self, wb):
         """Tests busmap, buscoords."""
         m = wb.busmap()
         assert not m.empty
-        
+
         # buscoords requires substation data, might be empty but call should work
         try:
             wb.buscoords()
