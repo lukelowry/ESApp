@@ -74,6 +74,7 @@ exclude_patterns = [
 ]
 
 nbsphinx_execute = 'never'
+nbsphinx_allow_errors = True
 html_sourcelink_suffix = ''
 master_doc = "index"
 
@@ -102,6 +103,10 @@ autodoc_mock_imports = [
     "pyproj",
 ]
 
+latex_documents = [
+    (master_doc, "esapp.tex", "ESA++ Documentation", author, "manual"),
+]
+
 latex_elements = {
     "preamble": r"""
 \usepackage{mathrsfs}
@@ -109,6 +114,8 @@ latex_elements = {
 \usepackage{booktabs}
 \usepackage{longtable}
 \usepackage{multirow}
+\sphinxsetup{verbatimwithframe=false}
 \sloppy
 """,
+    "figure_align": "H",
 }

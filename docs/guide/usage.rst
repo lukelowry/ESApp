@@ -110,11 +110,11 @@ Shortcuts for common edits when you do not want to assemble DataFrames or craft 
     wb.set_gen(bus=5, id="1", mw=150.0, mvar=40.0, status="Closed")
     wb.set_load(bus=10, id="1", mw=90.0, mvar=25.0, status="Closed")
 
-    wb.open_branch(from_bus=1, to_bus=2, id="1")
-    wb.close_branch(from_bus=1, to_bus=2, id="1")
+    wb.open_branch(bus1=1, bus2=2, ckt="1")
+    wb.close_branch(bus1=1, bus2=2, ckt="1")
 
-    wb.scale_gen(scale_factor=1.05)
-    wb.scale_load(scale_factor=0.95)
+    wb.scale_gen(factor=1.05)
+    wb.scale_load(factor=0.95)
 
 Calling SAW directly
 --------------------
@@ -145,5 +145,5 @@ linearized studies, external analytics, or custom contingency logic.
 Where to go next
 ----------------
 - End-to-end scripts: :doc:`examples`
-- Full API reference: :doc:`../api/api`
+- Full API reference: :doc:`../api/index`
 - Development and tests: :doc:`../dev/tests`

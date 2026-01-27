@@ -62,7 +62,7 @@ Here is a quick example of how ESA++ simplifies data access and power flow analy
     V = wb.pflow()
 
     # Do some action, write to PW
-    violations = wb.find_violations(v_min=0.95)
+    violations = wb.violations(v_min=0.95)
     wb[Gen, "GenMW"] = 100.0
 
     # Save case
@@ -94,7 +94,7 @@ ESA++ includes an extensive test suite covering both offline mocks and live Powe
 .. code-block:: bash
 
     pip install .[test]
-    pytest tests/test_saw.py
+    pytest tests/
 
 Citation
 --------

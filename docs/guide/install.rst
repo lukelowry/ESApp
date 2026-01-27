@@ -4,7 +4,7 @@ Install
 Prerequisites
 -------------
 - PowerWorld Simulator with SimAuto (COM interface) enabled
-- Python 3.10+ and ``pip`` available on your path
+- Python 3.9+ and ``pip`` available on your path
 
 Install the package
 -------------------
@@ -34,4 +34,4 @@ Next steps
 ----------
 - Continue to the :doc:`usage` guide for indexing and API basics
 - See :doc:`examples` for end-to-end notebooks
-- Review :doc:`../api/api` for full reference
+- Review :doc:`../api/index` for full reference
