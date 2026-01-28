@@ -636,43 +636,7 @@ class GridWorkBench(Indexable):
         """
         self.esa.UnSelectAll(obj_type, filter_name)
 
-    # --- Advanced Topology & Switching ---
 
-    def energize(self, obj_type, identifier, close_breakers=True):
-        """
-        Energizes a specific object by closing breakers.
-
-        Parameters
-        ----------
-        obj_type : str
-            Object type (e.g. 'Bus', 'Gen', 'Load').
-        identifier : str
-            Identifier string (e.g. '[1]', '[1 "1"]').
-        close_breakers : bool, optional
-            Whether to close breakers. Defaults to True.
-
-        Examples
-        --------
-        >>> wb.energize("Bus", "[1]")
-        """
-        self.esa.CloseWithBreakers(obj_type, identifier)
-
-    def deenergize(self, obj_type, identifier):
-        """
-        De-energizes a specific object by opening breakers.
-
-        Parameters
-        ----------
-        obj_type : str
-            Object type (e.g. 'Bus', 'Gen', 'Load').
-        identifier : str
-            Identifier string (e.g. '[1]', '[1 "1"]').
-      
-        Examples
-        --------
-        >>> wb.deenergize("Bus", "[1]")
-        """
-        self.esa.OpenWithBreakers(obj_type, identifier)
 
     def radial_paths(self):
         """

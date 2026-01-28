@@ -181,19 +181,7 @@ class TestGridWorkBenchFunctions:
         wb.select("Bus", "BusNum < 10")
         wb.unselect("Bus")
 
-    # -------------------------------------------------------------------------
-    # Advanced Topology & Switching
-    # -------------------------------------------------------------------------
 
-    def test_topology(self, wb):
-        """Tests energize, deenergize, radial_paths, path_distance, network_cut."""
-        wb.deenergize("Bus", create_object_string("Bus", 1))
-        wb.energize("Bus", create_object_string("Bus", 1))
-        
-        wb.radial_paths()
-        
-        wb.select("Branch", "BusNum = 1")
-        wb.network_cut(create_object_string("Bus", 1), branch_filter="SELECTED")
 
     # -------------------------------------------------------------------------
     # Analysis & Difference Flows

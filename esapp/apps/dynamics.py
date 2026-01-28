@@ -1,17 +1,44 @@
+"""
+Transient Stability Simulation Module
+=====================================
+
+This module provides a high-level interface for running transient stability
+simulations in PowerWorld Simulator.
+
+Example:
+    >>> from esapp import GridWorkBench, TS
+    >>> from esapp.grid import Gen, Bus
+    >>>
+    >>> wb = GridWorkBench("case.pwb")
+    >>> wb.dyn.runtime = 10.0
+    >>> wb.dyn.watch(Gen, [TS.Gen.P, TS.Gen.W, TS.Gen.Delta])
+    >>>
+    >>> (wb.dyn.contingency("Bus_Fault")
+    ...        .at(1.0).fault_bus("101")
+    ...        .at(1.1).clear_fault("101"))
+    >>>
+    >>> meta, results = wb.dyn.solve("Bus_Fault")
+    >>> wb.dyn.plot(meta, results)
+"""
 import logging
 import numpy as np
 import matplotlib.pyplot as plt
 from enum import Enum
 from typing import List, Tuple, Dict, Union, Optional, Any, Type
+
 from pandas import DataFrame, concat
 
 from ..indexable import Indexable
 from ..gobject import GObject
-# Import from grid (TSContingency, TSContingencyElement)
+from ..ts_fields import TS
 from esapp.grid import TSContingency, TSContingencyElement
 
 # Configure logger
 logger = logging.getLogger(__name__)
+
+# Re-export TS for backward compatibility - users can import from either location
+__all__ = ['Dynamics', 'ContingencyBuilder', 'SimAction', 'TS']
+
 
 class SimAction(str, Enum):
     """Enumeration of standard simulation actions to prevent magic string errors."""
@@ -105,9 +132,26 @@ class Dynamics(Indexable):
         self._pending_ctgs: Dict[str, ContingencyBuilder] = {}
         self._watch_fields: Dict[Any, List[str]] = {}
 
-    def watch(self, gtype: Type[GObject], fields: List[str]) -> None:
-        """Register fields to record during simulation for a specific object type."""
-        self._watch_fields[gtype] = list(fields)
+    def watch(self, gtype: Type[GObject], fields: List[Any]) -> 'Dynamics':
+        """
+        Register fields to record during simulation for a specific object type.
+
+        Args:
+            gtype: The GObject type to watch (e.g., Gen, Bus, Branch)
+            fields: List of TS field constants or field name strings
+                   Example: [TS.Gen.P, TS.Gen.W] or ["TSGenP", "TSGenW"]
+
+        Returns:
+            Self for method chaining
+
+        Example:
+            >>> wb.dyn.watch(Gen, [TS.Gen.P, TS.Gen.W, TS.Gen.Delta])
+            >>> wb.dyn.watch(Bus, [TS.Bus.VPU, TS.Bus.Freq])
+        """
+        # Convert TSField objects to their string names
+        field_names = [str(f) for f in fields]
+        self._watch_fields[gtype] = field_names
+        return self
 
     def contingency(self, name: str) -> ContingencyBuilder:
         """Start building a new contingency."""
@@ -127,13 +171,13 @@ class Dynamics(Indexable):
         
         IMPORTANT: Must be called BEFORE TSSolve to capture results.
         """
-        # Enable storage for ALL objects.
-        self.esa.TSResultStorageSetAll(object="ALL", value=True)
-        
         fields = []
         for gtype, flds in self._watch_fields.items():
+            # Enable storage for this specific object type
+            self.esa.TSResultStorageSetAll(object=gtype.TYPE, value=True)
+            
             # Retrieve ObjectIDs for the requested types
-            objs = self[gtype, ['ObjectID'] + list(gtype.keys)]
+            objs = self[gtype, ['ObjectID']]
             
             if objs is not None and not objs.empty:
                 # Filter out NaNs and ensure unique IDs
@@ -213,12 +257,6 @@ class Dynamics(Indexable):
             if ctg in self._pending_ctgs:
                 self.upload_contingency(ctg)
         
-        # Clear pending map to prevent double-uploading if called again
-        # (Though we already popped inside upload_contingency, strict safety is good)
-        keys_to_remove = [k for k in self._pending_ctgs if k in ctgs_to_solve]
-        for k in keys_to_remove: 
-            del self._pending_ctgs[k]
-
         # 2. Configure Storage & Build Fields
         # Crucial: Must be done before TSInitialize
         retrieval_fields = self._prepare_environment()
@@ -258,13 +296,14 @@ class Dynamics(Indexable):
 
         return final_meta, final_data
 
-    def plot(self, meta: DataFrame, df: DataFrame, **kwargs):
+    def plot(self, meta: DataFrame, df: DataFrame, xlim: Optional[Tuple[float, float]] = None, **kwargs):
         """
         Plots simulation results grouped by Object and Metric.
 
         Args:
             meta: Metadata DataFrame returned by solve().
             df: Time-series DataFrame returned by solve().
+            xlim: Optional tuple (min, max) for x-axis limits.
             **kwargs: Arguments passed to plt.subplots().
         """
         if meta.empty or df.empty:
@@ -278,8 +317,11 @@ class Dynamics(Indexable):
             logger.warning("No data groups found to plot.")
             return
 
+        if xlim is None:
+            xlim = (df.index.min(), df.index.max())
+
         # Intelligent figure sizing
-        fig_height = max(n_groups * 2.5, 4)
+        fig_height = max(n_groups * 3.0, 5)
         fig, axes = plt.subplots(n_groups, 1, sharex=True,
                                  figsize=(10, fig_height),
                                  squeeze=False, **kwargs)
@@ -310,11 +352,16 @@ class Dynamics(Indexable):
                     lbl = " ".join(label_parts)
                     
                     plot_label = f"{ctg} | {lbl}" if lbl else ctg
-                    ax.plot(ctg_data.index, ctg_data[col], label=plot_label)
+                    ax.plot(ctg_data.index, ctg_data[col], label=plot_label, linewidth=1.5)
 
-            ax.set_ylabel(f"{obj}\n{metric}")
-            ax.grid(True, alpha=0.3)
+            ax.set_ylabel(f"{obj}\n{metric}", fontsize=10, fontweight='bold')
+            ax.grid(True, which='major', linestyle='-', linewidth=0.75, alpha=0.7)
+            ax.grid(True, which='minor', linestyle=':', linewidth=0.5, alpha=0.5)
+            ax.minorticks_on()
+            
+            if xlim:
+                ax.set_xlim(xlim)
 
-        axes_flat[-1].set_xlabel("Time (s)")
-        plt.tight_layout(pad=1.5)
+        axes_flat[-1].set_xlabel("Time (s)", fontsize=10, fontweight='bold')
+        plt.tight_layout(pad=2.0)
         plt.show()

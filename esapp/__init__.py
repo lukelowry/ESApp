@@ -24,3 +24,6 @@ from .saw import (
 
 # Main Grid Work Bench Class
 from .workbench import GridWorkBench
+
+# Transient Stability Field Constants for Intellisense
+from .ts_fields import TS, TSField

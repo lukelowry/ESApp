@@ -38,7 +38,7 @@ from esapp import SAW
     ("SelectAll", ("Bus",), 'SelectAll(Bus, );'),
     ("TSTransferStateToPowerFlow", (), "TSTransferStateToPowerFlow(NO);"),
     ("TSSolveAll", (), "TSSolveAll()"),
-    ("TSSolve", ("MyCtg",), 'TSSolve("MyCtg")'),
+    ("TSSolve", ("MyCtg",), 'TSSolve("MyCtg", [0, 10, 0.25, YES])'),
     ("TSCalculateCriticalClearTime", ("[BRANCH 1 2 1]",), 'TSCalculateCriticalClearTime([BRANCH 1 2 1]);'),
     ("TSClearModelsforObjects", ("Gen", "SELECTED"), 'TSClearModelsforObjects(Gen, "SELECTED");'),
     ("TSJoinActiveCTGs", (10.0, False, True, "", "Both"), 'TSJoinActiveCTGs(10.0, NO, YES, "", Both);'),
@@ -1061,8 +1061,8 @@ class TestGetSubData:
     # TSRunResultAnalyzer (line 404)
     ("TSRunResultAnalyzer", (), 'TSRunResultAnalyzer("");'),
     ("TSRunResultAnalyzer", ("Ctg1",), 'TSRunResultAnalyzer("Ctg1");'),
-    # TSRunUntilSpecifiedTime (lines 416-433)
-    ("TSRunUntilSpecifiedTime", ("Ctg1",), 'TSRunUntilSpecifiedTime("Ctg1", [NO, NO]);'),
+    # TSRunUntilSpecifiedTime (lines 416-433) - uses defaults for step_size=0.25, steps_in_cycles=True
+    ("TSRunUntilSpecifiedTime", ("Ctg1",), 'TSRunUntilSpecifiedTime("Ctg1", [, 0.25, YES, NO]);'),
     ("TSRunUntilSpecifiedTime", ("Ctg1", 10.0, 0.01, True, True, 5),
      'TSRunUntilSpecifiedTime("Ctg1", [10.0, 0.01, YES, YES, 5]);'),
     # TSSaveBPA (lines 437-438)
@@ -1092,9 +1092,9 @@ class TestGetSubData:
      'TSSolve("GEN_TRIP", [0.0, 10.0, 0.01, NO])'),
     ("TSSolve", ("GEN_TRIP", 0.0, 10.0, 0.01, True),
      'TSSolve("GEN_TRIP", [0.0, 10.0, 0.01, YES])'),
-    # TSSolve with partial time params
+    # TSSolve with partial time params (uses defaults for step_size=0.25, step_in_cycles=True)
     ("TSSolve", ("GEN_TRIP", None, 10.0),
-     'TSSolve("GEN_TRIP", [, 10.0, , NO])'),
+     'TSSolve("GEN_TRIP", [, 10.0, 0.25, YES])'),
 ])
 def test_transient_extended(saw_obj, method, args, expected_script):
     """Verify transient mixin methods produce correct script commands."""

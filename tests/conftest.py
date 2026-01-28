@@ -204,8 +204,18 @@ def get_all_gobject_subclasses():
     return all_subclasses
 
 
-def get_sample_gobject_subclasses():
-    """Return a representative sample of GObject subclasses for faster parametrized tests."""
+def get_sample_gobject_subclasses(require_keys=False, require_multiple_editable=False, require_editable_non_key=False):
+    """Return a representative sample of GObject subclasses for faster parametrized tests.
+
+    Parameters
+    ----------
+    require_keys : bool
+        If True, only return classes with at least one key field.
+    require_multiple_editable : bool
+        If True, only return classes with at least 2 editable non-key fields.
+    require_editable_non_key : bool
+        If True, only return classes with at least 1 editable non-key field.
+    """
     try:
         from esapp import grid
         all_classes = get_all_gobject_subclasses()
@@ -214,6 +224,26 @@ def get_sample_gobject_subclasses():
             import warnings
             warnings.warn("No GObject subclasses found.")
             return []
+
+        # Apply filters if requested
+        if require_keys:
+            all_classes = [c for c in all_classes if hasattr(c, 'keys') and c.keys]
+
+        if require_editable_non_key:
+            def has_editable_non_key(cls):
+                if not hasattr(cls, 'editable') or not hasattr(cls, 'keys'):
+                    return False
+                editable_non_key = [f for f in cls.editable if f not in cls.keys]
+                return len(editable_non_key) >= 1
+            all_classes = [c for c in all_classes if has_editable_non_key(c)]
+
+        if require_multiple_editable:
+            def has_multiple_editable(cls):
+                if not hasattr(cls, 'editable') or not hasattr(cls, 'keys'):
+                    return False
+                editable_non_key = [f for f in cls.editable if f not in cls.keys]
+                return len(editable_non_key) >= 2
+            all_classes = [c for c in all_classes if has_multiple_editable(c)]
 
         priority_types = ['Bus', 'Gen', 'Load', 'Branch', 'Shunt', 'Area', 'Zone',
                          'Contingency', 'Interface', 'InjectionGroup']

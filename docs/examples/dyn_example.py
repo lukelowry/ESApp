@@ -1,30 +1,30 @@
-import ast
-from esapp import GridWorkBench
-from esapp.grid import Bus, Gen, TSContingency, TSContingencyElement
-from esapp.apps.dynamics import Dynamics
+"""
+Transient Stability Simulation Example
+======================================
 
-# Setup
+This example demonstrates how to run a transient stability simulation
+using the ESApp dynamics module.
+
+The TS class provides comprehensive intellisense for all available
+transient stability result fields, organized by object type.
+"""
+import ast
+from esapp import GridWorkBench, TS
+from esapp.grid import Bus, Gen
+
 with open(r'C:\Users\wyattluke.lowery\Documents\GitHub\ESAplus\docs\examples\case.txt', 'r') as f:
     case_path = ast.literal_eval(f.read().strip())
+
 wb = GridWorkBench(case_path)
 
+# Set the simulation runtime (seconds)
+wb.dyn.runtime = 10.0
 
-# 2. Configure Simulation
-# We only need to define what to watch and the total runtime.
-wb.dyn.runtime = 5.0
-wb.dyn.watch(Bus, ['TSBusVPU', 'TSBusAng'])
+wb.dyn.watch(Gen, [TS.Gen.P, TS.Gen.W, TS.Gen.Delta])
 
-# 3. Define Contingency
-# The fluent API allows chaining. No manual upload step is required.
 (wb.dyn.contingency("Fault_Bus5")
-       .at(1.0).fault_bus("5")
-       .at(1.0833).clear_fault("5"))
+       .at(1.0).fault_bus("1")        # Apply 3-phase fault at t=1.0s
+       .at(1.153).clear_fault("1"))   # Clear fault at t=1.153s
 
-# 4. Run Simulation
-# Pass the contingency name directly. The manager handles initialization and retrieval.
 meta, results = wb.dyn.solve("Fault_Bus5")
-
-# 5. Visualize
-if not results.empty:
-    print(f"Simulation complete: {len(results)} time steps retrieved.")
-    wb.dyn.plot(meta, results)
+wb.dyn.plot(meta, results)

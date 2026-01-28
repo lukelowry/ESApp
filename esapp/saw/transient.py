@@ -143,10 +143,10 @@ class TransientMixin:
     def TSSolve(
         self,
         ctgname: str,
-        start_time: float = None,
-        stop_time: float = None,
-        step_size: float = None,
-        step_in_cycles: bool = False,
+        start_time: float = 0,
+        stop_time: float = 10,
+        step_size: float = 0.25,
+        step_in_cycles: bool = True,
     ):
         """Solves a single transient stability contingency.
 
@@ -433,25 +433,17 @@ class TransientMixin:
         self,
         ctg_name: str,
         stop_time: float = None,
-        step_size: float = None,
-        steps_in_cycles: bool = False,
+        step_size: float = 0.25,
+        steps_in_cycles: bool = True,
         reset_start_time: bool = False,
         steps_to_do: int = 0,
     ):
         """Allows manual control of the transient stability run."""
         opts = []
-        if stop_time is not None:
-            opts.append(str(stop_time))
-        if step_size is not None:
-            opts.append(str(step_size))
-        if steps_in_cycles:
-            opts.append("YES")
-        else:
-            opts.append("NO")
-        if reset_start_time:
-            opts.append("YES")
-        else:
-            opts.append("NO")
+        opts.append(str(stop_time) if stop_time is not None else "")
+        opts.append(str(step_size) if step_size is not None else "")
+        opts.append("YES" if steps_in_cycles else "NO")
+        opts.append("YES" if reset_start_time else "NO")
         if steps_to_do > 0:
             opts.append(str(steps_to_do))
 

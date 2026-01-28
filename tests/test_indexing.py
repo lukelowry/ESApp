@@ -25,6 +25,21 @@ def pytest_generate_tests(metafunc):
         classes = get_sample_gobject_subclasses()
         ids = [c.TYPE if hasattr(c, 'TYPE') else c.__name__ for c in classes]
         metafunc.parametrize("g_object", classes, ids=ids)
+    elif "g_object_keyed" in metafunc.fixturenames:
+        # Objects that have keys (for tests that require GetParamsRectTyped to return key data)
+        classes = get_sample_gobject_subclasses(require_keys=True)
+        ids = [c.TYPE if hasattr(c, 'TYPE') else c.__name__ for c in classes]
+        metafunc.parametrize("g_object_keyed", classes, ids=ids)
+    elif "g_object_keyed_editable" in metafunc.fixturenames:
+        # Objects with keys AND at least 1 editable non-key field
+        classes = get_sample_gobject_subclasses(require_keys=True, require_editable_non_key=True)
+        ids = [c.TYPE if hasattr(c, 'TYPE') else c.__name__ for c in classes]
+        metafunc.parametrize("g_object_keyed_editable", classes, ids=ids)
+    elif "g_object_multi_editable" in metafunc.fixturenames:
+        # Objects with at least 2 editable non-key fields
+        classes = get_sample_gobject_subclasses(require_multiple_editable=True)
+        ids = [c.TYPE if hasattr(c, 'TYPE') else c.__name__ for c in classes]
+        metafunc.parametrize("g_object_multi_editable", classes, ids=ids)
 
 
 @pytest.fixture
@@ -154,12 +169,13 @@ def test_setitem_bulk_update_from_df(indexable_instance: Indexable, g_object: Ty
     )
 
 
-def test_setitem_broadcast_multiple_fields(indexable_instance: Indexable, g_object: Type[grid.GObject]):
+def test_setitem_broadcast_multiple_fields(indexable_instance: Indexable, g_object_multi_editable: Type[grid.GObject]):
     """idx[GObject, ['F1','F2']] = [v1, v2] broadcasts multiple values."""
     mock_esa = indexable_instance.esa
+    g_object = g_object_multi_editable
     editable_fields = [f for f in g_object.editable if f not in g_object.keys]
-    if len(editable_fields) < 2:
-        pytest.skip(f"{g_object.__name__} has < 2 editable fields.")
+    # Filtering already ensures at least 2 editable non-key fields
+    assert len(editable_fields) >= 2, f"{g_object.__name__} should have >= 2 editable fields"
 
     fields = editable_fields[:2]
     values = [1.1, 2.2]
@@ -290,3 +306,217 @@ def test_setitem_with_nan_values(indexable_instance: Indexable):
 
     sent_df = mock_esa.ChangeParametersMultipleElementRect.call_args[0][2]
     assert pd.isna(sent_df.iloc[1][editable_fields[0]])
+
+
+# =============================================================================
+# Additional coverage tests
+# =============================================================================
+
+def test_set_esa():
+    """set_esa() correctly assigns the SAW instance."""
+    instance = Indexable()
+    mock_esa = Mock()
+    instance.set_esa(mock_esa)
+    assert instance.esa is mock_esa
+
+
+def test_open_relative_path():
+    """open() converts relative path to absolute."""
+    from os import path as ospath
+    with patch('esapp.indexable.SAW') as mock_saw_class, \
+         patch('esapp.indexable.path.isabs', return_value=False), \
+         patch('esapp.indexable.path.abspath', return_value='/abs/path/case.pwb'):
+
+        mock_esa = Mock()
+        mock_saw_class.return_value = mock_esa
+
+        instance = Indexable()
+        instance.fname = 'relative/case.pwb'
+        instance.open()
+
+        assert instance.fname == '/abs/path/case.pwb'
+        mock_saw_class.assert_called_once_with('/abs/path/case.pwb', CreateIfNotFound=True, early_bind=True)
+        mock_esa.TSInitialize.assert_called_once()
+
+
+def test_open_absolute_path():
+    """open() preserves absolute path."""
+    with patch('esapp.indexable.SAW') as mock_saw_class, \
+         patch('esapp.indexable.path.isabs', return_value=True):
+
+        mock_esa = Mock()
+        mock_saw_class.return_value = mock_esa
+
+        instance = Indexable()
+        instance.fname = '/absolute/path/case.pwb'
+        instance.open()
+
+        assert instance.fname == '/absolute/path/case.pwb'
+        mock_saw_class.assert_called_once_with('/absolute/path/case.pwb', CreateIfNotFound=True, early_bind=True)
+
+
+def test_fexcept_helper():
+    """fexcept converts 'Three' prefix back to '3'."""
+    from esapp.indexable import fexcept
+
+    assert fexcept("ThreeWindingTransformer") == "3WindingTransformer"
+    assert fexcept("ThreePhase") == "3Phase"
+    assert fexcept("NormalName") == "NormalName"
+    assert fexcept("Bus") == "Bus"
+    assert fexcept("") == ""
+
+
+def test_getitem_with_gobject_enum_field(indexable_instance: Indexable):
+    """idx[GObject, GObject.Field] retrieves field using enum member."""
+    mock_esa = indexable_instance.esa
+
+    # Get a GObject field enum member
+    bus_fields = list(grid.Bus)
+    field_member = None
+    for member in bus_fields:
+        if hasattr(member, 'value') and isinstance(member.value, tuple) and len(member.value) >= 2:
+            field_member = member
+            break
+
+    if field_member is None:
+        pytest.skip("Could not find a suitable GObject field member.")
+
+    field_name = field_member.value[1]
+    expected_fields = sorted(list(set(grid.Bus.keys) | {field_name}))
+
+    mock_df = pd.DataFrame({f: [1, 2] for f in expected_fields})
+    mock_esa.GetParamsRectTyped.return_value = mock_df
+
+    result_df = indexable_instance[grid.Bus, field_member]
+    mock_esa.GetParamsRectTyped.assert_called_once_with(grid.Bus.TYPE, expected_fields)
+    assert_frame_equal(result_df, mock_df)
+
+
+def test_getitem_invalid_slice(indexable_instance: Indexable):
+    """ValueError when using unsupported slice for fields."""
+    with pytest.raises(ValueError, match="Only the full slice"):
+        indexable_instance[grid.Bus, [slice(1, 2)]]
+
+
+def test_setitem_invalid_fields_type(indexable_instance: Indexable):
+    """TypeError when fields is not a string or list."""
+    with pytest.raises(TypeError, match="Fields must be a string or a list/tuple"):
+        indexable_instance[grid.Bus, 123] = "value"
+
+
+def test_setitem_bulk_update_not_dataframe(indexable_instance: Indexable):
+    """TypeError when bulk update value is not a DataFrame."""
+    with pytest.raises(TypeError, match="A DataFrame is required"):
+        indexable_instance[grid.Bus] = "not a dataframe"
+
+
+def test_setitem_broadcast_empty_dataframe(indexable_instance: Indexable, g_object_keyed_editable: Type[grid.GObject]):
+    """Setting field on objects when no objects exist (empty DataFrame) is a no-op."""
+    mock_esa = indexable_instance.esa
+    g_object = g_object_keyed_editable
+    editable_fields = [f for f in g_object.editable if f not in g_object.keys]
+
+    # Filtering already ensures keys exist and at least 1 editable non-key field
+    assert g_object.keys, f"{g_object.__name__} should have keys"
+    assert editable_fields, f"{g_object.__name__} should have editable non-key fields"
+
+    mock_esa.GetParamsRectTyped.return_value = pd.DataFrame()
+
+    indexable_instance[g_object, editable_fields[0]] = 1.0
+
+    # Should not call ChangeParametersMultipleElementRect since no objects exist
+    mock_esa.ChangeParametersMultipleElementRect.assert_not_called()
+
+
+def test_setitem_broadcast_none_dataframe(indexable_instance: Indexable):
+    """Setting field when GetParamsRectTyped returns None is a no-op."""
+    mock_esa = indexable_instance.esa
+    editable_fields = [f for f in grid.Bus.editable if f not in grid.Bus.keys]
+
+    if not editable_fields:
+        pytest.skip("Bus has no editable non-key fields.")
+
+    mock_esa.GetParamsRectTyped.return_value = None
+
+    indexable_instance[grid.Bus, editable_fields[0]] = 1.0
+
+    mock_esa.ChangeParametersMultipleElementRect.assert_not_called()
+
+
+def test_bulk_update_not_found_missing_identifiers(indexable_instance: Indexable):
+    """ValueError when bulk update fails with missing identifiers."""
+    from esapp.saw import PowerWorldPrerequisiteError
+    mock_esa = indexable_instance.esa
+
+    # Create a DataFrame missing the secondary identifier (GenID)
+    update_df = pd.DataFrame({
+        "BusNum": [1, 2],
+        "GenMW": [100.0, 200.0]
+    })
+
+    # Mock ChangeParametersMultipleElementRect to raise "not found" error
+    mock_esa.ChangeParametersMultipleElementRect.side_effect = PowerWorldPrerequisiteError(
+        "Object not found in case"
+    )
+
+    with pytest.raises(ValueError, match="Missing required identifier field"):
+        indexable_instance[grid.Gen] = update_df
+
+
+def test_bulk_update_not_found_all_identifiers_present(indexable_instance: Indexable):
+    """PowerWorldPrerequisiteError re-raised when all identifiers present but still not found."""
+    from esapp.saw import PowerWorldPrerequisiteError
+    mock_esa = indexable_instance.esa
+
+    # Create a DataFrame with ALL identifiers present (Gen has many secondary identifiers)
+    # We need to include all fields in grid.Gen.identifiers
+    all_identifiers = grid.Gen.identifiers
+    update_data = {field: [999, 1000] if field == "BusNum" else ["1", "1"] for field in all_identifiers}
+    update_data["GenMW"] = [100.0, 200.0]  # Add an editable field
+    update_df = pd.DataFrame(update_data)
+
+    # Mock ChangeParametersMultipleElementRect to raise "not found" error
+    mock_esa.ChangeParametersMultipleElementRect.side_effect = PowerWorldPrerequisiteError(
+        "Object not found in case"
+    )
+
+    with pytest.raises(PowerWorldPrerequisiteError, match="not found"):
+        indexable_instance[grid.Gen] = update_df
+
+
+def test_bulk_update_other_error(indexable_instance: Indexable):
+    """Other PowerWorldPrerequisiteError is re-raised without modification."""
+    from esapp.saw import PowerWorldPrerequisiteError
+    mock_esa = indexable_instance.esa
+
+    update_df = pd.DataFrame({
+        "BusNum": [1, 2],
+        "GenID": ["1", "1"]
+    })
+
+    # Mock with a different error message (not "not found")
+    mock_esa.ChangeParametersMultipleElementRect.side_effect = PowerWorldPrerequisiteError(
+        "Some other PowerWorld error"
+    )
+
+    with pytest.raises(PowerWorldPrerequisiteError, match="Some other PowerWorld error"):
+        indexable_instance[grid.Gen] = update_df
+
+
+def test_getitem_single_string_field(indexable_instance: Indexable):
+    """idx[GObject, 'FieldName'] works with a single string field."""
+    mock_esa = indexable_instance.esa
+
+    non_key_fields = [f for f in grid.Bus.fields if f not in grid.Bus.keys]
+    if not non_key_fields:
+        pytest.skip("Bus has no non-key fields.")
+
+    field = non_key_fields[0]
+    expected_fields = sorted(list(set(grid.Bus.keys) | {field}))
+
+    mock_df = pd.DataFrame({f: [1, 2] for f in expected_fields})
+    mock_esa.GetParamsRectTyped.return_value = mock_df
+
+    result_df = indexable_instance[grid.Bus, field]
+    mock_esa.GetParamsRectTyped.assert_called_once_with(grid.Bus.TYPE, expected_fields)
+    assert_frame_equal(result_df, mock_df)
