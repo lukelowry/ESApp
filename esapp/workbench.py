@@ -1,6 +1,7 @@
 from .apps.gic import GIC
 from .apps.network import Network
 from .apps.modes import ForcedOscillation
+from .apps.dynamics import Dynamics
 from .indexable import Indexable
 from .grid import Bus, Branch, Gen, Load, Shunt, Area, Zone, Substation, Sim_Solution_Options
 from .saw import create_object_string
@@ -33,9 +34,7 @@ class GridWorkBench(Indexable):
         self.network = Network()
         self.gic     = GIC()
         self.modes   = ForcedOscillation()
-
-        #self.dyn = Dynamics(self.esa)
-        #self.statics = Statics(self.esa)
+        self.dyn     = Dynamics()
 
         # State chain for iterative solvers
         self._state_chain_idx = -1
@@ -62,6 +61,7 @@ class GridWorkBench(Indexable):
         self.network.set_esa(esa)
         self.gic.set_esa(esa)
         self.modes.set_esa(esa)
+        self.dyn.set_esa(esa)
 
     def voltage(self, complex=True, pu=True):
         """

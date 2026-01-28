@@ -49,12 +49,14 @@ class TransientMixin:
             Alternatively, if the given CtgName does not exist, a tuple
             of (None, None) will be returned.
         """
+        start_time_str = str(StartTime) if StartTime is not None else ""
+        stop_time_str = str(StopTime) if StopTime is not None else ""
         out = self._call_simauto(
             "TSGetContingencyResults",
             CtgName,
             ObjFieldList,
-            str(StartTime),
-            str(StopTime),
+            start_time_str,
+            stop_time_str,
         )
         # We get (None, (None,)) if the contingency does not exist.
         if out == (None, (None,)):
@@ -138,17 +140,43 @@ class TransientMixin:
         yn = "YES" if value else "NO"
         self.RunScriptCommand(f"TSResultStorageSetAll({object}, {yn})")
 
-    def TSSolve(self, ctgname: str):
+    def TSSolve(
+        self,
+        ctgname: str,
+        start_time: float = None,
+        stop_time: float = None,
+        step_size: float = None,
+        step_in_cycles: bool = False,
+    ):
         """Solves a single transient stability contingency.
-        
+
         This is a wrapper for the ``TSSolve`` script command.
-        
+
         Parameters
         ----------
         ctgname : str
             The name of the contingency to solve.
+        start_time : float, optional
+            Start time in seconds. Overrides the contingency's property.
+        stop_time : float, optional
+            Stop time in seconds. Overrides the contingency's property.
+        step_size : float, optional
+            Step size (in seconds unless step_in_cycles is True).
+            Overrides the contingency's property.
+        step_in_cycles : bool, optional
+            If True, step_size is interpreted as cycles rather than seconds.
+            Defaults to False.
         """
-        self.RunScriptCommand(f'TSSolve("{ctgname}")')
+        if start_time is not None or stop_time is not None or step_size is not None:
+            parts = []
+            parts.append(str(start_time) if start_time is not None else "")
+            parts.append(str(stop_time) if stop_time is not None else "")
+            parts.append(str(step_size) if step_size is not None else "")
+            sic = "YES" if step_in_cycles else "NO"
+            parts.append(sic)
+            self.RunScriptCommand(f'TSSolve("{ctgname}", [{", ".join(parts)}])')
+        else:
+            self.RunScriptCommand(f'TSSolve("{ctgname}")')
 
     def TSSolveAll(self):
         """Solves all defined transient stability contingencies.

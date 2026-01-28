@@ -7,6 +7,7 @@ using a mocked COM interface (no PowerWorld required).
 USAGE:
     pytest tests/test_saw_unit.py -v
 """
+import os
 import pytest
 from unittest.mock import MagicMock, Mock, patch
 import pandas as pd
@@ -805,3 +806,355 @@ class TestToNumericLocale:
         result = saw_obj._replace_decimal_delimiter(s)
         assert result.iloc[0] == 1.5
         saw_obj.decimal_delimiter = "."
+
+
+# =============================================================================
+# general.py — full coverage
+# =============================================================================
+
+@pytest.mark.parametrize("method, args, expected_script", [
+    # WriteTextToFile (lines 90-91)
+    ("WriteTextToFile", ("output.txt", "Hello World"), 'WriteTextToFile("output.txt", "Hello World");'),
+    # WriteTextToFile with embedded quotes
+    ("WriteTextToFile", ("output.txt", 'say "hi"'), 'WriteTextToFile("output.txt", "say ""hi""");'),
+    # LoadAux (lines 295-296)
+    ("LoadAux", ("data.aux",), 'LoadAux("data.aux", NO);'),
+    ("LoadAux", ("data.aux", True), 'LoadAux("data.aux", YES);'),
+    # ImportData (lines 321-322)
+    ("ImportData", ("data.csv", "CSV"), 'ImportData("data.csv", CSV, 1, NO);'),
+    ("ImportData", ("data.csv", "CSV", 2, True), 'ImportData("data.csv", CSV, 2, YES);'),
+    # SaveData with defaults (lines 414-432)
+    ("SaveData", ("out.csv", "CSV", "Bus", ["BusNum", "BusName"]),
+     'SaveData("out.csv", CSV, Bus, [BusNum, BusName], [], , [], NO, YES);'),
+    # SaveData with subdatalist
+    ("SaveData", ("out.csv", "CSV", "Gen", ["BusNum"], ["BidCurve"]),
+     'SaveData("out.csv", CSV, Gen, [BusNum], [BidCurve], , [], NO, YES);'),
+    # SaveData with filter
+    ("SaveData", ("out.csv", "CSV", "Bus", ["BusNum"], None, "MyFilter"),
+     'SaveData("out.csv", CSV, Bus, [BusNum], [], "MyFilter", [], NO, YES);'),
+    # SaveData with SELECTED filter (no quotes)
+    ("SaveData", ("out.csv", "CSV", "Bus", ["BusNum"], None, "SELECTED"),
+     'SaveData("out.csv", CSV, Bus, [BusNum], [], SELECTED, [], NO, YES);'),
+    # SaveData with sortfieldlist
+    ("SaveData", ("out.csv", "CSV", "Bus", ["BusNum"], None, "", ["BusNum"]),
+     'SaveData("out.csv", CSV, Bus, [BusNum], [], , [BusNum], NO, YES);'),
+    # SaveData with transpose and append
+    ("SaveData", ("out.csv", "CSV", "Bus", ["BusNum"], None, "", None, True, False),
+     'SaveData("out.csv", CSV, Bus, [BusNum], [], , [], YES, NO);'),
+    # SaveDataWithExtra (lines 474-489)
+    ("SaveDataWithExtra", ("out.csv", "CSV", "Bus", ["BusNum"]),
+     'SaveDataWithExtra("out.csv", CSV, Bus, [BusNum], [], , [], [], [], NO, YES);'),
+    # SaveDataWithExtra with all optional params
+    ("SaveDataWithExtra", ("out.csv", "CSV", "Bus", ["BusNum"], ["SubField"], "MyFilter", ["BusNum"], ["Header1"], ["Value1"], True, False),
+     'SaveDataWithExtra("out.csv", CSV, Bus, [BusNum], [SubField], "MyFilter", [BusNum], ["Header1"], ["Value1"], YES, NO);'),
+    # SaveObjectFields (lines 643-644)
+    ("SaveObjectFields", ("fields.txt", "Bus", ["BusNum", "BusName"]),
+     'SaveObjectFields("fields.txt", Bus, [BusNum, BusName]);'),
+    # SetData with custom filter
+    ("SetData", ("Bus", ["BusName"], ["NewName"], "MyFilter"),
+     'SetData(Bus, [BusName], [NewName], "MyFilter");'),
+    # SetData with SELECTED filter
+    ("SetData", ("Bus", ["BusName"], ["NewName"], "SELECTED"),
+     'SetData(Bus, [BusName], [NewName], SELECTED);'),
+    # SendToExcelAdvanced (lines 762-774)
+    ("SendToExcelAdvanced", ("Bus", ["BusNum", "BusName"]),
+     'SendtoExcel(Bus, [BusNum, BusName], , YES, "", "", [], [], [], YES, 0, 0);'),
+    # SendToExcelAdvanced with all params
+    ("SendToExcelAdvanced", ("Bus", ["BusNum"], "MyFilter", False, "Book1", "Sheet1", ["BusNum"], ["H1"], ["V1"], False, 1, 2),
+     'SendtoExcel(Bus, [BusNum], "MyFilter", NO, "Book1", "Sheet1", [BusNum], ["H1"], ["V1"], NO, 1, 2);'),
+    # LogAddDateTime (lines 813-816)
+    ("LogAddDateTime", ("Timer",), 'LogAddDateTime("Timer", YES, YES, NO);'),
+    ("LogAddDateTime", ("Timer", False, False, True), 'LogAddDateTime("Timer", NO, NO, YES);'),
+    # LoadAuxDirectory (lines 854-858) — with filter
+    ("LoadAuxDirectory", ("C:\\AuxFiles", "*.aux", True), 'LoadAuxDirectory("C:\\AuxFiles", "*.aux", YES);'),
+    # LoadAuxDirectory — without filter
+    ("LoadAuxDirectory", ("C:\\AuxFiles",), 'LoadAuxDirectory("C:\\AuxFiles", , NO);'),
+    # LoadData (lines 884-885)
+    ("LoadData", ("data.aux", "BusData"), 'LoadData("data.aux", BusData, NO);'),
+    ("LoadData", ("data.aux", "BusData", True), 'LoadData("data.aux", BusData, YES);'),
+])
+def test_general_extended(saw_obj, method, args, expected_script):
+    """Verify general mixin methods produce correct script commands."""
+    getattr(saw_obj, method)(*args)
+    saw_obj._pwcom.RunScriptCommand.assert_called_with(expected_script)
+
+
+class TestGetSubData:
+    """Tests for GetSubData — covers lines 577-620."""
+
+    @staticmethod
+    def _write_tmp(content):
+        """Write content to a real temp file (bypassing the mocked tempfile)."""
+        import tempfile as real_tempfile
+        path = os.path.join(real_tempfile.gettempdir(), f"test_subdata_{id(content)}.aux")
+        with open(path, "w") as f:
+            f.write(content)
+        return path
+
+    def test_get_sub_data_basic(self, saw_obj):
+        """GetSubData parses AUX output with subdata sections."""
+        aux_content = (
+            'DATA (Gen, [BusNum, GenID])\n'
+            '{\n'
+            '1 "1"\n'
+            '<SUBDATA BidCurve>\n'
+            '10.0 50.0\n'
+            '20.0 100.0\n'
+            '</SUBDATA>\n'
+            '2 "1"\n'
+            '<SUBDATA BidCurve>\n'
+            '15.0 75.0\n'
+            '</SUBDATA>\n'
+            '}\n'
+        )
+        tmp_name = self._write_tmp(aux_content)
+        try:
+            original_save = saw_obj.SaveData
+            def mock_save(filename, *a, **kw):
+                import shutil
+                shutil.copy(tmp_name, filename)
+            saw_obj.SaveData = mock_save
+
+            result = saw_obj.GetSubData("Gen", ["BusNum", "GenID"], ["BidCurve"])
+            assert isinstance(result, pd.DataFrame)
+            assert len(result) == 2
+            assert "BidCurve" in result.columns
+        finally:
+            saw_obj.SaveData = original_save
+            os.unlink(tmp_name)
+
+    def test_get_sub_data_file_not_found(self, saw_obj):
+        """GetSubData returns empty DataFrame when file doesn't exist."""
+        original_save = saw_obj.SaveData
+        saw_obj.SaveData = lambda filename, *a, **kw: None
+        try:
+            result = saw_obj.GetSubData("Bus", ["BusNum"], [])
+            assert isinstance(result, pd.DataFrame)
+            assert result.empty
+        finally:
+            saw_obj.SaveData = original_save
+
+    def test_get_sub_data_no_data_match(self, saw_obj):
+        """GetSubData returns empty DataFrame when AUX has no DATA block."""
+        tmp_name = self._write_tmp("// just a comment\n")
+        try:
+            original_save = saw_obj.SaveData
+            def mock_save(filename, *a, **kw):
+                import shutil
+                shutil.copy(tmp_name, filename)
+            saw_obj.SaveData = mock_save
+
+            result = saw_obj.GetSubData("Bus", ["BusNum"], [])
+            assert isinstance(result, pd.DataFrame)
+            assert result.empty
+        finally:
+            saw_obj.SaveData = original_save
+            os.unlink(tmp_name)
+
+    def test_get_sub_data_with_comments_and_blanks(self, saw_obj):
+        """GetSubData ignores comments and blank lines."""
+        aux_content = (
+            'DATA (Bus, [BusNum, BusName])\n'
+            '{\n'
+            '// This is a comment\n'
+            '\n'
+            '1 "Bus1"\n'
+            '}\n'
+        )
+        tmp_name = self._write_tmp(aux_content)
+        try:
+            original_save = saw_obj.SaveData
+            def mock_save(filename, *a, **kw):
+                import shutil
+                shutil.copy(tmp_name, filename)
+            saw_obj.SaveData = mock_save
+
+            result = saw_obj.GetSubData("Bus", ["BusNum", "BusName"])
+            assert isinstance(result, pd.DataFrame)
+            assert len(result) == 1
+        finally:
+            saw_obj.SaveData = original_save
+            os.unlink(tmp_name)
+
+    def test_get_sub_data_bracket_format(self, saw_obj):
+        """GetSubData parses bracket-delimited subdata lines."""
+        aux_content = (
+            'DATA (Gen, [BusNum, GenID])\n'
+            '{\n'
+            '1 "1"\n'
+            '<SUBDATA BidCurve>\n'
+            '[10.0, 50.0]\n'
+            '[20.0, 100.0]\n'
+            '</SUBDATA>\n'
+            '}\n'
+        )
+        tmp_name = self._write_tmp(aux_content)
+        try:
+            original_save = saw_obj.SaveData
+            def mock_save(filename, *a, **kw):
+                import shutil
+                shutil.copy(tmp_name, filename)
+            saw_obj.SaveData = mock_save
+
+            result = saw_obj.GetSubData("Gen", ["BusNum", "GenID"], ["BidCurve"])
+            assert isinstance(result, pd.DataFrame)
+            assert len(result) == 1
+            assert len(result.iloc[0]["BidCurve"]) == 2
+        finally:
+            saw_obj.SaveData = original_save
+            os.unlink(tmp_name)
+
+
+# =============================================================================
+# transient.py — full coverage
+# =============================================================================
+
+@pytest.mark.parametrize("method, args, expected_script", [
+    # TSInitialize (lines 121-124 — success path)
+    ("TSInitialize", (), "TSInitialize()"),
+    # TSStoreResponse (line 176)
+    ("TSStoreResponse", ("Gen", False), "TSResultStorageSetAll(Gen, NO)"),
+    ("TSStoreResponse", (), "TSResultStorageSetAll(ALL, YES)"),
+    # TSClearResultsFromRAM — ALL (lines 193-201)
+    ("TSClearResultsFromRAM", (), "TSClearResultsFromRAM(ALL,YES,YES,YES,YES,YES);"),
+    # TSClearResultsFromRAM — named contingency (quoted)
+    ("TSClearResultsFromRAM", ("MyCtg",), 'TSClearResultsFromRAM("MyCtg",YES,YES,YES,YES,YES);'),
+    # TSClearResultsFromRAM — SELECTED
+    ("TSClearResultsFromRAM", ("SELECTED",), "TSClearResultsFromRAM(SELECTED,YES,YES,YES,YES,YES);"),
+    # TSClearResultsFromRAM — already quoted
+    ("TSClearResultsFromRAM", ('"MyCtg"',), 'TSClearResultsFromRAM("MyCtg",YES,YES,YES,YES,YES);'),
+    # TSClearResultsFromRAM — mixed flags
+    ("TSClearResultsFromRAM", ("ALL", False, True, False, True, False),
+     "TSClearResultsFromRAM(ALL,NO,YES,NO,YES,NO);"),
+    # TSSetPlayInSignals is tested separately (needs numpy)
+    # TSClearResultsFromRAMAndDisableStorage (lines 249-250)
+    ("TSClearResultsFromRAMAndDisableStorage", (),
+     "TSClearResultsFromRAM(ALL,YES,YES,YES,YES,YES);"),
+    # TSWriteOptions (lines 277-287)
+    ("TSWriteOptions", ("opts.aux",),
+     'TSWriteOptions("opts.aux", [YES, YES, YES, YES, YES, YES, YES], PRIMARY);'),
+    ("TSWriteOptions", ("opts.aux", False, False, False, False, False, False, False, "SECONDARY"),
+     'TSWriteOptions("opts.aux", [NO, NO, NO, NO, NO, NO, NO], SECONDARY);'),
+    # TSAutoInsertZPOTT (line 312)
+    ("TSAutoInsertZPOTT", (80.0, "MyFilter"), 'TSAutoInsertZPOTT(80.0, "MyFilter");'),
+    # TSDisableMachineModelNonZeroDerivative (line 348)
+    ("TSDisableMachineModelNonZeroDerivative", (), "TSDisableMachineModelNonZeroDerivative(0.001);"),
+    ("TSDisableMachineModelNonZeroDerivative", (0.01,), "TSDisableMachineModelNonZeroDerivative(0.01);"),
+    # TSGetVCurveData (line 352)
+    ("TSGetVCurveData", ("vcurve.csv", "AllGens"), 'TSGetVCurveData("vcurve.csv", "AllGens");'),
+    # TSWriteResultsToCSV (lines 364-369)
+    ("TSWriteResultsToCSV", ("results.csv", "PLOT", ["Ctg1"], ["BusPUVolt"]),
+     'TSGetResults("results.csv", PLOT, ["Ctg1"], ["BusPUVolt"]);'),
+    # TSWriteResultsToCSV with times
+    ("TSWriteResultsToCSV", ("results.csv", "PLOT", ["Ctg1"], ["BusPUVolt"], 0.0, 10.0),
+     'TSGetResults("results.csv", PLOT, ["Ctg1"], ["BusPUVolt"], 0.0, 10.0);'),
+    # TSLoadRDB (line 381)
+    ("TSLoadRDB", ("relay.rdb", "SEL421"), 'TSLoadRDB("relay.rdb", SEL421, "");'),
+    ("TSLoadRDB", ("relay.rdb", "SEL421", "MyFilter"), 'TSLoadRDB("relay.rdb", SEL421, "MyFilter");'),
+    # TSLoadRelayCSV (line 385)
+    ("TSLoadRelayCSV", ("relay.csv", "SEL421"), 'TSLoadRelayCSV("relay.csv", SEL421, "");'),
+    # TSPlotSeriesAdd (line 398)
+    ("TSPlotSeriesAdd", ("Plot1", 1, 1, "Gen", "GenMW"),
+     'TSPlotSeriesAdd("Plot1", 1, 1, Gen, GenMW, "", "");'),
+    ("TSPlotSeriesAdd", ("Plot1", 1, 1, "Gen", "GenMW", "MyFilter", "color=red"),
+     'TSPlotSeriesAdd("Plot1", 1, 1, Gen, GenMW, "MyFilter", "color=red");'),
+    # TSRunResultAnalyzer (line 404)
+    ("TSRunResultAnalyzer", (), 'TSRunResultAnalyzer("");'),
+    ("TSRunResultAnalyzer", ("Ctg1",), 'TSRunResultAnalyzer("Ctg1");'),
+    # TSRunUntilSpecifiedTime (lines 416-433)
+    ("TSRunUntilSpecifiedTime", ("Ctg1",), 'TSRunUntilSpecifiedTime("Ctg1", [NO, NO]);'),
+    ("TSRunUntilSpecifiedTime", ("Ctg1", 10.0, 0.01, True, True, 5),
+     'TSRunUntilSpecifiedTime("Ctg1", [10.0, 0.01, YES, YES, 5]);'),
+    # TSSaveBPA (lines 437-438)
+    ("TSSaveBPA", ("out.bpa",), 'TSSaveBPA("out.bpa", NO);'),
+    ("TSSaveBPA", ("out.bpa", True), 'TSSaveBPA("out.bpa", YES);'),
+    # TSSaveGE (lines 442-443)
+    ("TSSaveGE", ("out.dyd",), 'TSSaveGE("out.dyd", NO);'),
+    ("TSSaveGE", ("out.dyd", True), 'TSSaveGE("out.dyd", YES);'),
+    # TSSavePTI (lines 447-448)
+    ("TSSavePTI", ("out.dyr",), 'TSSavePTI("out.dyr", NO);'),
+    ("TSSavePTI", ("out.dyr", True), 'TSSavePTI("out.dyr", YES);'),
+    # TSSaveTwoBusEquivalent (line 452)
+    ("TSSaveTwoBusEquivalent", ("twobus.pwb", "[BUS 1]"), 'TSSaveTwoBusEquivalent("twobus.pwb", [BUS 1]);'),
+    # TSWriteModels (lines 456-457)
+    ("TSWriteModels", ("models.aux",), 'TSWriteModels("models.aux", NO);'),
+    ("TSWriteModels", ("models.aux", True), 'TSWriteModels("models.aux", YES);'),
+    # TSSetSelectedForTransientReferences (lines 463-465)
+    ("TSSetSelectedForTransientReferences", ("CUSTOMINTEGER", "SET", ["Gen", "Bus"], ["GENROU", "EXST1"]),
+     "TSSetSelectedForTransientReferences(CUSTOMINTEGER, SET, [Gen, Bus], [GENROU, EXST1]);"),
+    # TSSaveDynamicModels (lines 471-472)
+    ("TSSaveDynamicModels", ("dyn.dyr", "PTI", "Gen"),
+     'TSSaveDynamicModels("dyn.dyr", PTI, Gen, "", NO);'),
+    ("TSSaveDynamicModels", ("dyn.dyr", "PTI", "Gen", "MyFilter", True),
+     'TSSaveDynamicModels("dyn.dyr", PTI, Gen, "MyFilter", YES);'),
+    # TSSolve with time params (new feature)
+    ("TSSolve", ("GEN_TRIP", 0.0, 10.0, 0.01, False),
+     'TSSolve("GEN_TRIP", [0.0, 10.0, 0.01, NO])'),
+    ("TSSolve", ("GEN_TRIP", 0.0, 10.0, 0.01, True),
+     'TSSolve("GEN_TRIP", [0.0, 10.0, 0.01, YES])'),
+    # TSSolve with partial time params
+    ("TSSolve", ("GEN_TRIP", None, 10.0),
+     'TSSolve("GEN_TRIP", [, 10.0, , NO])'),
+])
+def test_transient_extended(saw_obj, method, args, expected_script):
+    """Verify transient mixin methods produce correct script commands."""
+    getattr(saw_obj, method)(*args)
+    saw_obj._pwcom.RunScriptCommand.assert_called_with(expected_script)
+
+
+class TestTSSetPlayInSignals:
+    """Tests for TSSetPlayInSignals — covers lines 220-241."""
+
+    def test_set_play_in_signals(self, saw_obj):
+        """TSSetPlayInSignals constructs correct AUX data."""
+        times = np.array([0.0, 1.0, 2.0])
+        signals = np.array([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]])
+        saw_obj._pwcom.ProcessAuxFile.return_value = ("",)
+        with patch("os.unlink"):
+            saw_obj.TSSetPlayInSignals("Signal1", times, signals)
+            saw_obj._pwcom.ProcessAuxFile.assert_called()
+
+    def test_set_play_in_signals_dimension_mismatch(self, saw_obj):
+        """TSSetPlayInSignals raises ValueError on dimension mismatch."""
+        times = np.array([0.0, 1.0])
+        signals = np.array([[1.0], [2.0], [3.0]])  # 3 rows vs 2 times
+        with pytest.raises(ValueError, match="Dimension mismatch"):
+            saw_obj.TSSetPlayInSignals("Signal1", times, signals)
+
+    def test_set_play_in_signals_wrong_ndim(self, saw_obj):
+        """TSSetPlayInSignals raises ValueError for wrong dimensions."""
+        times = np.array([[0.0, 1.0]])  # 2D instead of 1D
+        signals = np.array([[1.0]])
+        with pytest.raises(ValueError, match="Dimension mismatch"):
+            saw_obj.TSSetPlayInSignals("Signal1", times, signals)
+
+    def test_set_play_in_signals_single_column(self, saw_obj):
+        """TSSetPlayInSignals with single signal column."""
+        times = np.array([0.0, 1.0])
+        signals = np.array([[1.0], [2.0]])
+        saw_obj._pwcom.ProcessAuxFile.return_value = ("",)
+        with patch("os.unlink"):
+            saw_obj.TSSetPlayInSignals("Signal1", times, signals)
+            saw_obj._pwcom.ProcessAuxFile.assert_called()
+
+
+class TestTSInitializeFailure:
+    """Tests for TSInitialize failure path — covers lines 121-124."""
+
+    def test_ts_initialize_failure_logs_warning(self, saw_obj):
+        """TSInitialize catches exception and logs warning."""
+        from esapp.saw._exceptions import PowerWorldError
+        saw_obj._pwcom.RunScriptCommand.return_value = ("Error: TS not initialized",)
+        # Should not raise — catches internally
+        saw_obj.TSInitialize()
+
+
+class TestTSGetContingencyResultsNotFound:
+    """Tests for TSGetContingencyResults not-found path — covers line 63."""
+
+    def test_returns_none_tuple_when_ctg_not_found(self, saw_obj):
+        """TSGetContingencyResults returns (None, None) for missing contingency."""
+        saw_obj._pwcom.TSGetContingencyResults.return_value = ("", None, (None,))
+        meta, data = saw_obj.TSGetContingencyResults("NonExistent", ["BusPUVolt"])
+        assert meta is None
+        assert data is None

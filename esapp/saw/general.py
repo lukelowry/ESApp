@@ -619,6 +619,71 @@ class GeneralMixin:
         finally:
             if os.path.exists(tmp.name): os.remove(tmp.name)
 
+    def SetSubData(self, objecttype: str, fieldlist: List[str],
+                   records: List[dict], subdatatype: str = None) -> None:
+        """Write object data with optional SubData sections to PowerWorld via AUX.
+
+        This is the write counterpart to ``GetSubData``. It constructs an AUX
+        DATA block and processes it, creating or updating objects including
+        their nested SubData sections.
+
+        Parameters
+        ----------
+        objecttype : str
+            The PowerWorld object type (e.g., "TSContingency", "Gen", "Contingency").
+        fieldlist : List[str]
+            Field names for the parent object's scalar columns.
+        records : List[dict]
+            Each dict must have keys matching ``fieldlist`` for scalar values.
+            If ``subdatatype`` is specified, the dict may also contain a key
+            matching ``subdatatype`` whose value is a list of lists (each inner
+            list is one row of subdata values).
+        subdatatype : str, optional
+            Name of the SubData section (e.g., "TSContingencyElement",
+            "CTGElement", "BidCurve"). If None, no subdata is written.
+
+        Examples
+        --------
+        >>> saw.SetSubData(
+        ...     "TSContingency",
+        ...     ["TSCTGName", "StartTime", "EndTime", "CTGSkip"],
+        ...     [{
+        ...         "TSCTGName": "Fault1",
+        ...         "StartTime": 0.0,
+        ...         "EndTime": 10.0,
+        ...         "CTGSkip": "NO",
+        ...         "TSContingencyElement": [
+        ...             ["FAULT BUS 1", 1.0],
+        ...             ["CLEAR FAULT 1", 1.083],
+        ...         ]
+        ...     }],
+        ...     subdatatype="TSContingencyElement"
+        ... )
+        """
+        def _fmt(val):
+            """Format a value for AUX output."""
+            if isinstance(val, str):
+                return f'"{val}"'
+            return str(val)
+
+        header = f'DATA ({objecttype}, [{", ".join(fieldlist)}])\n{{\n'
+        body_lines = []
+
+        for rec in records:
+            # Scalar fields for this record
+            vals = [_fmt(rec[f]) for f in fieldlist]
+            body_lines.append(" ".join(vals))
+
+            # SubData section
+            if subdatatype and subdatatype in rec:
+                body_lines.append(f"  <SUBDATA {subdatatype}>")
+                for row in rec[subdatatype]:
+                    body_lines.append("  " + " ".join(_fmt(v) for v in row))
+                body_lines.append("  </SUBDATA>")
+
+        aux = header + "\n".join(body_lines) + "\n}\n"
+        self.exec_aux(aux)
+
     def SaveObjectFields(self, filename: str, objecttype: str, fieldlist: List[str]):
         """Saves a list of fields available for the specified objecttype to a file.
 
