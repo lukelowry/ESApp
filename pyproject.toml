@@ -104,7 +104,7 @@ omit = [
     "*/__pycache__/*",
     # Auto-generated component definitions (175k+ lines, inflates coverage)
     "esapp/components/grid.py",
-    "esapp/components/generate_components.py"
+    "esapp/components/generate_components.py",
     "esapp/apps/modes.py",
 ]
 
