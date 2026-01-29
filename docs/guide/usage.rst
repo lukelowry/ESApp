@@ -233,8 +233,3 @@ Inspect which transient stability models are present in the case:
     print(models)
     # Returns DataFrame with columns: Category, Model, Object Type
 
-Where to go next
-----------------
-- End-to-end scripts: :doc:`examples`
-- Full API reference: :doc:`../api/index`
-- Development and tests: :doc:`../dev/tests`

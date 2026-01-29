@@ -194,9 +194,9 @@ class TSFieldList(Directive):
             table += tgroup
 
             # Column specs - give description more space
+            tgroup += nodes.colspec(colwidth=10)
             tgroup += nodes.colspec(colwidth=15)
-            tgroup += nodes.colspec(colwidth=20)
-            tgroup += nodes.colspec(colwidth=65)
+            tgroup += nodes.colspec(colwidth=75)
 
             # Header
             thead = nodes.thead()

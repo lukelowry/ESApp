@@ -22,12 +22,29 @@ extensions = [
 ]
 
 autosummary_generate = True
+autosummary_imported_members = False
+
+# Exclude ts_fields module from autosummary stub generation
+autosummary_mock_imports = ["esapp.components.ts_fields"]
 
 autodoc_default_options = {
     "members": True,
     "undoc-members": True,
     "member-order": "groupwise",
 }
+
+# Skip TS class and TSField from autodoc - we use custom tables instead
+def autodoc_skip_member(app, what, name, obj, skip, options):
+    # Skip the TS class and all its nested classes
+    if name in ("TS", "TSField"):
+        return True
+    # Skip nested TS category classes (Area, Branch, Bus, Gen, etc.)
+    if hasattr(obj, "__module__") and "ts_fields" in str(getattr(obj, "__module__", "")):
+        return True
+    return skip
+
+def setup(app):
+    app.connect("autodoc-skip-member", autodoc_skip_member)
 
 autodoc_preserve_defaults = True
 todo_include_todos = True
@@ -113,9 +130,10 @@ latex_documents = [
 
 latex_elements = {
     "pointsize": "10pt",
-    "fncychap": r"\usepackage[Sonny]{fncychap}",
+    "fncychap": r"\usepackage[Bjornstrup]{fncychap}",
     "fontpkg": r"""
-\usepackage{lmodern}
+\usepackage{charter}
+\usepackage[scaled=0.9]{inconsolata}
 """,
     "preamble": r"""
 \usepackage{mathrsfs}
@@ -126,46 +144,46 @@ latex_elements = {
 \usepackage{enumitem}
 \usepackage{microtype}
 \usepackage{xcolor}
+\usepackage{array}
+\usepackage{tabularx}
+
+% Define a modern color palette
+\definecolor{linkblue}{RGB}{0, 83, 155}
+\definecolor{codebackground}{RGB}{250, 250, 252}
+\definecolor{codeborder}{RGB}{220, 220, 230}
+\definecolor{headingblue}{RGB}{30, 60, 114}
 
 % Sphinx code-block styling
 \sphinxsetup{
     verbatimwithframe=false,
-    VerbatimColor={RGB}{248,248,248},
-    VerbatimBorderColor={RGB}{200,200,200},
-    InnerLinkColor={RGB}{50,50,150},
-    OuterLinkColor={RGB}{50,50,150}
+    VerbatimColor={RGB}{250,250,252},
+    VerbatimBorderColor={RGB}{220,220,230},
+    InnerLinkColor={RGB}{0,83,155},
+    OuterLinkColor={RGB}{0,83,155}
 }
 
-% Compact lists
-\setlist{nosep}
-\setlength{\parskip}{0.3em}
+% Compact lists with slight breathing room
+\setlist{nosep, itemsep=2pt}
+\setlength{\parskip}{0.4em}
 \setlength{\parindent}{0pt}
 
-% Table styling for better PDF output
-\usepackage{array}
-\usepackage{tabularx}
-\renewcommand{\arraystretch}{1.2}
+% Table styling
+\renewcommand{\arraystretch}{1.25}
+\setlength{\tabcolsep}{5pt}
 
-% Allow tables to break across pages
-\usepackage{ltablex}
-\keepXaliases
-
-% Smaller font for tables
-\AtBeginEnvironment{longtable}{\footnotesize}
-\AtBeginEnvironment{tabular}{\small}
-
-% Reduce table cell padding
-\setlength{\tabcolsep}{4pt}
-
-% Modern header/footer
+% Modern header/footer with clean lines
 \usepackage{fancyhdr}
 \pagestyle{fancy}
 \fancyhf{}
-\fancyhead[L]{\nouppercase{\leftmark}}
-\fancyhead[R]{\thepage}
-\fancyfoot[C]{\small ESA++ Documentation}
-\renewcommand{\headrulewidth}{0.4pt}
-\renewcommand{\footrulewidth}{0.2pt}
+\fancyhead[L]{\small\textcolor{gray}{\nouppercase{\leftmark}}}
+\fancyhead[R]{\small\textcolor{gray}{\thepage}}
+\fancyfoot[C]{\footnotesize\textcolor{gray}{ESA++ Documentation}}
+\renewcommand{\headrulewidth}{0.5pt}
+\renewcommand{\footrulewidth}{0pt}
+
+% Style the head rule
+\renewcommand{\headrule}{\vspace{-4pt}\hbox to\headwidth{\color{codeborder}\leaders\hrule height 0.5pt\hfill}}
 """,
     "figure_align": "H",
+    "sphinxsetup": "hmargin={1in,1in}, vmargin={1in,1in}",
 }

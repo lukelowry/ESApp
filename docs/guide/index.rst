@@ -6,4 +6,3 @@ User Guide
 
    install
    usage
-   examples

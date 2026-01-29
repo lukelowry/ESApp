@@ -1,17 +1,68 @@
 Specialized Applications
 ========================
 
-The ``apps`` package exposes focused helpers (network topology, GIC, etc.) surfaced on ``GridWorkBench``.
-For direct SAW access use ``wb.esa``; for higher-level helpers use the modules below. This page lists the
-API members only.
+The ``apps`` package provides high-level analysis modules accessible through ``GridWorkBench``.
+These modules abstract common workflows for network analysis, transient stability, GIC studies,
+and modal analysis.
 
-.. rubric:: App Modules
+Dynamics
+--------
 
-.. autosummary::
-   :toctree: generated/
+Transient stability simulation with a fluent API for defining contingencies and recording results.
 
-   esapp.apps.dynamics
-   esapp.apps.gic
-   esapp.apps.modes
-   esapp.apps.network
-   esapp.apps.static
+.. currentmodule:: esapp.apps.dynamics
+
+.. autoclass:: Dynamics
+   :members:
+   :show-inheritance:
+
+.. autoclass:: ContingencyBuilder
+   :members:
+
+GIC Analysis
+------------
+
+Geomagnetically Induced Current (GIC) analysis tools.
+
+.. currentmodule:: esapp.apps.gic
+
+.. autoclass:: GIC
+   :members:
+   :show-inheritance:
+
+Modal Analysis
+--------------
+
+Forced oscillation and modal analysis utilities.
+
+.. currentmodule:: esapp.apps.modes
+
+.. automodule:: esapp.apps.modes
+   :members:
+   :exclude-members: Modes
+
+.. autoclass:: Modes
+   :members:
+   :show-inheritance:
+
+Network Topology
+----------------
+
+Network graph analysis including incidence matrices, Laplacians, and path calculations.
+
+.. currentmodule:: esapp.apps.network
+
+.. autoclass:: Network
+   :members:
+   :show-inheritance:
+
+Static Analysis
+---------------
+
+Power flow and steady-state analysis helpers.
+
+.. currentmodule:: esapp.apps.static
+
+.. autoclass:: Static
+   :members:
+   :show-inheritance:

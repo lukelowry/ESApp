@@ -35,19 +35,19 @@
 /* First column: Field name - keep narrow, no wrap */
 .ts-field-table td:first-child {
     white-space: nowrap;
-    width: 12%;
+    width: 10%;
 }
 
 /* Second column: PowerWorld name - allow minimal wrap */
 .ts-field-table td:nth-child(2) {
-    width: 18%;
+    width: 15%;
     word-break: break-word;
     font-size: 0.85em;
 }
 
-/* Third column: Description - allow wrapping */
+/* Third column: Description - allow wrapping, wider */
 .ts-field-table td:nth-child(3) {
-    width: 70%;
+    width: 75%;
     word-wrap: break-word;
 }
 

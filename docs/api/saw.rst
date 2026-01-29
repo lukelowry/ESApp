@@ -1,45 +1,39 @@
 SimAuto Wrapper (SAW)
 =====================
 
-The ``SAW`` (SimAuto Wrapper) class exposes the full PowerWorld API. It is organized into mixins
-corresponding to PowerWorld functional areas (power flow, contingencies, optimization, sensitivity,
-transient, GIC, ATC, topology, voltage analysis, data management). Use ``wb.esa`` to access SAW from
-``GridWorkBench``. This page lists the complete API.
+The ``SAW`` (SimAuto Wrapper) class provides complete access to PowerWorld's SimAuto API.
+It is organized into functional mixins for power flow, contingencies, optimization, sensitivity,
+transient stability, GIC, ATC, topology, and data management. Access SAW through ``wb.esa``
+from ``GridWorkBench``.
 
-API Documentation
-------------------
+SAW Class
+---------
 
 .. currentmodule:: esapp.saw
 
 .. autoclass:: SAW
    :show-inheritance:
    :members:
-   :undoc-members:
+   :inherited-members:
+   :member-order: groupwise
 
-Mixin Modules
---------------
+Exceptions
+----------
 
-.. autosummary::
-   :toctree: generated/
+.. autoclass:: esapp.saw.PowerWorldError
+   :show-inheritance:
 
-   atc
-   base
-   case_actions
-   contingency
-   fault
-   general
-   gic
-   matrices
-   modify
-   oneline
-   opf
-   powerflow
-   pv
-   qv
-   regions
-   scheduled
-   sensitivity
-   timestep
-   topology
-   transient
-   weather
+.. autoclass:: esapp.saw.COMError
+   :show-inheritance:
+
+.. autoclass:: esapp.saw.CommandNotRespectedError
+   :show-inheritance:
+
+.. autoclass:: esapp.saw.SimAutoFeatureError
+   :show-inheritance:
+
+.. autoclass:: esapp.saw.PowerWorldPrerequisiteError
+   :show-inheritance:
+
+.. autoclass:: esapp.saw.PowerWorldAddonError
+   :show-inheritance:
