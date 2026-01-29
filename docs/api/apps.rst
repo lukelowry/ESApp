@@ -37,11 +37,7 @@ Forced oscillation and modal analysis utilities.
 
 .. currentmodule:: esapp.apps.modes
 
-.. automodule:: esapp.apps.modes
-   :members:
-   :exclude-members: Modes
-
-.. autoclass:: Modes
+.. autoclass:: ForcedOscillation
    :members:
    :show-inheritance:
 
@@ -59,10 +55,10 @@ Network graph analysis including incidence matrices, Laplacians, and path calcul
 Static Analysis
 ---------------
 
-Power flow and steady-state analysis helpers.
+Research-focused static analysis including continuation power flow (CPF) and random load variation.
 
 .. currentmodule:: esapp.apps.static
 
-.. autoclass:: Static
+.. autoclass:: Statics
    :members:
    :show-inheritance:

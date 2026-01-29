@@ -177,14 +177,6 @@ latex_elements = {
 \definecolor{tipgreen}{RGB}{232, 245, 233}
 \definecolor{tipborder}{RGB}{102, 187, 106}
 
-% Notebook cell colors
-\definecolor{nbinputbg}{RGB}{247, 247, 247}
-\definecolor{nbinputborder}{RGB}{207, 207, 207}
-\definecolor{nboutputbg}{RGB}{255, 255, 255}
-\definecolor{nboutputborder}{RGB}{221, 221, 221}
-\definecolor{nbinputlabel}{RGB}{48, 63, 159}
-\definecolor{nboutputlabel}{RGB}{211, 47, 47}
-
 % Sphinx code-block styling
 \sphinxsetup{
     verbatimwithframe=false,
@@ -318,66 +310,6 @@ latex_elements = {
 
 % Style the head rule
 \renewcommand{\headrule}{\vspace{-4pt}\hbox to\headwidth{\color{codeborder}\leaders\hrule height 0.5pt\hfill}}
-
-% ============================================================================
-% Jupyter Notebook Cell Styling for nbsphinx
-% ============================================================================
-
-% Style for notebook input cells (code cells)
-\tcbset{
-  nbinputstyle/.style={
-    enhanced,
-    breakable,
-    colback=nbinputbg,
-    colframe=nbinputborder,
-    boxrule=0.5pt,
-    arc=2pt,
-    outer arc=2pt,
-    left=4pt,
-    right=4pt,
-    top=4pt,
-    bottom=4pt,
-    fontupper=\ttfamily\small,
-    before skip=8pt,
-    after skip=4pt
-  },
-  nboutputstyle/.style={
-    enhanced,
-    breakable,
-    colback=nboutputbg,
-    colframe=nboutputborder,
-    boxrule=0.5pt,
-    arc=2pt,
-    outer arc=2pt,
-    left=4pt,
-    right=4pt,
-    top=4pt,
-    bottom=4pt,
-    fontupper=\ttfamily\small,
-    before skip=2pt,
-    after skip=8pt
-  }
-}
-
-% Redefine nbsphinx input/output environments if they exist
-\AtBeginDocument{%
-  % Override nbsphinx input cell styling
-  \@ifundefined{nbsphinxcellcode}{}{%
-    \renewenvironment{nbsphinxcellcode}{%
-      \begin{tcolorbox}[nbinputstyle]%
-    }{%
-      \end{tcolorbox}%
-    }%
-  }%
-  % Override nbsphinx output cell styling
-  \@ifundefined{nbsphinxcelloutput}{}{%
-    \renewenvironment{nbsphinxcelloutput}{%
-      \begin{tcolorbox}[nboutputstyle]%
-    }{%
-      \end{tcolorbox}%
-    }%
-  }%
-}
 
 % Style for DataFrame/table output in notebooks
 \renewcommand{\sphinxstyletheadfamily}{\sffamily\bfseries\small}

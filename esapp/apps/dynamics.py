@@ -236,17 +236,23 @@ class Dynamics(Indexable):
         """
         Register fields to record during simulation for a specific object type.
 
-        Args:
-            gtype: The GObject type to watch (e.g., Gen, Bus, Branch)
-            fields: List of TS field constants or field name strings
-                   Example: [TS.Gen.P, TS.Gen.W] or ["TSGenP", "TSGenW"]
+        Parameters
+        ----------
+        gtype : Type[GObject]
+            The GObject type to watch (e.g., Gen, Bus, Branch).
+        fields : list
+            List of TS field constants or field name strings.
+            Example: ``[TS.Gen.P, TS.Gen.W]`` or ``["TSGenP", "TSGenW"]``.
 
-        Returns:
-            Self for method chaining
+        Returns
+        -------
+        Dynamics
+            Self for method chaining.
 
-        Example:
-            >>> wb.dyn.watch(Gen, [TS.Gen.P, TS.Gen.W, TS.Gen.Delta])
-            >>> wb.dyn.watch(Bus, [TS.Bus.VPU, TS.Bus.Freq])
+        Examples
+        --------
+        >>> wb.dyn.watch(Gen, [TS.Gen.P, TS.Gen.W, TS.Gen.Delta])
+        >>> wb.dyn.watch(Bus, [TS.Bus.VPU, TS.Bus.Freq])
         """
         # Convert TSField objects to their string names
         field_names = [str(f) for f in fields]
@@ -570,11 +576,16 @@ class Dynamics(Indexable):
         """
         Plots simulation results grouped by Object and Metric.
 
-        Args:
-            meta: Metadata DataFrame returned by solve().
-            df: Time-series DataFrame returned by solve().
-            xlim: Optional tuple (min, max) for x-axis limits.
-            **kwargs: Arguments passed to plt.subplots().
+        Parameters
+        ----------
+        meta : DataFrame
+            Metadata DataFrame returned by solve().
+        df : DataFrame
+            Time-series DataFrame returned by solve().
+        xlim : tuple, optional
+            Tuple (min, max) for x-axis limits.
+        kwargs : dict
+            Additional arguments passed to plt.subplots().
         """
         if meta.empty or df.empty:
             logger.warning("No results to plot.")
