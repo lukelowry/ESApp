@@ -139,9 +139,9 @@ class ScheduledActionsMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        aa = "YES" if apply_actions else "NO" if apply_actions is not None else ""
-        uns = "YES" if use_normal_status else "NO" if use_normal_status is not None else ""
-        aw = "YES" if apply_window else "NO" if apply_window is not None else ""
+        aa = YesNo.from_bool(apply_actions) if apply_actions is not None else ""
+        uns = YesNo.from_bool(use_normal_status) if use_normal_status is not None else ""
+        aw = YesNo.from_bool(apply_window) if apply_window is not None else ""
         args = pack_args(f'"{view_time}"', aa, uns, aw)
         return self.RunScriptCommand(f"SetScheduleView({args});")
 

@@ -1,6 +1,7 @@
 """Time Step Simulation specific functions."""
-from typing import List
+from typing import List, Union
 from ._helpers import format_list, pack_args
+from ._enums import FilterKeyword, format_filter
 
 
 class TimeStepMixin:
@@ -272,7 +273,7 @@ class TimeStepMixin:
         args = pack_args(f'"{filename}"', fields, start_time, end_time)
         return self.RunScriptCommand(f"TIMESTEPSaveInputCSV({args});")
 
-    def TimeStepSaveFieldsSet(self, object_type: str, field_list: List[str], filter_name: str = "ALL"):
+    def TimeStepSaveFieldsSet(self, object_type: str, field_list: List[str], filter_name: Union[FilterKeyword, str] = FilterKeyword.ALL):
         """
         Sets fields to save during simulation.
 
@@ -282,8 +283,8 @@ class TimeStepMixin:
             Object type.
         field_list : List[str]
             List of fields.
-        filter_name : str, optional
-            Filter to apply. Defaults to "ALL".
+        filter_name : Union[FilterKeyword, str], optional
+            Filter to apply. Defaults to FilterKeyword.ALL.
 
         Returns
         -------
@@ -291,7 +292,7 @@ class TimeStepMixin:
             The result of the script command.
         """
         fields = format_list(field_list)
-        filt = f'"{filter_name}"' if filter_name != "ALL" and filter_name != "SELECTED" else filter_name
+        filt = format_filter(filter_name)
         return self.RunScriptCommand(f"TimeStepSaveFieldsSet({object_type}, {fields}, {filt});")
 
     def TimeStepSaveFieldsClear(self, object_types: List[str] = None):

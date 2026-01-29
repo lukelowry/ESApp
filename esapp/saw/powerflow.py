@@ -49,7 +49,7 @@ class PowerflowMixin:
         """
         self.RunScriptCommand("ResetToFlatStart();")
 
-    def SolvePowerFlowWithRetry(self, SolMethod: str = "RECTNEWT") -> None:
+    def SolvePowerFlowWithRetry(self, SolMethod: Union[SolverMethod, str] = SolverMethod.RECTNEWT) -> None:
         """Run the SolvePowerFlow command, with a retry mechanism.
 
         If the first attempt to solve the power flow fails, this method
@@ -57,8 +57,8 @@ class PowerflowMixin:
 
         Parameters
         ----------
-        SolMethod : str, optional
-            The solution method to use (e.g., "RECTNEWT"). Defaults to "RECTNEWT".
+        SolMethod : Union[SolverMethod, str], optional
+            The solution method to use. Defaults to SolverMethod.RECTNEWT.
         """
         try:
             self.SolvePowerFlow(SolMethod)

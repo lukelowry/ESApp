@@ -2,7 +2,7 @@
 from typing import Union
 
 from ._helpers import create_object_string, pack_args
-from ._enums import YesNo, LinearMethod
+from ._enums import YesNo, LinearMethod, IslandReference
 
 
 class SensitivityMixin:
@@ -344,7 +344,7 @@ class SensitivityMixin:
         args = pack_args(seller, buyer, transfer_type, avr)
         return self.RunScriptCommand(f"CalculateVoltToTransferSense({args});")
 
-    def CalculateLossSense(self, function_type: str, area_ref: str = "NO", island_ref: str = "EXISTING"):
+    def CalculateLossSense(self, function_type: str, area_ref: str = "NO", island_ref: Union[IslandReference, str] = IslandReference.EXISTING):
         """Calculates loss sensitivity at each bus.
 
         Loss sensitivity indicates how much system losses change for a unit

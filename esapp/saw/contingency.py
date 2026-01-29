@@ -1,7 +1,7 @@
 """Contingency analysis specific functions."""
-from typing import List
+from typing import List, Union
 
-from ._enums import YesNo
+from ._enums import YesNo, LinearMethod
 from ._helpers import format_list, pack_args
 
 
@@ -145,7 +145,7 @@ class ContingencyMixin:
         """
         return self.RunScriptCommand(f'CTGApply("{contingency_name}");')
 
-    def CTGCalculateOTDF(self, seller: str, buyer: str, linear_method: str = "DC"):
+    def CTGCalculateOTDF(self, seller: str, buyer: str, linear_method: Union[LinearMethod, str] = LinearMethod.DC):
         """Computes OTDFs using the specified linear method.
 
         OTDFs quantify the impact of an outage on power transfers between a seller and buyer.
@@ -156,8 +156,8 @@ class ContingencyMixin:
             The seller (source) object string (e.g., '[AREA "Top"]', '[BUS 7]').
         buyer : str
             The buyer (sink) object string (e.g., '[AREA "Bottom"]', '[BUS 8]').
-        linear_method : str, optional
-            The linear method to use for calculation ("AC", "DC", "DCPS"). Defaults to "DC".
+        linear_method : Union[LinearMethod, str], optional
+            The linear method to use for calculation. Defaults to LinearMethod.DC.
 
         Returns
         -------
