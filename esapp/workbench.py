@@ -1,13 +1,16 @@
+from typing import Optional, Tuple, Union
+
 from .apps.gic import GIC
 from .apps.network import Network
 from .apps.modes import ForcedOscillation
 from .apps.dynamics import Dynamics
 from .indexable import Indexable
 from .components import Bus, Branch, Gen, Load, Shunt, Area, Zone, Substation, Sim_Solution_Options
-from .saw import create_object_string
+from .saw import SAW, create_object_string
 
 import numpy as np
 from numpy import any as np_any
+import pandas as pd
 from pandas import DataFrame
 import tempfile
 import os
@@ -17,7 +20,7 @@ class GridWorkBench(Indexable):
     """
     Main entry point for interacting with the PowerWorld grid model.
     """
-    def __init__(self, fname=None):
+    def __init__(self, fname: Optional[str] = None):
         """
         Initialize the GridWorkBench.
 
@@ -55,7 +58,7 @@ class GridWorkBench(Indexable):
         # Propagate the esa instance to the applications.
         self.set_esa(self.esa)
 
-    def set_esa(self, esa):
+    def set_esa(self, esa: Optional[SAW]) -> None:
         """Sets the SAW instance for the workbench and its applications."""
         super().set_esa(esa)
         self.network.set_esa(esa)
@@ -63,7 +66,7 @@ class GridWorkBench(Indexable):
         self.modes.set_esa(esa)
         self.dyn.set_esa(esa)
 
-    def voltage(self, complex=True, pu=True):
+    def voltage(self, complex: bool = True, pu: bool = True) -> Union[pd.Series, Tuple[pd.Series, pd.Series]]:
         """
         Retrieves bus voltages.
 
@@ -85,7 +88,7 @@ class GridWorkBench(Indexable):
         """
         fields = ["BusPUVolt", "BusAngle"] if pu else ["BusKVVolt", "BusAngle"]
         df = self[Bus, fields]
-        
+
         mag = df[fields[0]]
         ang = df['BusAngle'] * np.pi / 180.0
 
@@ -95,7 +98,7 @@ class GridWorkBench(Indexable):
 
     # --- Simulation Control ---
 
-    def pflow(self, getvolts=True, method="POLARNEWT"):
+    def pflow(self, getvolts: bool = True, method: str = "POLARNEWT") -> Optional[Union[pd.Series, Tuple[pd.Series, pd.Series]]]:
         """
         Solve Power Flow in external system.
         By default bus voltages will be returned.
@@ -103,7 +106,7 @@ class GridWorkBench(Indexable):
         Parameters
         ----------
         getvolts : bool, optional
-            Flag to indicate the voltages should be returned after power flow, 
+            Flag to indicate the voltages should be returned after power flow,
             defaults to True.
 
         Returns
@@ -123,7 +126,7 @@ class GridWorkBench(Indexable):
             return self.voltage()
 
 
-    def flatstart(self):
+    def flatstart(self) -> None:
         """
         Resets the case to a flat start (1.0 pu voltage, 0.0 angle).
 
@@ -133,7 +136,7 @@ class GridWorkBench(Indexable):
         """
         self.esa.ResetToFlatStart()
 
-    def reset(self):
+    def reset(self) -> None:
         """
         Alias for flatstart(). Resets the case to a flat start (1.0 pu voltage, 0.0 angle).
 
@@ -143,7 +146,7 @@ class GridWorkBench(Indexable):
         """
         self.flatstart()
 
-    def save(self, filename=None):
+    def save(self, filename: Optional[str] = None) -> None:
         """
         Saves the case to the specified filename, or overwrites current if None.
 
@@ -257,7 +260,7 @@ class GridWorkBench(Indexable):
 
         return output
 
-    def close(self):
+    def close(self) -> None:
         """
         Closes the current case.
 
@@ -267,18 +270,24 @@ class GridWorkBench(Indexable):
         """
         self.esa.CloseCase()
 
-    def edit_mode(self):
-        '''
-        Description:
-            Enters PowerWorld into EDIT mode.
-        '''
+    def edit_mode(self) -> None:
+        """
+        Enter PowerWorld into EDIT mode.
+
+        Examples
+        --------
+        >>> wb.edit_mode()
+        """
         self.esa.EnterMode("EDIT")
 
-    def run_mode(self):
-        '''
-        Description:
-            Enters PowerWorld into RUN mode.
-        '''
+    def run_mode(self) -> None:
+        """
+        Enter PowerWorld into RUN mode.
+
+        Examples
+        --------
+        >>> wb.run_mode()
+        """
         self.esa.EnterMode("RUN")
 
     # --- File Operations ---
@@ -1115,7 +1124,7 @@ class GridWorkBench(Indexable):
         """
         return self.esa.get_gmatrix(dense)
 
-    ''' LOCATION FUNCTIONS '''
+    # --- Location Functions ---
 
     def busmap(self):
         """

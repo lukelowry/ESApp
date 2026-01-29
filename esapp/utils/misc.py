@@ -1,135 +1,213 @@
-from numpy import sum
+"""
+Power system utilities for sensitivity analysis and load modeling.
+
+This module provides tools for constructing injection vectors and
+modifying Y-bus matrices with load/generation models.
+"""
+
+from typing import Optional, Sequence
+
+import numpy as np
+from numpy import sum as npsum
+from numpy.typing import NDArray
 from pandas import DataFrame
+import scipy.sparse as sp
+
+__all__ = [
+    'InjectionVector',
+    'ybus_with_loads',
+]
 
 
 class InjectionVector:
-    """Represents a normalized injection vector for power system sensitivity studies."""
+    """
+    Normalized injection vector for power system sensitivity studies.
 
-    def __init__(self, loaddf: DataFrame, losscomp=0.05) -> None:
-        """Initializes the InjectionVector.
+    Represents a pattern of power injections across system buses,
+    normalized so that total supply equals total demand plus losses.
+    Useful for computing power transfer distribution factors (PTDFs)
+    and line outage distribution factors (LODFs).
 
-        Parameters
-        ----------
-        loaddf : pandas.DataFrame
-            A DataFrame containing at least a 'BusNum' column for all buses in the system.
-        losscomp : float, optional
-            Loss compensation factor. For an increased injection, generation will be
-            increased to compensate for losses. Defaults to 0.05.
-        """
+    Parameters
+    ----------
+    loaddf : pandas.DataFrame
+        DataFrame containing at least a 'BusNum' column for all buses.
+    losscomp : float, default 0.05
+        Loss compensation factor. Supply is scaled up by (1 + losscomp)
+        to account for system losses.
+
+    Attributes
+    ----------
+    loaddf : pandas.DataFrame
+        Internal DataFrame with 'Alpha' column for injection values,
+        indexed by BusNum.
+    losscomp : float
+        Loss compensation factor.
+
+    Examples
+    --------
+    >>> inj = InjectionVector(bus_df, losscomp=0.05)
+    >>> inj.supply(101, 102)  # Set buses 101, 102 as supply
+    >>> inj.demand(201)       # Set bus 201 as demand
+    >>> alpha = inj.vec       # Get normalized injection vector
+    """
+
+    def __init__(self, loaddf: DataFrame, losscomp: float = 0.05) -> None:
         self.loaddf = loaddf.copy()
-
-        self.loaddf['Alpha'] = 0
+        self.loaddf['Alpha'] = 0.0
         self.loaddf = self.loaddf.set_index('BusNum')
-
         self.losscomp = losscomp
-    
+
     @property
-    def vec(self):
-        """Returns the current injection vector as a NumPy array.
+    def vec(self) -> NDArray[np.float64]:
+        """
+        Get the current injection vector as a numpy array.
 
         Returns
         -------
-        numpy.ndarray
-            The injection vector.
+        np.ndarray
+            Injection values for all buses in bus number order.
         """
         return self.loaddf['Alpha'].to_numpy()
-    
-    def supply(self, *busids):
-        """Sets the specified buses as supply points (positive injection).
 
-        The 'Alpha' value for these buses will
+    def supply(self, *busids: int) -> None:
         """
-        self.loaddf.loc[busids, 'Alpha'] = 1
+        Set specified buses as supply points (positive injection).
+
+        The injection vector is automatically normalized after this call.
+
+        Parameters
+        ----------
+        *busids : int
+            Bus numbers to set as supply points.
+        """
+        self.loaddf.loc[list(busids), 'Alpha'] = 1.0
         self.norm()
 
-    def demand(self, *busids):
-        """Sets the specified buses as demand points (negative injection).
-
-        :param busids: Variable number of bus IDs.
+    def demand(self, *busids: int) -> None:
         """
-        self.loaddf.loc[busids, 'Alpha'] = -1
+        Set specified buses as demand points (negative injection).
+
+        The injection vector is automatically normalized after this call.
+
+        Parameters
+        ----------
+        *busids : int
+            Bus numbers to set as demand points.
+        """
+        self.loaddf.loc[list(busids), 'Alpha'] = -1.0
         self.norm()
-    
-    def norm(self):
-        """Normalizes the vector so that total supply equals total demand plus losses."""
-        # Normalize Positive
-        isPos = self.vec>0
-        posSum = sum(self.vec[isPos])
-        negSum = -sum(self.vec[~isPos])
 
-        self.loaddf.loc[isPos,'Alpha'] /= posSum/(1+self.losscomp) if posSum>0 else 1
-        self.loaddf.loc[~isPos,'Alpha'] /= negSum if negSum>0 else 1
+    def norm(self) -> None:
+        """
+        Normalize the injection vector.
+
+        Scales supply and demand so that:
+        - Total supply = (1 + losscomp) * total demand
+        - Supply buses sum to 1.0
+        - Demand buses sum to -1.0
+
+        This ensures power balance accounting for system losses.
+        """
+        alpha = self.vec
+        is_supply = alpha > 0
+        is_demand = ~is_supply
+
+        supply_sum = npsum(alpha[is_supply])
+        demand_sum = -npsum(alpha[is_demand])
+
+        if supply_sum > 0:
+            self.loaddf.loc[is_supply, 'Alpha'] /= supply_sum / (1 + self.losscomp)
+        if demand_sum > 0:
+            self.loaddf.loc[is_demand, 'Alpha'] /= demand_sum
 
 
-def ybus_with_loads(Y, buses, loads, gens=None):
+def ybus_with_loads(
+    Y: sp.spmatrix,
+    buses: Sequence,
+    loads: Sequence,
+    gens: Optional[Sequence] = None
+) -> sp.spmatrix:
     """
-    Modifies a Y-Bus matrix to include constant impedance load and generation models.
+    Modify Y-bus matrix to include constant impedance load/generation models.
 
-    This function converts P/Q injections into equivalent shunt admittances based on 
-    the current bus voltages and adds them to the diagonal of the Y-Bus matrix.
+    Converts P/Q injections at each bus into equivalent shunt admittances
+    based on bus voltages and adds them to the Y-bus diagonal. This creates
+    a linearized load model suitable for small-signal analysis.
 
-    :param Y: The original sparse Y-Bus matrix (scipy.sparse).
-    :param buses: List of Bus component objects.
-    :param loads: List of Load component objects.
-    :param gens: Optional list of Gen component objects. Generators without dynamic 
-        models (e.g., GENROU) are treated as negative constant impedance loads.
-    :return: The modified sparse Y-Bus matrix.
-    :rtype: scipy.sparse.base.spmatrix
+    Parameters
+    ----------
+    Y : scipy.sparse matrix
+        Original Y-bus admittance matrix.
+    buses : sequence
+        Bus component objects with attributes:
+        - BusNum: Bus number
+        - BusLoadMW: Active load (MW)
+        - BusLoadMVR: Reactive load (MVAr)
+        - BusPUVolt: Per-unit voltage magnitude
+    loads : sequence
+        Load component objects (currently unused, load data comes from buses).
+    gens : sequence, optional
+        Generator component objects. Generators without dynamic models
+        (not GENROU) are treated as negative constant impedance loads.
+        Each must have: BusNum, GenMW, GenMVR, BusPUVolt, TSGenMachineName,
+        GenStatus.
+
+    Returns
+    -------
+    scipy.sparse matrix
+        Modified Y-bus matrix with load/generation admittances added.
+
+    Notes
+    -----
+    - Uses 100 MVA base for per-unit conversion.
+    - Constant impedance model: Y_load = S* / |V|^2
+    - Generators with GENROU models and 'Closed' status are skipped
+      (assumed handled by dynamic simulation).
+
+    Examples
+    --------
+    >>> Y_modified = ybus_with_loads(Ybus, buses, loads, gens=generators)
     """
-
-    # Copy so don't modify
     Y = Y.copy()
+    basemva = 100.0
 
-    # Map the bus number to its Y-Bus Index
-    # TODO Do a sort by Bus Num to gaurentee order
-    busPosY = {b.BusNum: i for i, b in enumerate(buses)}
-
-    # For Per-Unit Conversion
-    basemva = 100
+    # Map bus number to Y-bus index
+    bus_to_idx = {b.BusNum: i for i, b in enumerate(buses)}
 
     for bus in buses:
+        idx = bus_to_idx[bus.BusNum]
 
-        # Location in YBus
-        busidx = busPosY[bus.BusNum]
+        # Net load at bus (per-unit)
+        p_pu = bus.BusLoadMW / basemva if bus.BusLoadMW > 0 else 0.0
+        q_pu = bus.BusLoadMVR / basemva
+        s_pu = p_pu + 1j * q_pu
 
-        # Net Load at Bus
-        pumw = bus.BusLoadMW/basemva if bus.BusLoadMW > 0 else 0
-        pumvar = bus.BusLoadMVR/basemva if bus.BusLoadMVR > 0 or bus.BusLoadMVR < 0 else 0
-        puS = pumw + 1j*pumvar
-
-        # V at Bus
+        # Voltage magnitude
         vmag = bus.BusPUVolt
 
-        # Const Impedenace Load/Gen
-        constAdmit = puS.conjugate()/vmag**2
+        # Constant impedance admittance
+        y_load = s_pu.conjugate() / vmag**2
 
-        # Add to Ybus
-        Y[busidx][busidx] += constAdmit # TODO determine if to use + or -!
+        Y[idx, idx] += y_load
 
-
-    # Add Generators without models as negative load (if closed)
+    # Add generators without dynamic models as negative load
     if gens is not None:
         for gen in gens:
-
-            if gen.TSGenMachineName == 'GENROU' and gen.GenStatus=='Closed':
+            # Skip generators with dynamic models
+            if gen.TSGenMachineName == 'GENROU' and gen.GenStatus == 'Closed':
                 continue
-            else:
-                basemva = 100
-                # Net Load at Bus
-                pumw = gen.GenMW/basemva
-                pumvar = gen.GenMVR/basemva
-                puS = pumw + 1j*pumvar
 
-                # V at Bus
-                vmag =gen.BusPUVolt
+            idx = bus_to_idx[gen.BusNum]
 
-                # Const Impedenace Load/Gen
-                constAdmit = puS.conjugate()/vmag**2
+            p_pu = gen.GenMW / basemva
+            q_pu = gen.GenMVR / basemva
+            s_pu = p_pu + 1j * q_pu
 
-                # Location in YBus
-                busidx = busPosY[gen.BusNum]
+            vmag = gen.BusPUVolt
+            y_gen = s_pu.conjugate() / vmag**2
 
-                # Negative Admittance
-                Y[busidx][busidx] -= constAdmit
+            # Negative admittance (generation = negative load)
+            Y[idx, idx] -= y_gen
 
     return Y

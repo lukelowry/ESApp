@@ -1,100 +1,175 @@
-from abc import ABC
+"""
+Mathematical utilities for linear algebra and spectral analysis.
 
-import scipy.sparse as sp
-from scipy.sparse.linalg import eigsh
-from scipy.linalg import schur
+This module provides functions for matrix decomposition, eigenvalue
+analysis, graph Laplacian construction, and matrix transformations
+commonly used in power systems and signal processing applications.
+"""
 
 import numpy as np
 from numpy import block, diag, real, imag
+from numpy.typing import NDArray
+import scipy.sparse as sp
+from scipy.sparse.linalg import eigsh
+from scipy.linalg import schur
+from typing import Union
 
-# Constants
-MU0 = 1.256637e-6
+__all__ = [
+    'MU0',
+    'takagi',
+    'eigmax',
+    'sorteig',
+    'periodiclap',
+    'pathlap',
+    'periodicincidence',
+    'pathincidence',
+    'normlap',
+    'hermitify',
+]
 
+# =============================================================================
+# Physical Constants
+# =============================================================================
 
-def takagi(M):
-   """
-   Performs the Takagi factorization of a complex symmetric matrix.
-
-   Parameters
-   ----------
-   M : np.ndarray
-       Complex symmetric matrix.
-
-   Returns
-   -------
-   tuple
-       (U, Sigma) where M = U * diag(Sigma) * U^T.
-   """
-   n = M.shape[0]
-   D, P = schur(block([[-real(M),imag(M)],[imag(M),real(M)]]))
-   pos = diag(D) > 0
-   Sigma = diag(D[pos,pos])
-   # Note: The arithmetic below is technically not necessary
-   U = P[n:,pos] + 1j*P[:n,pos]
-   return U, Sigma.diagonal()
-
+MU0: float = 1.256637e-6
+"""Permeability of free space (H/m)."""
 
 
-def eigmax(L):
+# =============================================================================
+# Matrix Decomposition
+# =============================================================================
+
+def takagi(M: NDArray[np.complexfloating]) -> tuple[NDArray, NDArray]:
     """
-    Finds the largest eigenvalue of a matrix (intended for sparse Laplacians).
+    Perform Takagi factorization of a complex symmetric matrix.
+
+    For a complex symmetric matrix M (where M = M^T, not M = M^H),
+    the Takagi factorization finds a unitary matrix U and non-negative
+    real diagonal values such that M = U @ diag(sigma) @ U^T.
 
     Parameters
     ----------
-    L : Union[np.ndarray, sp.spmatrix]
-        The input matrix.
+    M : np.ndarray
+        Complex symmetric matrix of shape (n, n).
+
+    Returns
+    -------
+    U : np.ndarray
+        Unitary matrix of shape (n, n).
+    sigma : np.ndarray
+        Non-negative singular values of shape (n,).
+
+    Notes
+    -----
+    This implementation uses the real Schur decomposition of an
+    augmented real matrix to compute the factorization.
+
+    References
+    ----------
+    .. [1] Takagi, T. (1925). "On an algebraic problem related to an
+           analytic theorem of Carathéodory and Fejér".
+    """
+    n = M.shape[0]
+    augmented = block([
+        [-real(M), imag(M)],
+        [imag(M), real(M)]
+    ])
+    D, P = schur(augmented)
+    pos = diag(D) > 0
+    sigma = diag(D[pos, pos])
+    U = P[n:, pos] + 1j * P[:n, pos]
+    return U, sigma.diagonal()
+
+
+# =============================================================================
+# Eigenvalue Analysis
+# =============================================================================
+
+def eigmax(L: Union[NDArray, sp.spmatrix]) -> float:
+    """
+    Find the largest eigenvalue of a matrix.
+
+    Optimized for sparse symmetric matrices using ARPACK.
+
+    Parameters
+    ----------
+    L : np.ndarray or scipy.sparse matrix
+        Input matrix (should be symmetric for meaningful results).
 
     Returns
     -------
     float
         The largest eigenvalue.
+
+    Notes
+    -----
+    Uses scipy.sparse.linalg.eigsh with 'LA' (largest algebraic)
+    selection, which is efficient for sparse matrices.
     """
     return eigsh(L, k=1, which='LA', return_eigenvectors=False)[0]
 
 
-def sorteig(Lam, U):
+def sorteig(
+    eigenvalues: NDArray,
+    eigenvectors: NDArray
+) -> tuple[NDArray, NDArray]:
     """
-    Sorts eigenvalue decomposition by eigenvalue magnitude (least to greatest).
+    Sort eigenvalue decomposition by magnitude.
 
     Parameters
     ----------
-    Lam : np.ndarray
-        Eigenvalues.
-    U : np.ndarray
-        Eigenvectors.
+    eigenvalues : np.ndarray
+        Array of eigenvalues.
+    eigenvectors : np.ndarray
+        Matrix of eigenvectors (columns).
 
     Returns
     -------
-    tuple
-        (Sorted Lam, Sorted U).
+    sorted_eigenvalues : np.ndarray
+        Eigenvalues sorted by absolute value (ascending).
+    sorted_eigenvectors : np.ndarray
+        Corresponding eigenvectors.
     """
-    idx = np.argsort(np.abs(Lam))
-    return Lam[idx], U[:,idx]
+    idx = np.argsort(np.abs(eigenvalues))
+    return eigenvalues[idx], eigenvectors[:, idx]
 
-# TODO rename to 'pathlap' so periodicity is an option
-def periodiclap(N, periodic=True):
+
+# =============================================================================
+# Graph Laplacian Construction
+# =============================================================================
+
+def pathlap(N: int, periodic: bool = False) -> NDArray:
     """
-    Creates a branchless periodic discrete graph Laplacian.
+    Create the graph Laplacian for a path or cycle graph.
 
     Parameters
     ----------
     N : int
         Number of nodes.
-    periodic : bool, optional
-        Whether the graph is periodic. Defaults to True.
+    periodic : bool, default False
+        If True, creates a cycle graph (first and last nodes connected).
+        If False, creates a path graph.
 
     Returns
     -------
     np.ndarray
-        The Laplacian matrix.
+        The Laplacian matrix of shape (N, N).
+
+    Notes
+    -----
+    - For a path graph: L[i,i] = 2 for interior nodes, 1 for endpoints.
+    - For a cycle graph: L[i,i] = 2 for all nodes.
+    - Off-diagonal entries are -1 for adjacent nodes.
+
+    See Also
+    --------
+    periodiclap : Alias with periodic=True default.
     """
-
     O = np.ones(N)
-
     L = sp.diags(
-        [2*O, -O[:1], -O[:1]],
-        offsets=[0, 1, -1], 
-        shape=(N,N)
+        [2 * O, -O[:1], -O[:1]],
+        offsets=[0, 1, -1],
+        shape=(N, N)
     ).toarray()
 
     if periodic:
@@ -106,346 +181,170 @@ def periodiclap(N, periodic=True):
 
     return L
 
-def periodicincidence(N, periodic=True):
+
+def periodiclap(N: int, periodic: bool = True) -> NDArray:
     """
-    Creates a branchless periodic discrete graph incidence matrix.
+    Create a periodic discrete graph Laplacian.
+
+    Alias for pathlap with periodic=True as default.
 
     Parameters
     ----------
     N : int
         Number of nodes.
-    periodic : bool, optional
-        Whether the graph is periodic. Defaults to True.
+    periodic : bool, default True
+        Whether the graph is periodic (cycle) or not (path).
+
+    Returns
+    -------
+    np.ndarray
+        The Laplacian matrix.
+
+    See Also
+    --------
+    pathlap : Primary implementation.
+    """
+    return pathlap(N, periodic=periodic)
+
+
+def pathincidence(N: int, periodic: bool = False) -> NDArray:
+    """
+    Create the incidence matrix for a path or cycle graph.
+
+    Parameters
+    ----------
+    N : int
+        Number of nodes.
+    periodic : bool, default False
+        If True, creates a cycle graph incidence matrix.
+        If False, creates a path graph incidence matrix.
 
     Returns
     -------
     np.ndarray
         The incidence matrix.
+
+    Notes
+    -----
+    For a path graph: shape is (N, N-1) with N-1 edges.
+    For a cycle graph: shape is (N, N) with N edges.
+    Each column has +1 at source node and -1 at target node.
+
+    See Also
+    --------
+    periodicincidence : Alias with periodic=True default.
     """
-
     O = np.ones(N)
-
-    L = sp.diags(
+    B = sp.diags(
         [O, -O[:1]],
-        offsets=[0, 1], 
-        shape=(N,N)
+        offsets=[0, 1],
+        shape=(N, N)
     ).toarray()
 
     if periodic:
-        L[-1, 0] = -1
+        B[-1, 0] = -1
 
-    return L
+    return B
 
-# Matrix Helper Functions
-def normlap(L, retD=False):
+
+def periodicincidence(N: int, periodic: bool = True) -> NDArray:
     """
-    Returns the normalized Laplacian of a square matrix.
+    Create a periodic discrete graph incidence matrix.
+
+    Alias for pathincidence with periodic=True as default.
 
     Parameters
     ----------
-    L : Union[np.ndarray, sp.spmatrix]
-        Input square Laplacian matrix.
-    retD : bool, optional
-        Whether to return the diagonal scaling matrices. Defaults to False.
+    N : int
+        Number of nodes.
+    periodic : bool, default True
+        Whether the graph is periodic.
 
     Returns
     -------
-    Union[np.ndarray, tuple]
-        Normalized Laplacian, or (NormL, D, Di) if retD is True.
+    np.ndarray
+        The incidence matrix.
+
+    See Also
+    --------
+    pathincidence : Primary implementation.
     """
-
-    # Get Diagonal and Invert for convenience
-    Yd = np.sqrt(L.diagonal())
-    Di = sp.diags(1/Yd)
-
-    # Return Normalized Laplacian with or without scaled diag
-    if retD:
-        D = sp.diags(Yd)
-        return Di@L@Di, D, Di
-    else:
-        return Di@L@Di
+    return pathincidence(N, periodic=periodic)
 
 
-def hermitify(A):
+# =============================================================================
+# Matrix Transformations
+# =============================================================================
+
+def normlap(
+    L: Union[NDArray, sp.spmatrix],
+    return_scaling: bool = False
+) -> Union[NDArray, tuple[NDArray, sp.dia_matrix, sp.dia_matrix]]:
     """
-    Converts a complex symmetric matrix to a Hermitian matrix.
+    Compute the normalized Laplacian of a matrix.
+
+    The normalized Laplacian is defined as:
+        L_norm = D^{-1/2} @ L @ D^{-1/2}
+
+    where D is the diagonal matrix of L's diagonal entries.
 
     Parameters
     ----------
-    A : Union[np.ndarray, sp.spmatrix]
+    L : np.ndarray or scipy.sparse matrix
+        Input Laplacian matrix.
+    return_scaling : bool, default False
+        If True, also return the scaling matrices.
+
+    Returns
+    -------
+    L_norm : np.ndarray
+        The normalized Laplacian.
+    D : scipy.sparse.dia_matrix, optional
+        Diagonal scaling matrix (sqrt of original diagonal).
+        Only returned if return_scaling=True.
+    D_inv : scipy.sparse.dia_matrix, optional
+        Inverse diagonal scaling matrix.
+        Only returned if return_scaling=True.
+
+    Notes
+    -----
+    The normalized Laplacian has eigenvalues in [0, 2] for
+    undirected graphs and is useful for spectral clustering.
+    """
+    Yd = np.sqrt(L.diagonal())
+    Di = sp.diags(1 / Yd)
+
+    if return_scaling:
+        D = sp.diags(Yd)
+        return Di @ L @ Di, D, Di
+    else:
+        return Di @ L @ Di
+
+
+def hermitify(A: Union[NDArray, sp.spmatrix]) -> NDArray:
+    """
+    Convert a complex symmetric matrix to Hermitian form.
+
+    For a complex symmetric matrix (A = A^T), this function produces
+    a Hermitian matrix (A_H = A_H^H) by taking the average of
+    conjugate transposes.
+
+    Parameters
+    ----------
+    A : np.ndarray or scipy.sparse matrix
         Input complex symmetric matrix.
 
     Returns
     -------
     np.ndarray
-        The Hermitian version of the matrix.
-    """
+        The Hermitian form of the matrix.
 
+    Notes
+    -----
+    Useful for converting admittance matrices to a form suitable
+    for eigenvalue algorithms that require Hermitian input.
+    """
     if isinstance(A, np.ndarray):
-        return (np.triu(A).conjugate() + np.tril(A))/2
+        return (np.triu(A).conjugate() + np.tril(A)) / 2
     else:
-        return (np.triu(A.A).conjugate() + np.tril(A.A))/2
-
-
-class Operator(ABC):
-    """Abstract Mathematical Operator Object."""
-
-    def __init__(self) -> None:
-        pass
-    
-
-class DifferentialOperator(Operator):
-    """
-    Finite difference operator generator for 2D grids.
-    Only Supports 2D Fortran Style Ordering.
-    """
-
-    def __init__(self, shape, order='F') -> None:
-        """
-        Initialize the DifferentialOperator.
-
-        Parameters
-        ----------
-        shape : tuple
-            (nx, ny) dimensions of the grid.
-        order : str, optional
-            Memory ordering. Defaults to 'F'.
-        """
-        self.shape = shape
-        self.nx, self.ny = shape
-        self.nElement = self.nx*self.ny
-
-        self.D = [-1, 1] 
-
-    def newop(self):
-        """Create empty operator matrices."""
-        return np.zeros((self.nElement, self.nElement)), np.zeros((self.nElement, self.nElement))
-    
-    def aslil(self, Dx, Dy):
-        """Convert to LIL sparse format."""
-        return sp.lil_matrix(Dx), sp.lil_matrix(Dy)
-
-    def flatidx(self, x, y):
-        """
-        Convert 2D coordinates to flat index.
-
-        Parameters
-        ----------
-        x : int
-            X coordinate.
-        y : int
-            Y coordinate.
-        """
-        return y*self.nx + x
-    
-    def flattoloc(self, idx):
-        return idx%self.nx, idx//self.nx
-    
-    def up(self, idx):
-        return idx + self.nx
-        
-    def down(self, idx):
-        return idx - self.nx
-    
-    def right(self, idx):
-        return idx + 1
-    
-    def left(self, idx):
-        return idx - 1
-    
-    def elementiter(self):
-        """Iterate through each tensor element to get index and position."""
-
-        for yi in np.arange(self.ny):
-            for xi in np.arange(self.nx):
-                yield xi, yi, self.flatidx(xi, yi)
-        
-    def central_diffs(self) -> None:
-        """
-        Produces central difference gradient operators for a vector field.
-
-        Returns
-        -------
-        tuple
-            (Dx, Dy) sparse matrices.
-        """
-
-        Dx, Dy = self.newop()
-
-        for xi, yi, idx in self.elementiter():
-
-            if xi==0 or xi==self.nx-1: continue
-            if yi==0 or yi==self.ny-1: continue
-
-            # Selectors
-            dx = [ self.left(idx) , self.right(idx) ]
-            dy = [ self.down(idx) , self.up(idx)    ]
-
-            Dx[idx , dx] += self.D
-            Dy[idx , dy] += self.D
-
-        return self.aslil(Dx/2, Dy/2)
-
-
-    def forward_diffs(self) -> None:
-        """
-        Produces forward difference gradient operators for a vector field.
-
-        Returns
-        -------
-        tuple
-            (Dx, Dy) sparse matrices.
-        """
-
-        Dx, Dy = self.newop()
-
-        for xi, yi, idx in self.elementiter():
-
-            # Selectors
-            dx = [idx , self.right(idx)]
-            dy = [idx , self.up(idx)]
-
-            # Add Y Differential to Tile
-            if xi < self.nx-1:
-                Dx[idx , dx] += self.D
-
-            # Add to Adjacent Tiles
-            if yi < self.ny-1:
-                Dy[idx , dy] += self.D
-
-        return self.aslil(Dx, Dy)
-    
-    def backward_diffs(self) -> None:
-        """
-        Produces backward difference gradient operators for a vector field.
-
-        Returns
-        -------
-        tuple
-            (Dx, Dy) sparse matrices.
-        """
-
-        Dx, Dy = self.newop()
-
-        for xi, yi, idx in self.elementiter():
-
-            # Selectors
-            dx = [idx, self.left(idx)]
-            dy = [idx, self.down(idx)]
-
-            if xi != 0:
-                Dx[idx , dx] += self.D
-
-            if yi != 0:
-                Dy[idx , dy] += self.D
-
-        return self.aslil(Dx, Dy)
-    
-    def partial(self):
-        """
-        Return centered partial operators for a 2D vector field tensor.
-
-        Returns
-        -------
-        tuple
-            (Dx, Dy) sparse matrices.
-        """
-
-        Dxf, Dyf = self.forward_diffs()
-        Dxb, Dyb = self.backward_diffs()
-
-        return Dxb - Dxf, Dyb - Dyf
-    
-    def divergence(self):
-        """
-        Central Difference Based Finite Divergence.
-
-        Returns
-        -------
-        sp.spmatrix
-            Divergence operator.
-        """
-
-        Dx, Dy = self.partial()
-        return sp.hstack([Dx, Dy])
-    
-    def curl(self):
-        """
-        Central Difference Based Finite Curl.
-
-        Returns
-        -------
-        sp.spmatrix
-            Curl operator.
-        """
-    
-        Dx, Dy = self.partial()
-        return sp.hstack([Dy, -Dx])
-    
-    def laplacian(self):
-        """
-        Central Difference Based Discrete Laplacian.
-
-        Returns
-        -------
-        sp.spmatrix
-            Laplacian operator.
-        """
-
-        Dxf, Dyf = self.forward_diffs()
-        return Dxf.T@Dxf + Dyf.T@Dyf
-    
-    def J(self):
-        """Complex Unit Equivilent and/or hodge star."""
-
-        n = self.nElement
-        I = sp.eye(n)
-        return sp.bmat([
-            [None, -I  ],
-            [I   , None]
-        ])
-    
-    def ext_der(self):
-        """Calculate exterior derivative of linear function/operator."""
-        # Used outside class up top
-        pass
-
-    
-
-
-class MeshSelector:
-    """Helper for selecting regions of a 2D mesh."""
-
-    def __init__(self, dop: DifferentialOperator) -> None:
-        """
-        Initialize the MeshSelector.
-
-        Parameters
-        ----------
-        dop : DifferentialOperator
-            The operator defining the mesh dimensions.
-        """
-
-        self.SELECTOR = np.full(dop.nElement, False)
-
-        nsel = lambda n: (self.SELECTOR.copy() for i in range(n))
-
-        # Sides Including Corners
-        self.LEFT, self.RIGHT, self.UP, self.DOWN = nsel(4)
-
-        # Primary Indexing
-        for xi, yi, idx in dop.elementiter(): 
-            self.LEFT[idx] =  (xi==0)
-            self.RIGHT[idx] =  (xi==dop.nx-1)
-            self.UP[idx] =  (yi==dop.ny-1)
-            self.DOWN[idx] =  (yi==0)
-
-            # CENTRAL2[idx] = ~((xi==1) or (yi==1) or (xi==dop.nx-2) or (yi==dop.ny-2))
-
-        # Secondary Indexing
-        self.ALLCRNR = (self.LEFT|self.RIGHT)&(self.UP|self.DOWN)
-        self.BOUND = self.LEFT|self.RIGHT|self.UP|self.DOWN
-        self.CENTRAL = ~self.BOUND 
-
-
-        # TODO Generic versions of above
+        return (np.triu(A.A).conjugate() + np.tril(A.A)) / 2
