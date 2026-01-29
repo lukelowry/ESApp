@@ -95,7 +95,7 @@ html_theme_options = {
     "navigation_depth": 2,
 }
 html_static_path = ["_static"]
-html_css_files = ["custom.css"]
+html_css_files = ["custom.css", "custom_tables.css"]
 
 autodoc_mock_imports = [
     "win32com", 
@@ -140,6 +140,22 @@ latex_elements = {
 \setlist{nosep}
 \setlength{\parskip}{0.3em}
 \setlength{\parindent}{0pt}
+
+% Table styling for better PDF output
+\usepackage{array}
+\usepackage{tabularx}
+\renewcommand{\arraystretch}{1.2}
+
+% Allow tables to break across pages
+\usepackage{ltablex}
+\keepXaliases
+
+% Smaller font for tables
+\AtBeginEnvironment{longtable}{\footnotesize}
+\AtBeginEnvironment{tabular}{\small}
+
+% Reduce table cell padding
+\setlength{\tabcolsep}{4pt}
 
 % Modern header/footer
 \usepackage{fancyhdr}

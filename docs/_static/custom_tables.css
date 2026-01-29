@@ -1,0 +1,97 @@
+/* Custom table styling for grid component and TS field tables */
+
+/* Grid component table - compact multi-column layout */
+.grid-component-table {
+    width: 100%;
+    font-size: 0.9em;
+}
+
+.grid-component-table td {
+    padding: 4px 8px;
+    white-space: nowrap;
+}
+
+/* TS field table - structured 3-column layout */
+.ts-field-table {
+    width: 100%;
+    font-size: 0.85em;
+    table-layout: fixed;
+}
+
+.ts-field-table th {
+    background-color: #f0f0f0;
+    font-weight: bold;
+    padding: 6px 8px;
+    text-align: left;
+    border-bottom: 2px solid #ccc;
+}
+
+.ts-field-table td {
+    padding: 4px 8px;
+    vertical-align: top;
+    border-bottom: 1px solid #eee;
+}
+
+/* First column: Field name - keep narrow, no wrap */
+.ts-field-table td:first-child {
+    white-space: nowrap;
+    width: 12%;
+}
+
+/* Second column: PowerWorld name - allow minimal wrap */
+.ts-field-table td:nth-child(2) {
+    width: 18%;
+    word-break: break-word;
+    font-size: 0.85em;
+}
+
+/* Third column: Description - allow wrapping */
+.ts-field-table td:nth-child(3) {
+    width: 70%;
+    word-wrap: break-word;
+}
+
+/* Code/literal styling in tables */
+.ts-field-table code,
+.ts-field-table .literal {
+    font-size: 0.9em;
+    padding: 1px 3px;
+    background-color: #f5f5f5;
+    border-radius: 2px;
+}
+
+/* Alternating row colors for readability */
+.ts-field-table tbody tr:nth-child(even) {
+    background-color: #fafafa;
+}
+
+.ts-field-table tbody tr:hover {
+    background-color: #f0f7ff;
+}
+
+/* PDF-specific adjustments via print media query */
+@media print {
+    .ts-field-table {
+        font-size: 8pt;
+    }
+
+    .ts-field-table td {
+        padding: 2px 4px;
+    }
+
+    .ts-field-table td:first-child {
+        width: 15%;
+    }
+
+    .ts-field-table td:nth-child(2) {
+        width: 25%;
+    }
+
+    .ts-field-table td:nth-child(3) {
+        width: 60%;
+    }
+
+    .grid-component-table {
+        font-size: 9pt;
+    }
+}

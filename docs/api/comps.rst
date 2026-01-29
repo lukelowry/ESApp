@@ -49,13 +49,13 @@ during simulation.
     # Watch bus fields
     wb.dyn.watch(Bus, [TS.Bus.VPU, TS.Bus.Freq])
 
-Available TS field categories include:
+TS Field Reference
+~~~~~~~~~~~~~~~~~~
 
-- ``TS.Gen``: Generator fields (P, Q, W, Delta, etc.)
-- ``TS.Bus``: Bus fields (VPU, Freq, Angle, etc.)
-- ``TS.Branch``: Branch fields (P, Q, I, etc.)
-- ``TS.Load``: Load fields (P, Q, etc.)
-- ``TS.Area``: Area fields (Frequency, etc.)
+The following tables list all available transient stability field constants by category.
+Access fields using ``TS.<Category>.<Field>`` syntax (e.g., ``TS.Gen.P``, ``TS.Bus.VPU``).
+
+.. ts-field-list::
 
 Available Grid Object Types
 ----------------------------

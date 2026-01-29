@@ -12,22 +12,31 @@ class QVMixin:
     """Mixin for QV analysis functions."""
 
     def QVDataWriteOptionsAndResults(self, filename: str, append: bool = True, key_field: str = "PRIMARY"):
-        """Writes out all information related to QV analysis, including options and results.
+        """
+        Write all QV analysis information to an auxiliary file.
+
+        Saves the same information as ``QVWriteResultsAndOptions`` but uses
+        the concise format for DATA section headers and variable names. Data
+        is written using DATA sections instead of SUBDATA sections.
+
+        This is a wrapper for the ``QVDataWriteOptionsAndResults`` script command.
 
         Parameters
         ----------
         filename : str
-            The path to the auxiliary file where the QV information will be written.
+            Name of the auxiliary file to save.
         append : bool, optional
-            If True, appends to the file if it exists. If False, overwrites.
+            If True, appends results to existing file. If False, overwrites.
             Defaults to True.
         key_field : str, optional
-            Identifier to use for the data ("PRIMARY", "SECONDARY", "LABEL").
-            Defaults to "PRIMARY".
+            Identifier to use for data. "PRIMARY" uses bus numbers and primary
+            key fields. "SECONDARY" uses bus name and nominal kV. "LABEL" uses
+            device labels. Defaults to "PRIMARY".
 
         Returns
         -------
-        None
+        str
+            The response from the PowerWorld script command.
 
         Raises
         ------
@@ -39,11 +48,19 @@ class QVMixin:
         return self.RunScriptCommand(f"QVDataWriteOptionsAndResults({args});")
 
     def QVDeleteAllResults(self):
-        """Deletes all QV results from memory.
+        """
+        Delete all QV results from memory.
+
+        Removes all QV analysis results including QVCurve and
+        PWQVResultListContainer object types. Use this to free memory
+        after QV analysis is complete.
+
+        This is a wrapper for the ``QVDeleteAllResults`` script command.
 
         Returns
         -------
-        None
+        str
+            The response from the PowerWorld script command.
 
         Raises
         ------
@@ -53,27 +70,38 @@ class QVMixin:
         return self.RunScriptCommand("QVDeleteAllResults;")
 
     def RunQV(self, filename: str = None) -> pd.DataFrame:
-        """Starts a QV (Reactive Power-Voltage) analysis.
+        """
+        Run a QV (Reactive Power-Voltage) analysis.
 
-        This method simulates the system's voltage stability by varying reactive power
-        and observing voltage response.
+        Performs a QV study for buses whose QVSELECTED field is set to YES.
+        QV analysis varies reactive power injection at monitored buses to
+        determine voltage stability margins. The analysis produces QV curves
+        showing the relationship between reactive power and voltage.
+
+        This is a wrapper for the ``QVRun`` script command.
 
         Parameters
         ----------
         filename : str, optional
-            Optional path to a CSV file to save results to. If None, a temporary file
-            is used, and the results are returned as a pandas DataFrame. Defaults to None.
+            Path to a CSV file to save results. If None, a temporary file is
+            used and results are returned as a DataFrame. Defaults to None.
 
         Returns
         -------
         pandas.DataFrame or None
-            If `filename` is None, returns a DataFrame containing the QV analysis results.
+            If `filename` is None, returns a DataFrame containing the QV
+            analysis results (voltage vs. reactive power for each bus).
             Otherwise, returns None.
 
         Raises
         ------
         PowerWorldError
-            If the SimAuto call fails or the QV analysis does not complete successfully.
+            If the SimAuto call fails or the QV analysis does not complete.
+
+        Notes
+        -----
+        The base case must be solvable. If it's not, the method will attempt
+        a solvability analysis to fix the issue (InErrorMakeBaseSolvable=YES).
         """
         if filename:
             self.RunScriptCommand(f'QVRun("{filename}", YES, NO);')
@@ -92,13 +120,20 @@ class QVMixin:
                     os.unlink(temp_path)
 
     def QVSelectSingleBusPerSuperBus(self):
-        """Modifies monitored buses for QV analysis to one per pnode (super bus).
+        """
+        Reduce monitored QV buses to one per pnode (super bus).
 
-        This simplifies the QV analysis by focusing on representative buses.
+        When using QV analysis on a full topology model, this modifies the
+        monitored buses so that only one bus is monitored for each pnode.
+        This simplifies analysis and reduces computational load by focusing
+        on representative buses.
+
+        This is a wrapper for the ``QVSelectSingleBusPerSuperBus`` script command.
 
         Returns
         -------
-        None
+        str
+            The response from the PowerWorld script command.
 
         Raises
         ------
@@ -108,22 +143,33 @@ class QVMixin:
         return self.RunScriptCommand("QVSelectSingleBusPerSuperBus;")
 
     def QVWriteCurves(self, filename: str, include_quantities: bool = True, filter_name: str = "", append: bool = False):
-        """Saves QV curve points to a file.
+        """
+        Save QV curve points to a CSV file.
+
+        Exports the QV curve data (voltage vs. reactive power points) for
+        each monitored bus to a comma-separated file.
+
+        This is a wrapper for the ``QVWriteCurves`` script command.
 
         Parameters
         ----------
         filename : str
-            The path to the output file.
+            Name of the CSV file to save.
         include_quantities : bool, optional
-            If True, includes quantities (e.g., MW, Mvar) in the output. Defaults to True.
+            If True, includes any Quantities to Track along with the QV
+            curve points. Defaults to True.
         filter_name : str, optional
-            A PowerWorld filter name to apply to buses. Defaults to an empty string (all).
+            Filter applied to QVCurve objects. Empty string selects all
+            curve results. Note: AREAZONE filtering is ignored for QVCurve.
+            Defaults to "" (all curves).
         append : bool, optional
-            If True, appends to the file if it exists. Defaults to False.
+            If True, appends data to existing file. If False, overwrites.
+            Defaults to False.
 
         Returns
         -------
-        None
+        str
+            The response from the PowerWorld script command.
 
         Raises
         ------
@@ -136,18 +182,33 @@ class QVMixin:
         return self.RunScriptCommand(f"QVWriteCurves({args});")
 
     def QVWriteResultsAndOptions(self, filename: str, append: bool = True):
-        """Writes out all information related to QV analysis to an auxiliary file.
+        """
+        Write all QV analysis information to an auxiliary file.
+
+        Exports complete QV analysis data including Contingency Definitions,
+        Remedial Action Definitions, Solution Options, QV Options, QV results,
+        and any Model Criteria used by Contingency and Remedial Action
+        Definitions.
+
+        Dependencies are saved along with definitions, including: Model
+        Conditions, Model Filters, Model Planes, Model Expressions, Model
+        Result Overrides, Interfaces, Injection Groups, Calculated Fields,
+        and Expressions.
+
+        This is a wrapper for the ``QVWriteResultsAndOptions`` script command.
 
         Parameters
         ----------
         filename : str
-            The path to the auxiliary file.
+            Name of the auxiliary file to save.
         append : bool, optional
-            If True, appends to the file if it exists. Defaults to True.
+            If True, appends data to existing file. If False, overwrites.
+            Defaults to True.
 
         Returns
         -------
-        None
+        str
+            The response from the PowerWorld script command.
 
         Raises
         ------
