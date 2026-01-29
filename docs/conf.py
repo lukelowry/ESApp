@@ -207,17 +207,14 @@ latex_elements = {
     leftrule=3pt,
     arc=0pt,
     outer arc=0pt,
-    left=8pt,
-    right=8pt,
-    top=6pt,
-    bottom=6pt,
-    fonttitle=\bfseries\sffamily\small,
-    title={\textcolor{noteborder}{#1}},
-    coltitle=noteborder,
-    attach boxed title to top left={yshift=-2mm, xshift=0mm},
-    boxed title style={colback=white, colframe=white, boxrule=0pt}
+    left=10pt,
+    right=10pt,
+    top=8pt,
+    bottom=8pt,
+    before skip=10pt,
+    after skip=10pt
   ]
-  \small
+  \textbf{\sffamily\textcolor{noteborder}{#1}}\par\smallskip
 }{\end{tcolorbox}}
 
 \renewenvironment{sphinxwarning}[1]{%
@@ -230,17 +227,14 @@ latex_elements = {
     leftrule=3pt,
     arc=0pt,
     outer arc=0pt,
-    left=8pt,
-    right=8pt,
-    top=6pt,
-    bottom=6pt,
-    fonttitle=\bfseries\sffamily\small,
-    title={\textcolor{warningborder}{#1}},
-    coltitle=warningborder,
-    attach boxed title to top left={yshift=-2mm, xshift=0mm},
-    boxed title style={colback=white, colframe=white, boxrule=0pt}
+    left=10pt,
+    right=10pt,
+    top=8pt,
+    bottom=8pt,
+    before skip=10pt,
+    after skip=10pt
   ]
-  \small
+  \textbf{\sffamily\textcolor{warningborder}{#1}}\par\smallskip
 }{\end{tcolorbox}}
 
 \renewenvironment{sphinxhint}[1]{%
@@ -253,17 +247,14 @@ latex_elements = {
     leftrule=3pt,
     arc=0pt,
     outer arc=0pt,
-    left=8pt,
-    right=8pt,
-    top=6pt,
-    bottom=6pt,
-    fonttitle=\bfseries\sffamily\small,
-    title={\textcolor{tipborder}{#1}},
-    coltitle=tipborder,
-    attach boxed title to top left={yshift=-2mm, xshift=0mm},
-    boxed title style={colback=white, colframe=white, boxrule=0pt}
+    left=10pt,
+    right=10pt,
+    top=8pt,
+    bottom=8pt,
+    before skip=10pt,
+    after skip=10pt
   ]
-  \small
+  \textbf{\sffamily\textcolor{tipborder}{#1}}\par\smallskip
 }{\end{tcolorbox}}
 
 \renewenvironment{sphinxtip}[1]{%
@@ -276,17 +267,14 @@ latex_elements = {
     leftrule=3pt,
     arc=0pt,
     outer arc=0pt,
-    left=8pt,
-    right=8pt,
-    top=6pt,
-    bottom=6pt,
-    fonttitle=\bfseries\sffamily\small,
-    title={\textcolor{tipborder}{#1}},
-    coltitle=tipborder,
-    attach boxed title to top left={yshift=-2mm, xshift=0mm},
-    boxed title style={colback=white, colframe=white, boxrule=0pt}
+    left=10pt,
+    right=10pt,
+    top=8pt,
+    bottom=8pt,
+    before skip=10pt,
+    after skip=10pt
   ]
-  \small
+  \textbf{\sffamily\textcolor{tipborder}{#1}}\par\smallskip
 }{\end{tcolorbox}}
 
 % Compact lists with slight breathing room
