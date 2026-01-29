@@ -1,504 +1,565 @@
-# Data Structure Imports
-import warnings
-from pandas import DataFrame, concat
-from numpy import nan, exp, any, arange, nanmin, isnan, inf
-from numpy.random import random
+"""
+Static Analysis Module
+======================
 
-# WorkBench Imports
+This module provides specialized tools for advanced static power system analysis,
+including continuation power flow (CPF), random load variation, and generator
+limit checking.
+
+Classes
+-------
+Statics
+    Research-focused static analysis application with CPF and state management.
+
+Key Features
+------------
+- Continuation power flow for maximum transfer capability analysis
+- State chain management for iterative algorithms
+- Generator P/Q limit violation detection
+- ZIP load injection interface
+
+Example
+-------
+Basic continuation power flow::
+
+    >>> from esapp import GridWorkBench
+    >>> wb = GridWorkBench("case.pwb")
+    >>> interface = np.array([1, -1, 0, ...])  # Injection pattern
+    >>> for mw in wb.statics.continuation_pf(interface, maxiter=100):
+    ...     print(f"Converged at {mw:.2f} MW")
+
+See Also
+--------
+esapp.apps.dynamics : Transient stability simulation.
+esapp.apps.network : Network matrix construction.
+"""
+
+import warnings
+from typing import Optional, Callable, Iterator
+
+import numpy as np
+from numpy import nan, exp, any, arange, inf
+from pandas import DataFrame
+
 from ..indexable import Indexable
-from ..components import Contingency, Gen, Load, Bus
+from ..components import Gen, Load, Bus
 from ..saw._exceptions import (
     BifurcationException,
     GeneratorLimitException,
 )
 
-# Annoying FutureWarnings
+# Suppress FutureWarnings from pandas
 warnings.simplefilter(action="ignore", category=FutureWarning)
+
+__all__ = ['Statics']
 
 
 class Statics(Indexable):
     """
     Research-focused static analysis application.
-    
-    This class provides specialized functions for continuation power flow (CPF),
-    random load variation, and other advanced static analysis methods.
-    These functions are intentionally untested as they are for highly specific
-    research and data analysis.
-    
+
+    Provides specialized functions for continuation power flow (CPF),
+    random load variation, and advanced static analysis methods.
+    These functions are intentionally untested as they support highly
+    specific research and data analysis workflows.
+
     For general-purpose functions, use GridWorkBench methods:
-    - wb.gens_above_pmax() / wb.gens_above_qmax() for limit checking
-    - wb.init_state_chain() / wb.push_state() / wb.restore_state_chain() for state management
-    - wb.set_zip_load() / wb.clear_zip_loads() for load injection
+    - ``wb.gens_above_pmax()`` / ``wb.gens_above_qmax()`` for limit checking
+    - ``wb.init_state_chain()`` / ``wb.push_state()`` for state management
+    - ``wb.set_zip_load()`` / ``wb.clear_zip_loads()`` for load injection
+
+    Attributes
+    ----------
+    genqmax : pd.Series
+        Maximum reactive power limits for all generators.
+    genqmin : pd.Series
+        Minimum reactive power limits for all generators.
+    genpmax : pd.Series
+        Maximum active power limits for all generators.
+    genpmin : pd.Series
+        Minimum active power limits for all generators.
+    DispatchPQ : DataFrame
+        DataFrame for ZIP load dispatch at each bus.
     """
 
     io: Indexable
 
     def __init__(self) -> None:
-
-        # TODO don't need to read ALL of this!
         gens = self[Gen, ['GenMVRMin', 'GenMVRMax']]
         buses = self[Bus]
 
-        zipfields = ['LoadSMW', 'LoadSMVR','LoadIMW', 'LoadIMVR','LoadZMW', 'LoadZMVR']
-        
-        # Gen Q Limits
+        zipfields = ['LoadSMW', 'LoadSMVR', 'LoadIMW', 'LoadIMVR', 'LoadZMW', 'LoadZMVR']
+
+        # Generator Q limits
         self.genqmax = gens['GenMVRMax']
         self.genqmin = gens['GenMVRMin']
 
-        # Gen P Limits
+        # Generator P limits
         self.genpmax = gens['GenMWMax']
         self.genpmin = gens['GenMWMin']
 
-        # Create DF that stores manipultable loads for all buses
-        l = buses[['BusNum', 'BusName_NomVolt']].copy()
-        l.loc[:,zipfields] = 0.0
-        l['LoadID'] = 99 # NOTE Random Large ID so that it does not interfere
-        l['LoadStatus'] = 'Closed'
-        l = l.fillna(0)
+        # Create DataFrame for manipulable loads at all buses
+        load_df = buses[['BusNum', 'BusName_NomVolt']].copy()
+        load_df.loc[:, zipfields] = 0.0
+        load_df['LoadID'] = 99  # Large ID to avoid interference
+        load_df['LoadStatus'] = 'Closed'
+        load_df = load_df.fillna(0)
 
-        # Send to PW
-        self[Load] = l
+        # Send to PowerWorld
+        self[Load] = load_df
 
-        # Smaller DF just for updating Constant Power at Buses for Injection Interface Functions
-        self.DispatchPQ = l[['BusNum', 'LoadID'] + zipfields].copy()
-    
+        # Smaller DataFrame for updating constant power at buses
+        self.DispatchPQ = load_df[['BusNum', 'LoadID'] + zipfields].copy()
 
-
+    # State for random load variation
     load_nom = None
     load_df = None
 
-    def randload(self, scale=1, sigma=0.1):
-        '''Temporarily Change the Load with random variation and scale'''
+    def randomize_load(self, scale: float = 1.0, sigma: float = 0.1) -> None:
+        """
+        Apply random variation to system loads.
 
+        Temporarily modifies load values with log-normal random scaling.
+        Original load values are cached for restoration.
+
+        Parameters
+        ----------
+        scale : float, default 1.0
+            Base scale factor for all loads.
+        sigma : float, default 0.1
+            Standard deviation of log-normal distribution.
+        """
         if self.load_nom is None or self.load_df is None:
             self.load_df = self[Load, 'LoadMW']
             self.load_nom = self.load_df['LoadMW']
-            
-        self[Load, 'LoadMW'] = scale*self.load_nom* exp(sigma*random(len(self.load_nom)))
 
+        random_factors = exp(sigma * np.random.random(len(self.load_nom)))
+        self[Load, 'LoadMW'] = scale * self.load_nom * random_factors
 
-    def solve(self, ctgs: list[Contingency] = None):
+    # Backwards compatibility alias
+    randload = randomize_load
 
-        
-        return "Depricated functions used."
-    
-        # Cast to List
-        if ctgs is None:
-            ctgs = ["SimOnly"]
-        if not isinstance(ctgs, list):
-            ctgs: list[Contingency] = [ctgs]
+    def gens_above_pmax(
+        self,
+        p: Optional[np.ndarray] = None,
+        is_closed: Optional[np.ndarray] = None,
+        tol: float = 0.001
+    ) -> bool:
+        """
+        Check if any closed generators exceed P limits.
 
-        # Prepare Data Fields
-        gtype = self.metric["Type"]
-        field = self.metric["Static"]
-        keyFields = self.keys(gtype)
+        Parameters
+        ----------
+        p : np.ndarray, optional
+            Generator MW output. If None, reads from case.
+        is_closed : np.ndarray, optional
+            Boolean mask of closed generators. If None, reads from case.
+        tol : float, default 0.001
+            Tolerance for limit violation (MW).
 
-        # Get Keys OR Values
-        def get(field: str = None) -> DataFrame:
-            if field is None:
-                data = self.get(gtype)
-            else:
-                self.pflow()
-                data = self.get(gtype, [field])
-                data.rename(columns={field: "Value"}, inplace=True)
-                data.drop(columns=keyFields, inplace=True)
-
-            return data
-
-        # Initialize DFs
-        meta = DataFrame(columns=["Object", "ID-A", "ID-B", "Metric", "Contingency"])
-        df = DataFrame(columns=["Value", "Reference"])
-        keys = get()
-
-        # Add All Meta Records
-        for ctg in ctgs:
-            ctgMeta = DataFrame(
-                {
-                    "Object": gtype,
-                    "ID-A": keys.iloc[:, 0],
-                    "ID-B": keys.iloc[:, 1] if len(keys.columns) > 1 else nan,
-                    "Metric": self.metric["Units"],
-                    "Contingency": ctg,
-                }
-            )
-            meta = concat([meta, ctgMeta], ignore_index=True)
-
-        # If Base Case Does not Solve, Return N/A vals
-        try:
-            refSol = get(field)
-
-            # Set Reference (i.e. No CTG) and Solve
-            self.esa.RunScriptCommand(f"CTGSetAsReference;")
-        except:
-            print("Loading Does Not Converge.")
-            df = DataFrame(
-                nan, index=["Value", "Reference"], columns=range(len(ctgs))
-            )
-            return (meta, df)
-
-        # For Each CTG
-        for ctg in ctgs:
-            # Empty DF
-            data = DataFrame(columns=["Value", "Reference"])
-
-            # Apply CTG
-            if ctg != "SimOnly":
-                self.esa.RunScriptCommand(f"CTGApply({ctg})")
-
-            # Solve, Drop Keys
-            try:
-                data["Value"] = get(field)
-            except:
-                data["Value"] = nan
-
-            # Set Reference Values
-            data["Reference"] = refSol
-
-            # Un-Apply CTG
-            self.esa.RunScriptCommand(f"CTGRestoreReference;")
-
-            # Add Data to Main
-            df = concat([df, data], ignore_index=True)
-
-        return (meta, df.T)
-    
-    def gensAbovePMax(self, p=None, isClosed=None, tol=0.001):
-        '''Returns True if any CLOSED gens are outside P limits. Active function.'''
+        Returns
+        -------
+        bool
+            True if any closed generator violates P limits.
+        """
         if p is None:
             p = self[Gen, 'GenMW']['GenMW']
 
-        isHigh = p > self.genpmax + tol
-        isLow = p < self.genpmin - tol
-        if isClosed is None:
-            isClosed = self[Gen, 'GenStatus']['GenStatus'] =='Closed'
-        violation = isClosed & (isHigh | isLow)
+        is_high = p > self.genpmax + tol
+        is_low = p < self.genpmin - tol
 
+        if is_closed is None:
+            is_closed = self[Gen, 'GenStatus']['GenStatus'] == 'Closed'
+
+        violation = is_closed & (is_high | is_low)
         return any(violation)
-        #return any(p > self.genpmax + tol) or any(p < self.genpmin - tol)
-    
-    def gensAboveQMax(self, q=None, isClosed=None, tol=0.001):
-        '''Returns True if any CLOSED gens are outside Q limits. Active function.'''
+
+    # Backwards compatibility alias
+    gensAbovePMax = gens_above_pmax
+
+    def gens_above_qmax(
+        self,
+        q: Optional[np.ndarray] = None,
+        is_closed: Optional[np.ndarray] = None,
+        tol: float = 0.001
+    ) -> bool:
+        """
+        Check if any closed generators exceed Q limits.
+
+        Parameters
+        ----------
+        q : np.ndarray, optional
+            Generator MVAr output. If None, reads from case.
+        is_closed : np.ndarray, optional
+            Boolean mask of closed generators. If None, reads from case.
+        tol : float, default 0.001
+            Tolerance for limit violation (MVAr).
+
+        Returns
+        -------
+        bool
+            True if any closed generator violates Q limits.
+        """
         if q is None:
             q = self[Gen, 'GenMVR']['GenMVR']
 
-        isHigh = q > self.genqmax + tol
-        isLow = q < self.genqmin - tol
-        if isClosed is None:
-            isClosed = self[Gen, 'GenStatus']['GenStatus'] =='Closed'
-        violation = isClosed & (isHigh | isLow)
+        is_high = q > self.genqmax + tol
+        is_low = q < self.genqmin - tol
 
+        if is_closed is None:
+            is_closed = self[Gen, 'GenStatus']['GenStatus'] == 'Closed'
+
+        violation = is_closed & (is_high | is_low)
         return any(violation)
-        #return any(q > self.genqmax + tol) or any(q < self.genqmin - tol)
-            
-    # TODO The only thing I have to do is switch slack bus to an interface bus
-    # NOTE This is because we are interested in maximum POSSIBLE injection of MW. 
-    # So then if all gens are at max but injection buses, one of them needs to be slack bus
-    # if we want the flow values to be realistic
-    def continuation_pf(self, interface, initialmw = 0, minstep=1, maxstep=50, maxiter=200, nrtol=0.0001, verbose=False, boundary_func=None, restore_when_done=False, qlimtol=0, plimtol=None, bifur_check=True):
-        ''' 
-        Continuation Power Flow. Will Find the maximum INjection MW through an interface. As an iterator, the last element will be the boundary value.
-        The continuation will begin from the state
-        params:
-        -minstep: Accuracy in Max Injection MW
-        -maxstep: largest jump in MW
-        -initial_mw: starting interface MW. Could speed up convergence if you know a lower limit
-        -nrtol: Newton rhapston MVA tolerance
-        -boundary_func: Optional, pass a callable object to be called at boundary. Return of callable will be put into obj.X
-        -qlim_tol: Tolerance on detecting if a generator is above its Q limits (None = Do not check)
-        -plimtol: Tolerance on detecting if a generator is above its P Limits (None = Do not check)
-        returns:
-        - iterator with elements being the magnitude of interface injection. The last element is the CPF solution.
-        '''
-        
-        # Helper Function since this is common
-        def log(x,**kwargs): 
-            if verbose: print(x,**kwargs)
 
-        # 1. Solved -> Last Solved Solution,     2. Stable -> Known HV Solution  
-        if restore_when_done:  
+    # Backwards compatibility alias
+    gensAboveQMax = gens_above_qmax
+
+    def continuation_pf(
+        self,
+        interface: np.ndarray,
+        initialmw: float = 0,
+        minstep: float = 1,
+        maxstep: float = 50,
+        maxiter: int = 200,
+        nrtol: float = 0.0001,
+        verbose: bool = False,
+        boundary_func: Optional[Callable] = None,
+        restore_when_done: bool = False,
+        qlimtol: Optional[float] = 0,
+        plimtol: Optional[float] = None,
+        bifur_check: bool = True
+    ) -> Iterator[float]:
+        """
+        Continuation power flow for maximum transfer capability.
+
+        Iteratively increases interface injection until the system reaches
+        a voltage stability boundary (bifurcation point) or generator limits.
+
+        Parameters
+        ----------
+        interface : np.ndarray
+            Injection pattern vector (positive = supply, negative = demand).
+        initialmw : float, default 0
+            Starting interface MW level.
+        minstep : float, default 1
+            Minimum step size (MW) - determines solution accuracy.
+        maxstep : float, default 50
+            Maximum step size (MW) per iteration.
+        maxiter : int, default 200
+            Maximum number of iterations.
+        nrtol : float, default 0.0001
+            Newton-Raphson MVA tolerance.
+        verbose : bool, default False
+            Print progress information.
+        boundary_func : callable, optional
+            Function to call at the boundary. Result stored in func.X.
+        restore_when_done : bool, default False
+            Restore original state after completion.
+        qlimtol : float, optional
+            Q limit tolerance. None disables Q limit checking.
+        plimtol : float, optional
+            P limit tolerance. None disables P limit checking.
+        bifur_check : bool, default True
+            Enable bifurcation detection.
+
+        Yields
+        ------
+        float
+            Interface MW at each stable solution point.
+
+        Notes
+        -----
+        The algorithm uses adaptive step sizing with binary search backstep
+        on failure. Stability is detected by monitoring total reactive power
+        output - a drop indicates approaching the nose of the PV curve.
+        """
+        def log(x, **kwargs):
+            if verbose:
+                print(x, **kwargs)
+
+        # Save state if restoration requested
+        if restore_when_done:
             self.save_state('BACKUP')
 
-        # Initialize Stability State Chain
+        # Initialize state chain
         self.chain()
         self.pushstate()
         self.pushstate()
 
-        # For solution Continuity
+        # For solution continuity
         self.save_state('PREV')
 
-        # Set NR Tolerance in MVA
+        # Set NR tolerance
         self.set_mva_tol(nrtol)
 
-        log(f'Starting Injection at:  {initialmw:.4f} MW ')
-        
-        # Misc Iteration Tracking
-        backstepPercent=0.25
-        pnow, step = initialmw, maxstep # Current Interface MW, Step Size in MW
+        log(f'Starting Injection at: {initialmw:.4f} MW')
+
+        # Iteration tracking
+        backstep_percent = 0.25
+        pnow, step = initialmw, maxstep
         pstable, pprev = initialmw, initialmw
         qstable, qprev = -inf, -inf
-        qmax, pmax = -inf, initialmw # Maximum Observed Sum MVAR
-        laststableindex = 0
+        qmax, pmax = -inf, initialmw
+        last_stable_index = 0
 
-
-        # Continuation Loop
+        # Continuation loop
         for i in arange(maxiter):
+            # Set injection for this iteration
+            self.setload(SP=-pnow * interface)
 
-            # Set Injection for this iteration
-            self.setload(SP=-pnow*interface)
-            
-            try: 
-
-                # Do Power Flow
+            try:
+                # Solve power flow
                 log(f'\nPF: {pnow:>12.4f} MW', end='\t')
-                self.pflow() 
+                self.pflow()
 
-                # Fail if slack is at max
-                qall = self[Gen, ['GenMVR','GenStatus']]
-                qclosed = qall['GenStatus']=='Closed'
+                # Check generator limits
+                qall = self[Gen, ['GenMVR', 'GenStatus']]
+                qclosed = qall['GenStatus'] == 'Closed'
 
-                # Check Max Reactive Output
-                if qlimtol is not None and self.gensAboveQMax(qall['GenMVR'], qclosed,tol=qlimtol): 
+                if qlimtol is not None and self.gens_above_qmax(qall['GenMVR'], qclosed, tol=qlimtol):
                     log(' Q+ ', end=' ')
                     raise GeneratorLimitException
-                
-                # Check Max Power Output (Rarer but happens)
-                # Need to be enabled by user because they might not care about slack
-                if plimtol is not None and self.gensAbovePMax(None, qclosed, tol=plimtol):
+
+                if plimtol is not None and self.gens_above_pmax(None, qclosed, tol=plimtol):
                     log(' P+ ', end=' ')
                     raise GeneratorLimitException
-                
-                # Indicator Data
+
+                # Stability indicator
                 qsum = qall['GenMVR'].sum()
 
-                # Stability Indicator
-                # 0 - Atleast 1 previous solution
-                # 1 - Net Q of generators risen above a previous stable solution
-                # 3 - Net Q of generators risen above a known maximum
-                # 2 - MW Injection at detected Q drop is less than MW of previous known solution
-                # (Does not actually gaurentee stable - but the previous is DEFINITLY stable)
-                isStable =  (i > 0) and (qsum > qstable) and (qsum > qmax) and (pnow > pstable) and (pnow > pmax)
+                # Stability criteria:
+                # - At least 1 previous solution
+                # - Net Q risen above previous stable
+                # - Net Q risen above known maximum
+                # - MW injection above previous stable point
+                is_stable = (
+                    (i > 0) and
+                    (qsum > qstable) and
+                    (qsum > qmax) and
+                    (pnow > pstable) and
+                    (pnow > pmax)
+                )
 
-
-                ''' STATE SAVE DETERMINATION - Criteria: Stability'''
-
-                # Stable Solution Candidate Actions
-                if isStable:
-                    
+                # Stable solution handling
+                if is_stable:
                     log(' ST ', end=' ')
-                    self.pushstate() # Push in Stable Chain
+                    self.pushstate()
 
-                    # Don't yield on first stable
-                    if laststableindex > 0:
+                    if last_stable_index > 0:
                         self.irestore(1)
                         yield pprev
                         self.irestore(0)
 
-                    laststableindex = i
+                    last_stable_index = i
                     pstable, qstable = pprev, qprev
-                    
-                # Bifurcation Action
-                if bifur_check:
 
-                    # After so many unstable solutions we can quit and assume bifurcation
-                    if i - laststableindex > 4:
-                        log(f' SL+ ', end=' ')
-                        raise BifurcationException    
+                # Bifurcation detection
+                if bifur_check and (i - last_stable_index > 4):
+                    log(' SL+ ', end=' ')
+                    raise BifurcationException
 
-
-                # Store as solved solution - but not stable
+                # Store as solved (but not necessarily stable)
                 self.save_state('PREV')
 
                 pmax, qmax = max(pnow, pprev), max(qsum, qprev)
                 pprev, qprev = pnow, qsum
-                
-                
 
-                # Yield Stable Solutions
-                #if pstable is not None:
-                    #yield pprev # NOTE I thought should be yeilding stable but this gives the clearly more correct answer
-
-            except BifurcationException as e:
-
-                pnow = pstable 
+            except BifurcationException:
+                pnow = pstable
                 pprev = pstable
-                qprev = qstable 
-                step *= backstepPercent
+                qprev = qstable
+                step *= backstep_percent
                 self.irestore(1)
-                
-            # Catch Fails, then backstep injection
-            except (Exception, GeneratorLimitException) as e: 
 
+            except (Exception, GeneratorLimitException):
                 log('XXX', end=' ')
 
-                # Failure on first iteration - return and restore the state the function was called in
-                if i==0:
-                    log('First Injection Failed. This could be due to a LV Solution, or it is already past the boundary.')
-                    #self.irestore(0)
+                if i == 0:
+                    log('First Injection Failed. Check for LV solution or already past boundary.')
                     self.restore_state('PREV')
-                    log(f'-----------EXIT-----------\n\n')
+                    log('-----------EXIT-----------\n\n')
                     return
 
-                # Non-Bifurcative Failure, backstep binary search       
                 pnow = pprev
-                #pnow, pprev = pstable, pstable
-                #qprev = qstable
-                step *= backstepPercent
-                if pprev!=0: 
+                step *= backstep_percent
+                if pprev != 0:
                     self.irestore(1)
-                    #self.restore_state('PREV')
 
-            # Terminating Condition
-            if step<minstep:
+            # Termination condition
+            if step < minstep:
                 break
 
-            # Advance Injection
+            # Advance injection
             pnow += step
-            
-        # Execute Boundary Function
+
+        # Execute boundary function
         if boundary_func is not None:
             self.irestore(1)
             log(f'BD: {pprev:>12.4f} MW\t ! ')
-            log(f'Calling Boundary Function...')
+            log('Calling Boundary Function...')
             boundary_func.X = boundary_func()
 
-        # Set Dispatch SMW to Zero
-        self.setload(SP=0*interface)
+        # Reset dispatch loads
+        self.setload(SP=0 * interface)
 
-        # TODO delete states that were saved
-
-        # Restore to before CPF Regardless of everything
-        if restore_when_done: 
+        # Restore original state if requested
+        if restore_when_done:
             self.restore_state('BACKUP')
-        log(f'-----------EXIT-----------\n\n')
+        log('-----------EXIT-----------\n\n')
 
-    '''
-    The following functions probably deserve their own object or atleast be relocated
-    '''
-    
-    def chain(self, maxstates=2):
-        '''Initiate a state-chain for iterative functions that require state restoration. The data of n states will be tracked and
-        managed as a queue.
-        '''
+    def chain(self, maxstates: int = 2) -> None:
+        """
+        Initialize state chain for iterative algorithms.
+
+        Creates a queue-based state management system for algorithms
+        that need to track and restore multiple previous states.
+
+        Parameters
+        ----------
+        maxstates : int, default 2
+            Maximum number of states to retain in the chain.
+        """
         self.maxstates = maxstates
         self.stateidx = -1
 
-        # TODO delete old states when this is called
+    def pushstate(self, verbose: bool = False) -> None:
+        """
+        Push current state onto the state chain.
 
-    def pushstate(self, verbose=False):
-        '''Update the PF chain queue with the current state. The n-th state will be forgotten.'''
+        Saves the current power flow state and removes the oldest
+        state if the chain exceeds maxstates.
 
-        # Each line represents a call to push() with nmax = 3
-        # 0*          <- push()  State 0 added (sidx = 0)
-        # 0 1*        <- push()  State 1 added (sidx = 1)
-        # 0 1 2*      <- push()  State 2 added (sidx = 2)
-        #   1 2  3*    <- push()  State 3 added (sidx = 3) and 0 was deleted
-        #     2  3  4* <- push()  State 4 added (sidx = 4) and 1 was deleted
-
-        # Save current state on the right of the queue
+        Parameters
+        ----------
+        verbose : bool, default False
+            Print state management information.
+        """
         self.stateidx += 1
         self.save_state(f'GWBState{self.stateidx}')
 
-        if verbose: print(f'Pushed States -> {self.stateidx},  Delete -> {self.stateidx-self.maxstates}')
+        if verbose:
+            print(f'Pushed States -> {self.stateidx}, Delete -> {self.stateidx - self.maxstates}')
 
-        # Try and delete the state (nmax) behind this one
         if self.stateidx >= self.maxstates:
-            self.delete_state(f'GWBState{self.stateidx-self.maxstates}')
+            self.delete_state(f'GWBState{self.stateidx - self.maxstates}')
 
-    def istore(self, n:int=0, verbose=False):
-        '''
-        Instead of pushing a new state to the save chain, this will update the nth state in the chain.
+    def istore(self, n: int = 0, verbose: bool = False) -> None:
+        """
+        Update the nth state in the chain with current state.
 
-        # Each line represents a call to push() with nmax = 3
-        # 0*             <- push()  State 0 added (sidx = 0)
-        # 0 1*           <- push()  State 1 added (sidx = 1)
-        # 0 1 2*         <- push()  State 2 added (sidx = 2)
-        #   1 2  3*      <- push()  State 3 added (sidx = 3) and 0 was deleted
-        #     2  3  4*   <- push()  State 4 added (sidx = 4) and 1 was deleted
-        #     2  3  4'   <- assign(0) modifies State 4
-        #        3  4' 5 <- push() State 5 added (sidx = 5)
-        '''
+        Parameters
+        ----------
+        n : int, default 0
+            State offset from current (0 = most recent).
+        verbose : bool, default False
+            Print state management information.
 
-        # Can only go back number of states
+        Raises
+        ------
+        Exception
+            If n exceeds available states.
+        """
         if n > self.maxstates or n > self.stateidx:
-            raise Exception
-        
-        if verbose: print(f'Restore -> {self.stateidx-n}')
-        
-        # Restore
-        self.save_state(f'GWBState{self.stateidx-n}')
-        
-    def irestore(self, n:int=1, verbose=False):
-        '''
-        Regress backward in the saved states. Consecutive calls do not affect which state is restored.
-        Example:
-        back(1) # Loads 2 states ago
-        back(0) # Will load the same state
+            raise Exception("State index out of range")
 
-        # Each line represents a call to push() with nmax = 3
-        # 0*          <- push()  State 0 added (sidx = 0)
-        # 0 1*        <- push()  State 1 added (sidx = 1)
-        # 0 1 2*      <- push()  State 2 added (sidx = 2)
-        #   1 2  3*    <- push()  State 3 added (sidx = 3) and 0 was deleted
-        #     2  3  4* <- push()  State 4 added (sidx = 4) and 1 was deleted
-        #     2  3* 4  <- back(1) State 3 is restored
-        #     2* 3  4  <- back(2) State 2 is restored
-        #     2  3  4* <- back(0) State 4 is restored
+        if verbose:
+            print(f'Store -> {self.stateidx - n}')
 
-        '''
-        # Can only go back number of states
+        self.save_state(f'GWBState{self.stateidx - n}')
+
+    def irestore(self, n: int = 1, verbose: bool = False) -> None:
+        """
+        Restore the nth previous state from the chain.
+
+        Consecutive calls restore the same state (non-destructive).
+
+        Parameters
+        ----------
+        n : int, default 1
+            State offset from current (1 = previous state).
+        verbose : bool, default False
+            Print state management information.
+
+        Raises
+        ------
+        Exception
+            If n exceeds available states.
+        """
         if n > self.maxstates or n > self.stateidx:
-            if verbose: print(f'Restoration Failure')
-            raise Exception
-        
-        if verbose: print(f'Restore -> {self.stateidx-n}')
-        
-        # Restore
-        self.restore_state(f'GWBState{self.stateidx-n}')
-        
-    def setload(self, SP=None, SQ=None, IP=None, IQ=None, ZP=None, ZQ=None):
+            if verbose:
+                print('Restoration Failure')
+            raise Exception("State index out of range")
 
-        '''Set ZIP loads by bus. Vector of loads must include every bus.
-        The loads set by this function are independent of existing loads.
-        This serves as a functional and fast way to apply 'deltas' to base case bus loads.
-        Load ID 99 is used so that it does not interfere with existing loads.
-        This is a TEMPORARY load. Functions in GWB can and will override any Load ID 99.
-        params:
-        SP: Constant Active Power
-        SQ: Constant Reactive Power
-        IP: Constant Real Current
-        IQ: Constant Reactive Current
-        ZP: Constant Resistance
-        ZQ: Constant Reactance'''
+        if verbose:
+            print(f'Restore -> {self.stateidx - n}')
 
+        self.restore_state(f'GWBState{self.stateidx - n}')
+
+    def setload(
+        self,
+        SP: Optional[np.ndarray] = None,
+        SQ: Optional[np.ndarray] = None,
+        IP: Optional[np.ndarray] = None,
+        IQ: Optional[np.ndarray] = None,
+        ZP: Optional[np.ndarray] = None,
+        ZQ: Optional[np.ndarray] = None
+    ) -> None:
+        """
+        Set ZIP load components at each bus.
+
+        Provides a fast interface for applying load deltas independent
+        of existing loads. Uses LoadID=99 to avoid interference.
+
+        Parameters
+        ----------
+        SP : np.ndarray, optional
+            Constant active power (MW) at each bus.
+        SQ : np.ndarray, optional
+            Constant reactive power (MVAr) at each bus.
+        IP : np.ndarray, optional
+            Constant real current component.
+        IQ : np.ndarray, optional
+            Constant reactive current component.
+        ZP : np.ndarray, optional
+            Constant resistance component.
+        ZQ : np.ndarray, optional
+            Constant reactance component.
+
+        Notes
+        -----
+        All vectors must include every bus. These loads are temporary
+        and can be overwritten by other GridWorkBench functions.
+        """
         fields = ['BusNum', 'LoadID']
 
         if SP is not None:
             fields.append('LoadSMW')
-            self.DispatchPQ.loc[:,'LoadSMW'] = SP
+            self.DispatchPQ.loc[:, 'LoadSMW'] = SP
         if SQ is not None:
             fields.append('LoadSMVR')
-            self.DispatchPQ.loc[:,'LoadSMVR'] = SQ
+            self.DispatchPQ.loc[:, 'LoadSMVR'] = SQ
         if IP is not None:
             fields.append('LoadIMW')
-            self.DispatchPQ.loc[:,'LoadIMW'] = IP
+            self.DispatchPQ.loc[:, 'LoadIMW'] = IP
         if IQ is not None:
             fields.append('LoadIMVR')
-            self.DispatchPQ.loc[:,'LoadIMVR'] = IQ
+            self.DispatchPQ.loc[:, 'LoadIMVR'] = IQ
         if ZP is not None:
             fields.append('LoadZMW')
-            self.DispatchPQ.loc[:,'LoadZMW'] = ZP
+            self.DispatchPQ.loc[:, 'LoadZMW'] = ZP
         if ZQ is not None:
             fields.append('LoadZMVR')
-            self.DispatchPQ.loc[:,'LoadZMVR'] = ZQ
+            self.DispatchPQ.loc[:, 'LoadZMVR'] = ZQ
 
-        self[Load] = self.DispatchPQ.loc[:,fields]
+        self[Load] = self.DispatchPQ.loc[:, fields]
 
-    def clearloads(self):
-        '''
-        Clears the script-applied load of the context
-        '''
+    def clearloads(self) -> None:
+        """
+        Clear all script-applied ZIP loads.
 
-        zipfields = ['LoadSMW', 'LoadSMVR','LoadIMW', 'LoadIMVR','LoadZMW', 'LoadZMVR']
+        Resets all ZIP load components set via setload() to zero.
+        """
+        zipfields = ['LoadSMW', 'LoadSMVR', 'LoadIMW', 'LoadIMVR', 'LoadZMW', 'LoadZMVR']
         self.DispatchPQ.loc[:, zipfields] = 0
-
-        self[Load] = self.DispatchPQ 
+        self[Load] = self.DispatchPQ

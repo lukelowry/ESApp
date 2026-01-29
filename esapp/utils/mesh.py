@@ -571,8 +571,3 @@ class GridSelector:
         self.corners = (self.left | self.right) & (self.bottom | self.top)
         self.boundary = self.left | self.right | self.bottom | self.top
         self.interior = ~self.boundary
-
-
-# Backwards compatibility aliases
-DifferentialOperator = Grid2D
-MeshSelector = GridSelector

@@ -42,6 +42,27 @@ def _get_test_case_path():
     return None
 
 
+def _get_gic_test_cases():
+    """
+    Get additional GIC test case paths from configuration.
+
+    Returns a list of (path, label) tuples for parametrization.
+    Only includes paths that exist on disk.
+    """
+    try:
+        import config_test
+        if hasattr(config_test, 'GIC_TEST_CASES'):
+            cases = []
+            for path in config_test.GIC_TEST_CASES:
+                if os.path.exists(path):
+                    label = os.path.splitext(os.path.basename(path))[0]
+                    cases.append((path, label))
+            return cases
+    except ImportError:
+        pass
+    return []
+
+
 # -------------------------------------------------------------------------
 # Integration fixture (live PowerWorld)
 # -------------------------------------------------------------------------
@@ -76,6 +97,62 @@ def saw_session():
                 saw.exit()
             except Exception as e:
                 print(f"Warning: Error during SAW cleanup: {e}")
+
+
+# -------------------------------------------------------------------------
+# GIC multi-case fixture
+# -------------------------------------------------------------------------
+
+def pytest_generate_tests(metafunc):
+    """Parametrize tests that request the gic_saw fixture."""
+    if "gic_saw" in metafunc.fixturenames:
+        cases = _get_gic_test_cases()
+        if cases:
+            metafunc.parametrize(
+                "gic_saw",
+                [path for path, _ in cases],
+                ids=[label for _, label in cases],
+                indirect=True,
+            )
+        else:
+            # Fall back to main case
+            main = _get_test_case_path()
+            if main and os.path.exists(main):
+                label = os.path.splitext(os.path.basename(main))[0]
+                metafunc.parametrize("gic_saw", [main], ids=[label], indirect=True)
+
+
+@pytest.fixture
+def gic_saw(request, saw_session):
+    """
+    Reuses the session SAW instance but swaps in a different case file.
+
+    After the test, the original session case is reopened so subsequent
+    tests are not affected. This avoids creating a second PowerWorld COM
+    connection, which would conflict with the single-instance application.
+    """
+    case_path = request.param
+    original_case = _get_test_case_path()
+    label = os.path.splitext(os.path.basename(case_path))[0]
+
+    # If the requested case is the same as the session case, just yield
+    if os.path.normcase(os.path.abspath(case_path)) == os.path.normcase(os.path.abspath(original_case)):
+        yield saw_session
+        return
+
+    print(f"\n[GIC] Switching to case: {label}")
+    saw_session.CloseCase()
+    saw_session.OpenCase(case_path)
+    try:
+        yield saw_session
+    finally:
+        # Restore the original session case
+        print(f"\n[GIC] Restoring original case")
+        try:
+            saw_session.CloseCase()
+            saw_session.OpenCase(original_case)
+        except Exception:
+            pass
 
 
 # -------------------------------------------------------------------------

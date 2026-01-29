@@ -1,239 +1,313 @@
+"""
+Network Matrix Utilities
+========================
+
+Provides network topology analysis including incidence matrices,
+graph Laplacians with various weighting schemes, and branch parameter
+calculations for power system analysis.
+
+Classes
+-------
+Network
+    Network matrix construction and branch weight calculations.
+BranchType
+    Enumeration of supported branch weight types for Laplacian construction.
+
+Key Features
+------------
+- Sparse incidence matrix construction (with optional HVDC lines)
+- Weighted graph Laplacian with multiple weighting schemes
+- Branch parameter calculations (impedance, admittance, propagation delay)
+- Support for transformer pseudo-lengths based on impedance
+
+Example
+-------
+Basic network matrix operations::
+
+    >>> from esapp import GridWorkBench
+    >>> wb = GridWorkBench("case.pwb")
+    >>> A = wb.net.incidence()  # Incidence matrix
+    >>> L = wb.net.laplacian(BranchType.LENGTH)  # Length-weighted Laplacian
+
+See Also
+--------
+esapp.apps.gic : GIC analysis with network topology.
+esapp.saw.matrices : Matrix retrieval from PowerWorld.
+"""
+
+from enum import Enum
+from typing import Union
+
+import numpy as np
+from pandas import Series, concat
+from scipy.sparse import diags, coo_matrix, csc_matrix
+
 from ..components import Branch, Bus, DCTransmissionLine
 from ..indexable import Indexable
 
-from scipy.sparse import diags, lil_matrix, csc_matrix
-import numpy as np
-from pandas import Series, concat
-from enum import Enum
+__all__ = ['Network', 'BranchType']
 
 
-# Types of support branch weights
 class BranchType(Enum):
+    """
+    Branch weighting schemes for Laplacian construction.
+
+    These weights determine how branches contribute to the graph Laplacian,
+    affecting spectral properties and analysis results.
+
+    Attributes
+    ----------
+    LENGTH : int
+        Weight by inverse squared physical length (km^-2).
+        Emphasizes short connections in the network topology.
+    RES_DIST : int
+        Weight by inverse impedance magnitude (resistance distance).
+        Reflects electrical distance between nodes.
+    DELAY : int
+        Weight by inverse squared propagation delay (s^-2).
+        Based on effective LC time constants of branches.
+    """
     LENGTH = 1
-    RES_DIST = 2 # Resistance Distance
+    RES_DIST = 2
     DELAY = 3
-    
 
 
-# Constructing Network Matricies and other metrics
 class Network(Indexable):
+    """
+    Network matrix construction and analysis.
 
+    Provides methods for building sparse network matrices (incidence,
+    Laplacian) and computing branch electrical parameters. Supports
+    both AC branches and optionally HVDC transmission lines.
+
+    Attributes
+    ----------
+    A : scipy.sparse.csc_matrix or None
+        Cached incidence matrix. Recomputed when remake=True.
+
+    Notes
+    -----
+    Matrix dimensions follow PowerWorld bus ordering. Use busmap()
+    to translate between bus numbers and matrix indices.
+    """
 
     A = None
 
-
-    def busmap(self):
-        '''
-        Returns a Pandas Series indexed by BusNum to the positional value of each bus.
-
-        Useful for mapping bus numbers to matrix indices.
+    def busmap(self) -> Series:
+        """
+        Create mapping from bus numbers to matrix indices.
 
         Returns
         -------
         pd.Series
-            Mapping from BusNum to matrix index.
-        '''
-        busNums = self[Bus]
-        return Series(busNums.index, busNums["BusNum"])
+            Series indexed by BusNum with positional values.
 
-    def incidence(self, remake=True, hvdc=False):
-        '''
-        Returns the sparse incidence matrix of the branch network.
-
-        Parameters
-        ----------
-        remake : bool, optional
-            If True, recalculates the matrix even if cached. Defaults to True.
-        hvdc : bool, optional
-            If True, includes HVDC lines. Defaults to False.
-
-        Returns
+        Example
         -------
-        scipy.sparse.lil_matrix
-            Sparse Incidence Matrix of the branch network (Branches x Buses).
-        '''
+        >>> bmap = wb.net.busmap()
+        >>> matrix_idx = bmap[bus_number]
+        """
+        bus_nums = self[Bus]
+        return Series(bus_nums.index, bus_nums["BusNum"])
 
-        # If already made, don't remake
-        if self.A is not None and not remake:
-            return self.A
-        
+    def incidence(self, remake: bool = True, hvdc: bool = False) -> csc_matrix:
+        """
+        Construct the sparse arc-incidence matrix.
 
-
-        # Retrieve
-        fields = ["BusNum", "BusNum:1"]
-        branches = self[Branch][fields]
-
-        if hvdc:
-            hvdc_branches = self[DCTransmissionLine,fields][fields]
-            branches = concat([branches,hvdc_branches], ignore_index=True)
-
-        # Column Positions 
-        bmap    = self.busmap()
-        fromBus = branches["BusNum"].map(bmap).to_numpy()
-        toBus   = branches["BusNum:1"].map(bmap).to_numpy()
-
-        # Lengths and indexers
-        nbranches = len(branches)
-        branchIDs = np.arange(nbranches)
-
-        # Sparse Arc-Incidence Matrix
-        # TODO crerate with COO for better performance
-        A = lil_matrix((nbranches,len(bmap)))
-        A[branchIDs, fromBus] = -1
-        A[branchIDs, toBus]   = 1
-        A = csc_matrix(A)
-
-        self.A = A
-
-        return A
-
-    def laplacian(self, weights: BranchType, longer_xfmr_lens=True, len_thresh=0.01, hvdc=False):
-        '''
-        Uses the systems incident matrix and creates a laplacian with branch weights.
+        The incidence matrix A has shape (branches, buses) where each
+        row represents a branch with +1 at the to-bus and -1 at the
+        from-bus.
 
         Parameters
         ----------
-        weights : BranchType
-            Type of weights to use (LENGTH, RES_DIST, DELAY).
-        longer_xfmr_lens : bool, optional
-            If True, uses fictitious lengths for transformers. Defaults to True.
-        len_thresh : float, optional
-            Threshold for short lines in km. Defaults to 0.01.
-        hvdc : bool, optional
-            If True, includes HVDC lines. Defaults to False.
+        remake : bool, default True
+            If True, recomputes even if cached.
+        hvdc : bool, default False
+            If True, includes HVDC transmission lines.
 
         Returns
         -------
         scipy.sparse.csc_matrix
-            Sparse Laplacian matrix.
-        '''
+            Sparse incidence matrix (branches x buses).
+        """
+        if self.A is not None and not remake:
+            return self.A
 
-        if weights == BranchType.LENGTH:    #  m^-2
-            W = 1/self.lengths(longer_xfmr_lens, len_thresh, hvdc)**2
-        elif weights == BranchType.RES_DIST:  #  ohms^-2
-            W = 1/self.zmag(hvdc) 
+        # Retrieve branch data
+        fields = ["BusNum", "BusNum:1"]
+        branches = self[Branch][fields]
+
+        if hvdc:
+            hvdc_branches = self[DCTransmissionLine, fields][fields]
+            branches = concat([branches, hvdc_branches], ignore_index=True)
+
+        # Create bus mapping
+        bmap = self.busmap()
+        from_bus = branches["BusNum"].map(bmap).to_numpy()
+        to_bus = branches["BusNum:1"].map(bmap).to_numpy()
+
+        nbranches = len(branches)
+        nbuses = len(bmap)
+
+        # Build sparse matrix using COO format (efficient construction)
+        rows = np.concatenate([np.arange(nbranches), np.arange(nbranches)])
+        cols = np.concatenate([from_bus, to_bus])
+        data = np.concatenate([-np.ones(nbranches), np.ones(nbranches)])
+
+        A = coo_matrix((data, (rows, cols)), shape=(nbranches, nbuses))
+        self.A = A.tocsc()
+
+        return self.A
+
+    def laplacian(
+        self,
+        weights: Union[BranchType, np.ndarray],
+        longer_xfmr_lens: bool = True,
+        len_thresh: float = 0.01,
+        hvdc: bool = False
+    ) -> csc_matrix:
+        """
+        Construct weighted graph Laplacian.
+
+        Computes L = A.T @ W @ A where W is a diagonal weight matrix
+        determined by the weighting scheme.
+
+        Parameters
+        ----------
+        weights : BranchType or np.ndarray
+            Weighting scheme or custom weight vector.
+        longer_xfmr_lens : bool, default True
+            Use impedance-based pseudo-lengths for transformers.
+        len_thresh : float, default 0.01
+            Threshold (km) below which branches are treated as transformers.
+        hvdc : bool, default False
+            Include HVDC transmission lines.
+
+        Returns
+        -------
+        scipy.sparse.csc_matrix
+            Sparse weighted Laplacian matrix (buses x buses).
+        """
+        if weights == BranchType.LENGTH:
+            W = 1 / self.lengths(longer_xfmr_lens, len_thresh, hvdc) ** 2
+        elif weights == BranchType.RES_DIST:
+            W = 1 / self.zmag(hvdc)
         elif weights == BranchType.DELAY:
-            W = 1/self.delay()**2  # 1/s^2
+            W = 1 / self.delay() ** 2
         else:
             W = weights
 
         A = self.incidence(hvdc=hvdc)
-
-        LAP =  A.T@diags(W)@A
+        LAP = A.T @ diags(W) @ A
 
         return LAP.tocsc()
-    
-    ''' Branch Weights '''
 
-  
-    def lengths(self, longer_xfmr_lens=False, length_thresh_km = 0.01,hvdc=False):
-        '''
-        Returns lengths of each branch in kilometers.
+    def lengths(
+        self,
+        longer_xfmr_lens: bool = False,
+        length_thresh_km: float = 0.01,
+        hvdc: bool = False
+    ) -> Series:
+        """
+        Get branch lengths in kilometers.
 
         Parameters
         ----------
-        longer_xfmr_lens : bool, optional
-            Use a ficticious length for transformers. Defaults to False.
-        length_thresh_km : float, optional
-            Minimum length threshold in km. Defaults to 0.01.
-        hvdc : bool, optional
-            If True, includes HVDC lines. Defaults to False.
+        longer_xfmr_lens : bool, default False
+            Calculate pseudo-lengths for transformers based on
+            their impedance relative to average line impedance per km.
+        length_thresh_km : float, default 0.01
+            Branches shorter than this are treated as transformers.
+        hvdc : bool, default False
+            Include HVDC transmission lines.
 
         Returns
         -------
         pd.Series
-            Lengths of branches.
-        '''
+            Branch lengths in kilometers.
 
-        # This is distance in kilometers
-        # Just found out that this can be EITHER?? so have to figure 
-        # out which to use. Porbably prefer first field
+        Notes
+        -----
+        When longer_xfmr_lens=True, transformer pseudo-length is
+        computed as: Z_xfmr / (average Z per km of lines).
+        """
         field = ["LineLengthByParameters", "LineLengthByParameters:2"]
-        ell = self[Branch,field][field]
+        ell = self[Branch, field][field]
 
+        # Prefer user-specified length over calculated
         ell_user = ell["LineLengthByParameters"]
-        ell.loc[ell_user>0,"LineLengthByParameters:2"] = ell.loc[ell_user>0,"LineLengthByParameters"]
+        ell.loc[ell_user > 0, "LineLengthByParameters:2"] = ell.loc[ell_user > 0, "LineLengthByParameters"]
         ell = ell["LineLengthByParameters:2"]
 
         if hvdc:
-            field = "LineLengthByParameters"
-            hvdc_ell = self[DCTransmissionLine,field][field]
+            hvdc_field = "LineLengthByParameters"
+            hvdc_ell = self[DCTransmissionLine, hvdc_field][hvdc_field]
             ell = concat([ell, hvdc_ell], ignore_index=True)
 
-        # Calculate the equivilent distance if same admittance of a line
         if longer_xfmr_lens:
-
             fields = ["LineX:2", "LineR:2"]
             branches = self[Branch, fields][fields]
 
-            isLongLine = ell > length_thresh_km
-            lines = branches.loc[isLongLine]
-            xfmrs = branches.loc[~isLongLine]
+            is_long_line = ell > length_thresh_km
+            lines = branches.loc[is_long_line]
+            xfmrs = branches.loc[~is_long_line]
 
-            lineZ = np.abs(lines["LineR:2"] + 1j*lines["LineX:2"])
-            xfmrZ = np.abs(xfmrs["LineR:2"] + 1j*xfmrs["LineX:2"])
+            line_z = np.abs(lines["LineR:2"] + 1j * lines["LineX:2"])
+            xfmr_z = np.abs(xfmrs["LineR:2"] + 1j * xfmrs["LineX:2"])
 
-            # Average Ohms per km for lines
-            ZperKM = (lineZ/ell).mean()
+            # Average ohms per km for transmission lines
+            z_per_km = (line_z / ell[is_long_line]).mean()
 
-            # BUG Mean is probably a bad way, since the line lengths are very diverse.
-
-            # Impedence Magnitude of Transformers
-            psuedoLength = (xfmrZ/ZperKM).to_numpy()
-
-
-            ell.loc[~isLongLine] = psuedoLength
-
-        # Assume XFMR 10 meter long
+            # Pseudo-length based on impedance
+            pseudo_length = (xfmr_z / z_per_km).to_numpy()
+            ell.loc[~is_long_line] = pseudo_length
         else:
-            ell.loc[ell==0] = 0.01
+            # Assume transformers are 10 meters
+            ell.loc[ell == 0] = 0.01
 
         return ell
-    
-    def zmag(self, hvdc=False):
-        '''
-        Steady-state phase delays of the branches, approximated as the angle of the complex value.
+
+    def zmag(self, hvdc: bool = False) -> Series:
+        """
+        Get branch impedance magnitudes.
 
         Parameters
         ----------
-        hvdc : bool, optional
-            If True, includes HVDC lines. Defaults to False.
+        hvdc : bool, default False
+            Include HVDC transmission lines.
 
         Returns
         -------
         pd.Series
-            Phase delays (radians).
-        '''
-        Y = self.ybranch(hvdc=hvdc) 
+            Impedance magnitude |Z| for each branch.
+        """
+        Y = self.ybranch(hvdc=hvdc)
+        return 1 / np.abs(Y)
 
-        return 1/np.abs(Y)
-      
-    def ybranch(self, asZ=False, hvdc=False):
-        '''
-        Return Admittance (or Impedance) of Lines in Complex Form.
+    def ybranch(self, asZ: bool = False, hvdc: bool = False) -> Series:
+        """
+        Get branch admittance (or impedance) in complex form.
 
         Parameters
         ----------
-        asZ : bool, optional
-            If True, returns Impedance (Z). If False, returns Admittance (Y). Defaults to False.
-        hvdc : bool, optional
-            If True, includes HVDC lines. Defaults to False.
+        asZ : bool, default False
+            If True, return impedance Z. If False, return admittance Y.
+        hvdc : bool, default False
+            Include HVDC transmission lines (uses small impedance).
 
         Returns
         -------
         pd.Series
-            Complex admittance or impedance.
-        '''
-
+            Complex admittance Y = 1/(R + jX) or impedance Z = R + jX.
+        """
         branches = self[Branch, ["LineR:2", "LineX:2"]]
-
-
 
         R = branches["LineR:2"]
         X = branches["LineX:2"]
-        Z = R + 1j*X 
+        Z = R + 1j * X
 
-        if hvdc: # Just add small impedence for HVDC
+        if hvdc:
+            # Use small impedance for HVDC lines
             cnt = len(self[DCTransmissionLine])
             Zdc = Z[:cnt].copy()
             Zdc[:] = 0.001
@@ -241,136 +315,91 @@ class Network(Indexable):
 
         if asZ:
             return Z
-        return 1/Z
-    
-    def yshunt(self):
-        '''
-        Return Shunt Admittance of Lines in Complex Form.
+        return 1 / Z
+
+    def yshunt(self) -> Series:
+        """
+        Get branch shunt admittance in complex form.
 
         Returns
         -------
         pd.Series
-            Complex shunt admittance.
-        '''
-
+            Complex shunt admittance Y = G + jB.
+        """
         branches = self[Branch, ["LineG", "LineC"]]
         G = branches["LineG"]
         B = branches["LineC"]
- 
-        return G + 1j*B
+        return G + 1j * B
 
-    def gamma(self):
-        '''
-        Returns approximation of propagation constants for each branch.
+    def gamma(self) -> Series:
+        """
+        Compute propagation constants for each branch.
 
         Returns
         -------
         pd.Series
-            Propagation constants.
-        '''
-
-        # Length (Set Xfmr to 1 meter)
+            Complex propagation constant gamma = sqrt(Z * Y).
+        """
         ell = self.lengths()
-
-        # Series Parameters
         Z = self.ybranch(asZ=True)
         Y = self.yshunt()
 
+        # Handle zero values
+        Z[Z == 0] = 0.000446 + 0.002878j
+        Y[Y == 0] = 0.000463j
 
-        # Correct Zero-Values
-        Z[Z==0] = 0.000446+ 0.002878j
-        Y[Y==0] = 0.000463j
+        # Per-unit length parameters
+        Z = Z / ell
+        Y = Y / ell
 
-        # By Length TODO check the mult/division order here.
-        Z /= ell # Series Value
-        Y /= ell # Shunt Value
-        
+        return np.sqrt(Y * Z)
 
-        # Propagation Parameter
-        return  np.sqrt(Y*Z)
-    
-    
-    def delay(self, min_delay=10e-4):
-        r'''
-        Return the effective propagation delay (beta) of network branches.
+    def delay(self, min_delay: float = 10e-4) -> Series:
+        r"""
+        Compute effective propagation delay for network branches.
 
-        This method calculates the lossless propagation delay used to construct
-        the Delay Graph Laplacian :math:`\mathscr{L} = \mathbf{A}^\top \mathbf{T}^{-2} \mathbf{A}`.
-        It derives effective branch parameters by aggregating nodal shunt 
-        admittances and series impedances.
+        Calculates the lossless propagation delay (beta) used to construct
+        the Delay Graph Laplacian: L = A^T @ T^{-2} @ A.
 
-        Mathematical Derivation
-        -----------------------
-        The branch inductance is derived from the imaginary component of the
-        series branch impedance :math:`Z_{ij}`:
-
-        .. math:: \omega L_{ij} = \text{Im}(Z^{br}_{ij})
-
-        The effective branch capacitance :math:`C_{ij}` accounts for capacitor 
-        banks and constant impedance reactive loads by averaging the net nodal 
-        capacitances :math:`C_n` at the branch terminals (using a :math:`\pi`-model 
-        assumption):
-
-        .. math:: C_{ij} = \frac{1}{2}(C_i + C_j)
-
-        where :math:`\omega C_n = \text{Im}(Y^{sh}_n)`. The propagation delay 
-        :math:`\tau_{ij}` is then computed via the propagation constant 
-        :math:`\gamma = \sqrt{Z_{ij}Y_{ij}}`:
-
-        .. math:: \omega_{base}\tau_{ij} = \text{Im}(\sqrt{Z_{ij}Y_{ij}}) = \beta_{ij}
+        The effective branch capacitance accounts for capacitor banks and
+        constant impedance reactive loads by averaging nodal capacitances
+        at branch terminals (pi-model assumption).
 
         Parameters
         ----------
-        min_delay : float, optional
-            Minimum delay value permitted to prevent precision overflow during
-            Laplacian inversion (:math:`\mathbf{T}^{-2}`). Defaults to 10e-4.
+        min_delay : float, default 10e-4
+            Minimum delay value to prevent numerical overflow when
+            computing 1/delay^2 in the Laplacian.
 
         Returns
         -------
         pd.Series
-            Effective propagation parameter (:math:`\beta`) for each branch,
-            enforced by the `min_delay` lower bound.
+            Effective propagation parameter beta for each branch.
 
         Notes
         -----
-        For numerical stability and to avoid precision overflow when calculating 
-        :math:`1/\tau^2`, the returned value is currently the phase constant 
-        :math:`\beta` rather than :math:`\tau = \beta/\omega`.
-        '''
+        Mathematical derivation:
 
+        - Branch inductance: omega * L_ij = Im(Z^br_ij)
+        - Effective capacitance: C_ij = (C_i + C_j) / 2
+        - Propagation delay: omega * tau_ij = Im(sqrt(Z_ij * Y_ij)) = beta_ij
 
-        w = 2*np.pi*60
-
-        # EDGE SERIES RESISTANCE & INDUCTANCE
+        For numerical stability, returns beta rather than tau = beta/omega.
+        """
+        # Edge series impedance
         Z = self.ybranch(asZ=True)
 
-        # EFFECTIVE EDGE SHUNT ADMITTANCE
+        # Effective edge shunt admittance (averaged from bus shunts)
         Ybus = self.esa.get_ybus()
         SUM = np.ones(Ybus.shape[0])
-        AVG = np.abs(self.incidence())/2 
-        Y = AVG@Ybus@SUM 
+        AVG = np.abs(self.incidence()) / 2
+        Y = AVG @ Ybus @ SUM
 
-        # NOTE Do I need to make G =0?
-
-        # Propagation Constant
-        gam = np.sqrt(Z*Y)
+        # Propagation constant
+        gam = np.sqrt(Z * Y)
         beta = np.imag(gam)
 
+        # Enforce lower bound for numerical stability
+        beta[beta < min_delay] = min_delay
 
-
-        # NOTE The issue I am seeing is that this value tau
-        # is very very small in most cases. Dividing it by w
-        # makes it even smaller.
-        # So when it 1/t^2 is calculated, there is an overflow of precision.
-        # Therefore here (for now) we will actually just use beta
-        # for stability purposes
-
-        # EFFECTIVE DELAY
-        tau = beta#/w
-
-        # Enforce lower bound
-        tau[tau<min_delay] = min_delay
-
-        # Propagation Parameter
-        return tau
-    
+        return beta

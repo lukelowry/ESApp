@@ -27,8 +27,6 @@ from .mesh import (
     extract_unique_edges,
     Grid2D,
     GridSelector,
-    DifferentialOperator,  # Backwards compatibility
-    MeshSelector,          # Backwards compatibility
 )
 
 from .misc import (
@@ -68,8 +66,6 @@ __all__ = [
     'extract_unique_edges',
     'Grid2D',
     'GridSelector',
-    'DifferentialOperator',
-    'MeshSelector',
     # misc
     'InjectionVector',
     'ybus_with_loads',

@@ -112,6 +112,64 @@ class MatrixMixin:
             os.unlink(g_matrix_path)
             os.unlink(id_file_path)
 
+    def get_gmatrix_with_ids(self, full: bool = False):
+        """Get the GIC conductance matrix (G) along with the node ID mapping.
+
+        This method returns both the G-matrix and a list of node identifiers
+        that describe what each row/column represents (substations and buses).
+
+        Parameters
+        ----------
+        full : bool, optional
+            If True, returns a dense NumPy array. If False (default), returns a
+            SciPy CSR sparse matrix.
+
+        Returns
+        -------
+        tuple
+            A tuple of (G_matrix, node_ids) where:
+            - G_matrix: The G-matrix as either dense array or sparse CSR matrix
+            - node_ids: List of strings describing each node (e.g., "Sub 1", "Bus 101")
+        """
+        g_matrix_path, id_file_path = self._make_temp_matrix_files()
+        try:
+            cmd = f'GICSaveGMatrix("{g_matrix_path}","{id_file_path}");'
+            self.RunScriptCommand(cmd)
+            self.RunScriptCommand(cmd)
+
+            with open(g_matrix_path, "r") as f:
+                mat_str = f.read()
+            sparse_matrix = self._parse_real_matrix(mat_str, "GMatrix")
+
+            with open(id_file_path, "r") as f:
+                id_content = f.read()
+
+            # Parse the ID file - format: "ObjectType, Number, Row/Col, Name"
+            # First line is header, skip it
+            node_ids = []
+            lines = id_content.strip().split('\n')
+            for line in lines[1:]:  # Skip header line
+                line = line.strip()
+                if not line:
+                    continue
+                # Split by comma
+                parts = [p.strip() for p in line.split(',')]
+                # Format: ObjectType, Number, Row/Col, Name - Name is 4th field (index 3)
+                if len(parts) >= 4:
+                    node_ids.append(parts[3])  # Name is 4th field
+                elif len(parts) >= 3:
+                    node_ids.append(parts[2])  # Fallback to 3rd field
+                elif len(parts) >= 2:
+                    node_ids.append(parts[1])  # Fallback to 2nd field
+                else:
+                    node_ids.append(line)
+
+            matrix = sparse_matrix.toarray() if full else sparse_matrix
+            return matrix, node_ids
+        finally:
+            os.unlink(g_matrix_path)
+            os.unlink(id_file_path)
+
     def get_jacobian(self, full: bool = False) -> Union[np.ndarray, csr_matrix]:
         """Get the power flow Jacobian matrix.
 

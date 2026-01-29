@@ -96,6 +96,22 @@ class ComponentGenerator:
         'GEDateIn', 'GEDateOut'
     }
 
+    # Manual field definitions for fields not properly defined in PWRaw
+    # Format: {ObjectType: [FieldDefinition, ...]}
+    MANUAL_FIELDS = {
+        'Substation': [
+            FieldDefinition(
+                variable_name='GICUsedSubGroundOhms',
+                python_name='GICUsedSubGroundOhms',
+                concise_name='RgroundUsed',
+                data_type='Real',
+                description='Substation grounding ohms actually used in the geomagnetic induced current calculations.',
+                role=FieldRole.STANDARD,
+                enterable=False
+            ),
+        ],
+    }
+
     DTYPE_MAP = {"String": "str", "Real": "float", "Integer": "int"}
 
     TS_OBJECT_MAPPING = {
@@ -246,6 +262,11 @@ from .gobject import *
             for obj_name, obj_def in self.objects.items():
                 cls_name = self._sanitize_for_python(obj_name.split(" ")[0])
                 f.write(f'\n\nclass {cls_name}(GObject):')
+
+                # Inject manual fields for this object type
+                if obj_name in self.MANUAL_FIELDS:
+                    for manual_field in self.MANUAL_FIELDS[obj_name]:
+                        obj_def.fields.append(manual_field)
 
                 obj_def.fields.sort(key=self._get_sort_key)
 
