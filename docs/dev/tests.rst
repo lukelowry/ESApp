@@ -4,44 +4,58 @@ Testing Suite
 One suite covers everything: fast unit tests that run without PowerWorld and integration tests that exercise
 live Simulator cases. Configure once, run anywhere.
 
-Test map
+Test Map
 --------
+
+**Unit Tests** (No PowerWorld required)
 
 .. list-table::
    :header-rows: 1
-   :widths: 30 50 20
+   :widths: 35 65
 
    * - File
-     - What it covers
-     - PowerWorld?
+     - Coverage
+   * - test_gobject.py
+     - GObject base class, FieldPriority flags, repr/str methods
    * - test_grid_components.py
-     - Component definitions, field metadata, GObject behavior
-     - No
-   * - test_exceptions.py
-     - Exception hierarchy and messaging
-     - No
-   * - test_indexable_data_access.py
-     - Indexing reads/writes on mock data
-     - No
-   * - test_saw_core_methods.py
-     - SAW core calls with mocked COM responses
-     - No
-   * - test_integration_saw_powerworld.py
-     - Power flow, contingencies, file ops against real cases
-     - **Yes**
-   * - test_integration_workbench.py
-     - GridWorkBench data access on a live case
-     - **Yes**
+     - Field collection, key/editable/settable classification, all generated components
+   * - test_indexing.py
+     - Indexable class data access (``wb[GObject, "field"]`` syntax), broadcast, bulk update
+   * - test_helpers_unit.py
+     - SAW helper functions: df_to_aux, path conversion, formatting utilities
+   * - test_dynamics.py
+     - Dynamics module: ContingencyBuilder, SimAction enum (mocked)
 
-Configure integration tests (one-time)
---------------------------------------
+**Integration Tests** (Requires PowerWorld)
+
+.. list-table::
+   :header-rows: 1
+   :widths: 35 65
+
+   * - File
+     - Coverage
+   * - test_integration_saw_powerworld.py
+     - Core SAW operations, file I/O, data retrieval against live cases
+   * - test_integration_workbench.py
+     - GridWorkBench data access, indexing on live case
+   * - test_integration_powerflow.py
+     - Power flow solutions, matrices (Ybus, Jacobian), PTDF/LODF sensitivity
+   * - test_integration_contingency.py
+     - Contingency auto-insertion, solving, cloning, OTDF calculations
+   * - test_integration_analysis.py
+     - GIC analysis, ATC analysis, transient stability, time step simulation
+   * - test_integration_extended.py
+     - Scheduled actions, weather, oneline, OPF, extended method coverage
+
+Configure Integration Tests
+---------------------------
 
 1. Copy ``tests/config_test.example.py`` to ``tests/config_test.py``
 2. Set an absolute path to a PowerWorld case: ``SAW_TEST_CASE = r"C:\Path\To\Your\Case.pwb"``
 3. Keep the file alongside the tests; pytest will auto-detect it
 
-How to run
-----------
+Running Tests
+-------------
 
 .. code-block:: bash
 
@@ -49,7 +63,10 @@ How to run
     pytest tests/
 
     # Unit only (skip PowerWorld)
-    pytest tests/ -m "not online"
+    pytest tests/ -m "not integration"
+
+    # Integration only
+    pytest tests/ -m integration
 
     # Specific file
     pytest tests/test_grid_components.py -v
@@ -60,12 +77,12 @@ How to run
 VS Code
 -------
 
-Open the Testing view (beaker icon); tests are discovered automatically. You can run by file or class, and
+Open the Testing view (beaker icon); tests are discovered automatically. Run by file or class, and
 debug individual tests from the UI.
 
 Troubleshooting
 ---------------
 
-- PowerWorld not found: ensure ``tests/config_test.py`` exists and the path is correct
-- Online tests slow: run ``pytest -m "not online"`` for unit-only
-- Import errors: install in editable mode ``pip install -e .``
+- **PowerWorld not found**: Ensure ``tests/config_test.py`` exists with a valid case path
+- **Integration tests slow**: Run ``pytest -m "not integration"`` for unit-only
+- **Import errors**: Install in editable mode with ``pip install -e .``

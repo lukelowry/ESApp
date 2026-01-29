@@ -146,12 +146,20 @@ latex_elements = {
 \usepackage{xcolor}
 \usepackage{array}
 \usepackage{tabularx}
+\usepackage{tcolorbox}
+\tcbuselibrary{skins,breakable}
 
 % Define a modern color palette
 \definecolor{linkblue}{RGB}{0, 83, 155}
 \definecolor{codebackground}{RGB}{250, 250, 252}
 \definecolor{codeborder}{RGB}{220, 220, 230}
 \definecolor{headingblue}{RGB}{30, 60, 114}
+\definecolor{noteblue}{RGB}{232, 244, 253}
+\definecolor{noteborder}{RGB}{66, 165, 245}
+\definecolor{warningyellow}{RGB}{255, 249, 230}
+\definecolor{warningborder}{RGB}{255, 183, 77}
+\definecolor{tipgreen}{RGB}{232, 245, 233}
+\definecolor{tipborder}{RGB}{102, 187, 106}
 
 % Sphinx code-block styling
 \sphinxsetup{
@@ -159,8 +167,111 @@ latex_elements = {
     VerbatimColor={RGB}{250,250,252},
     VerbatimBorderColor={RGB}{220,220,230},
     InnerLinkColor={RGB}{0,83,155},
-    OuterLinkColor={RGB}{0,83,155}
+    OuterLinkColor={RGB}{0,83,155},
+    noteBgColor={RGB}{232,244,253},
+    noteBorderColor={RGB}{66,165,245},
+    warningBgColor={RGB}{255,249,230},
+    warningBorderColor={RGB}{255,183,77},
+    importantBgColor={RGB}{255,243,224},
+    importantBorderColor={RGB}{255,152,0},
+    tipBgColor={RGB}{232,245,233},
+    tipBorderColor={RGB}{102,187,106},
+    hintBgColor={RGB}{232,245,233},
+    hintBorderColor={RGB}{102,187,106}
 }
+
+% Modern admonition styling - override Sphinx defaults
+\renewenvironment{sphinxnote}[1]{%
+  \begin{tcolorbox}[
+    enhanced,
+    breakable,
+    colback=noteblue,
+    colframe=noteborder,
+    boxrule=0pt,
+    leftrule=3pt,
+    arc=0pt,
+    outer arc=0pt,
+    left=8pt,
+    right=8pt,
+    top=6pt,
+    bottom=6pt,
+    fonttitle=\bfseries\sffamily\small,
+    title={\textcolor{noteborder}{#1}},
+    coltitle=noteborder,
+    attach boxed title to top left={yshift=-2mm, xshift=0mm},
+    boxed title style={colback=white, colframe=white, boxrule=0pt}
+  ]
+  \small
+}{\end{tcolorbox}}
+
+\renewenvironment{sphinxwarning}[1]{%
+  \begin{tcolorbox}[
+    enhanced,
+    breakable,
+    colback=warningyellow,
+    colframe=warningborder,
+    boxrule=0pt,
+    leftrule=3pt,
+    arc=0pt,
+    outer arc=0pt,
+    left=8pt,
+    right=8pt,
+    top=6pt,
+    bottom=6pt,
+    fonttitle=\bfseries\sffamily\small,
+    title={\textcolor{warningborder}{#1}},
+    coltitle=warningborder,
+    attach boxed title to top left={yshift=-2mm, xshift=0mm},
+    boxed title style={colback=white, colframe=white, boxrule=0pt}
+  ]
+  \small
+}{\end{tcolorbox}}
+
+\renewenvironment{sphinxhint}[1]{%
+  \begin{tcolorbox}[
+    enhanced,
+    breakable,
+    colback=tipgreen,
+    colframe=tipborder,
+    boxrule=0pt,
+    leftrule=3pt,
+    arc=0pt,
+    outer arc=0pt,
+    left=8pt,
+    right=8pt,
+    top=6pt,
+    bottom=6pt,
+    fonttitle=\bfseries\sffamily\small,
+    title={\textcolor{tipborder}{#1}},
+    coltitle=tipborder,
+    attach boxed title to top left={yshift=-2mm, xshift=0mm},
+    boxed title style={colback=white, colframe=white, boxrule=0pt}
+  ]
+  \small
+}{\end{tcolorbox}}
+
+\renewenvironment{sphinxtip}[1]{%
+  \begin{tcolorbox}[
+    enhanced,
+    breakable,
+    colback=tipgreen,
+    colframe=tipborder,
+    boxrule=0pt,
+    leftrule=3pt,
+    arc=0pt,
+    outer arc=0pt,
+    left=8pt,
+    right=8pt,
+    top=6pt,
+    bottom=6pt,
+    fonttitle=\bfseries\sffamily\small,
+    title={\textcolor{tipborder}{#1}},
+    coltitle=tipborder,
+    attach boxed title to top left={yshift=-2mm, xshift=0mm},
+    boxed title style={colback=white, colframe=white, boxrule=0pt}
+  ]
+  \small
+}{\end{tcolorbox}}
 
 % Compact lists with slight breathing room
 \setlist{nosep, itemsep=2pt}
@@ -187,3 +298,6 @@ latex_elements = {
     "figure_align": "H",
     "sphinxsetup": "hmargin={1in,1in}, vmargin={1in,1in}",
 }
+
+# Disable the module index in PDF (it's not useful)
+latex_domain_indices = False

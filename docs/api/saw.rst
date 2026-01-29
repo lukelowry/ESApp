@@ -34,107 +34,296 @@ enums instead of raw strings provides IDE autocomplete, type checking, and preve
 SolverMethod
 ~~~~~~~~~~~~
 
-Power flow solution algorithms.
+Power flow solution algorithms for the ``SolvePowerFlow`` command.
 
-.. autoclass:: esapp.saw.SolverMethod
-   :members:
-   :undoc-members:
+.. list-table::
+   :header-rows: 1
+   :widths: 25 75
+
+   * - Value
+     - Description
+   * - ``RECTNEWT``
+     - Rectangular Newton-Raphson (default)
+   * - ``POLARNEWT``
+     - Polar Newton-Raphson
+   * - ``GAUSSSEIDEL``
+     - Gauss-Seidel iterative method
+   * - ``FASTDEC``
+     - Fast Decoupled method
+   * - ``ROBUST``
+     - Robust solver for difficult cases
+   * - ``DC``
+     - DC power flow (linear approximation)
 
 LinearMethod
 ~~~~~~~~~~~~
 
-Linear calculation methods for sensitivity analysis (PTDF, LODF, etc.).
+Linear calculation methods for sensitivity analysis (PTDF, LODF, shift factors).
 
-.. autoclass:: esapp.saw.LinearMethod
-   :members:
-   :undoc-members:
+.. list-table::
+   :header-rows: 1
+   :widths: 25 75
+
+   * - Value
+     - Description
+   * - ``DC``
+     - DC linear method (most common default)
+   * - ``AC``
+     - AC linear method
+   * - ``DCPS``
+     - DC linear with post-solution adjustment
 
 FilterKeyword
 ~~~~~~~~~~~~~
 
 Special filter keywords passed unquoted to PowerWorld commands.
 
-.. autoclass:: esapp.saw.FilterKeyword
-   :members:
-   :undoc-members:
+.. list-table::
+   :header-rows: 1
+   :widths: 25 75
+
+   * - Value
+     - Description
+   * - ``ALL``
+     - Select all objects of the type
+   * - ``SELECTED``
+     - Only objects currently selected in PowerWorld
+   * - ``AREAZONE``
+     - Objects in the active area/zone filter
 
 YesNo
 ~~~~~
 
 Boolean flag values for PowerWorld commands that use "YES"/"NO" strings.
 
-.. autoclass:: esapp.saw.YesNo
-   :members:
-   :undoc-members:
+.. list-table::
+   :header-rows: 1
+   :widths: 25 75
+
+   * - Value
+     - Description
+   * - ``YES``
+     - Affirmative / enable option
+   * - ``NO``
+     - Negative / disable option
+
+Use ``YesNo.from_bool(value)`` to convert Python booleans.
 
 FileFormat
 ~~~~~~~~~~
 
 File format types for import/export operations.
 
-.. autoclass:: esapp.saw.FileFormat
-   :members:
-   :undoc-members:
+.. list-table::
+   :header-rows: 1
+   :widths: 25 75
+
+   * - Value
+     - Description
+   * - ``CSV``
+     - Comma-separated values
+   * - ``CSVCOLHEADER``
+     - CSV with column headers
+   * - ``CSVNOHEADER``
+     - CSV without headers
+   * - ``AUX``
+     - PowerWorld auxiliary format
+   * - ``AUXCSV``
+     - Hybrid auxiliary/CSV format
+   * - ``TAB``
+     - Tab-separated format
+   * - ``PTI``
+     - PTI/PSS-E format
+   * - ``TXT``
+     - Text format
+   * - ``PWB``
+     - PowerWorld case format
+   * - ``AXD``
+     - Oneline diagram format
+   * - ``GE``
+     - GE EPC format
+   * - ``CF``
+     - Custom format
+   * - ``UCTE``
+     - UCTE format
+   * - ``AREVAHDB``
+     - AREVA HDB format
+   * - ``OPENNETEMS``
+     - OPENNET EMS format
 
 ObjectType
 ~~~~~~~~~~
 
 PowerWorld object type identifiers for filtering and operations.
 
-.. autoclass:: esapp.saw.ObjectType
-   :members:
-   :undoc-members:
+.. list-table::
+   :header-rows: 1
+   :widths: 25 75
+
+   * - Value
+     - Description
+   * - ``BUS``
+     - Bus/node
+   * - ``BRANCH``
+     - Branch (line or transformer)
+   * - ``GEN``
+     - Generator
+   * - ``LOAD``
+     - Load
+   * - ``SHUNT``
+     - Shunt device
+   * - ``AREA``
+     - Control area
+   * - ``ZONE``
+     - Zone
+   * - ``OWNER``
+     - Owner
+   * - ``INTERFACE``
+     - Interface (flowgate)
+   * - ``INJECTIONGROUP``
+     - Injection group
+   * - ``BUSSHUNT``
+     - Bus shunt
+   * - ``SUPERBUS``
+     - Super bus (aggregated)
+   * - ``TRANSFORMER``
+     - Transformer specifically
+   * - ``LINE``
+     - Transmission line specifically
+   * - ``SUPERAREA``
+     - Super area (aggregated)
 
 KeyFieldType
 ~~~~~~~~~~~~
 
 Key field types for result output formatting.
 
-.. autoclass:: esapp.saw.KeyFieldType
-   :members:
-   :undoc-members:
+.. list-table::
+   :header-rows: 1
+   :widths: 25 75
+
+   * - Value
+     - Description
+   * - ``PRIMARY``
+     - Primary key fields (e.g., BusNum)
+   * - ``SECONDARY``
+     - Secondary key fields (e.g., BusName)
+   * - ``LABEL``
+     - Label-based identification
 
 IslandReference
 ~~~~~~~~~~~~~~~
 
 Island reference options for sensitivity analysis.
 
-.. autoclass:: esapp.saw.IslandReference
-   :members:
-   :undoc-members:
+.. list-table::
+   :header-rows: 1
+   :widths: 25 75
+
+   * - Value
+     - Description
+   * - ``EXISTING``
+     - Use existing island configuration
+   * - ``NO``
+     - No area reference
 
 Other Enumerations
 ~~~~~~~~~~~~~~~~~~
 
-Additional specialized enumerations:
+Additional specialized enumerations for specific operations:
 
-.. autoclass:: esapp.saw.InterfaceLimitSetting
-   :members:
-   :undoc-members:
+**InterfaceLimitSetting** - Interface limit configuration
 
-.. autoclass:: esapp.saw.StarBusHandling
-   :members:
-   :undoc-members:
+.. list-table::
+   :header-rows: 1
+   :widths: 25 75
 
-.. autoclass:: esapp.saw.MultiSectionLineHandling
-   :members:
-   :undoc-members:
+   * - Value
+     - Description
+   * - ``AUTO``
+     - Automatic limit calculation
+   * - ``NONE``
+     - No limit applied
 
-.. autoclass:: esapp.saw.OnelineLinkMode
-   :members:
-   :undoc-members:
+**StarBusHandling** - Star bus handling for case append
 
-.. autoclass:: esapp.saw.ShuntModel
-   :members:
-   :undoc-members:
+.. list-table::
+   :header-rows: 1
+   :widths: 25 75
 
-.. autoclass:: esapp.saw.BranchDeviceType
-   :members:
-   :undoc-members:
+   * - Value
+     - Description
+   * - ``NEAR``
+     - Map to nearest bus (default)
+   * - ``MAX``
+     - Map to maximum impedance bus
 
-.. autoclass:: esapp.saw.TSGetResultsMode
-   :members:
-   :undoc-members:
+**MultiSectionLineHandling** - Multi-section line handling for case append
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 75
+
+   * - Value
+     - Description
+   * - ``MAINTAIN``
+     - Maintain multisection line structure (default)
+   * - ``EQUIVALENCE``
+     - Convert to equivalent circuits
+
+**OnelineLinkMode** - Oneline diagram linking modes
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 75
+
+   * - Value
+     - Description
+   * - ``LABELS``
+     - Link objects by labels (default)
+   * - ``NUMBERS``
+     - Link objects by numbers
+
+**ShuntModel** - Shunt model types for line tapping
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 75
+
+   * - Value
+     - Description
+   * - ``CAPACITANCE``
+     - Capacitive shunt model
+   * - ``INDUCTANCE``
+     - Inductive shunt model
+
+**BranchDeviceType** - Branch device types for bus splitting
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 75
+
+   * - Value
+     - Description
+   * - ``Line``
+     - Transmission line
+   * - ``Breaker``
+     - Circuit breaker
+
+**TSGetResultsMode** - Transient stability results save mode
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 75
+
+   * - Value
+     - Description
+   * - ``SINGLE``
+     - Single combined output file
+   * - ``SEPARATE``
+     - Separate files per object
+   * - ``JSIS``
+     - JSIS format output
 
 Helper Functions
 ~~~~~~~~~~~~~~~~

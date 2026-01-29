@@ -39,14 +39,13 @@ The component system consists of:
    .. code-block:: python
 
        class Bus(GObject):
-           """A power system bus/node"""
-           # First member defines the PowerWorld object type
-           _ = 'Bus'
-
-           # Fields: (PowerWorld name, data type, priority flags)
-           Number = 'BusNum', int, FieldPriority.PRIMARY
-           Name = 'BusName', str, FieldPriority.REQUIRED | FieldPriority.EDITABLE
-           PUVolt = 'BusPUVolt', float, FieldPriority.OPTIONAL
+           # Fields: (PowerWorld field name, data type, priority flags)
+           BusNum = ("BusNum", int, FieldPriority.PRIMARY)
+           """Number"""
+           BusName = ("BusName", str, FieldPriority.SECONDARY | FieldPriority.REQUIRED | FieldPriority.EDITABLE)
+           """Name"""
+           AreaNum = ("AreaNum", int, FieldPriority.SECONDARY | FieldPriority.REQUIRED | FieldPriority.EDITABLE)
+           """Area Num"""
 
 3. **Transient Stability Fields** (``esapp/components/ts_fields.py``)
 
@@ -198,22 +197,25 @@ EDITABLE
 Example Generated Component
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-A generated component class follows this pattern:
+A generated component class follows this pattern (excerpt from actual ``Bus`` class):
 
 .. code-block:: python
 
     class Bus(GObject):
-        """A power system bus/node - represents a point of electrical connection"""
-
-        # First member defines the PowerWorld object type
-        _ = 'Bus'
-
         # Fields: (PowerWorld field name, Python type, composable priority flags)
-        Number = 'BusNum', int, FieldPriority.PRIMARY
-        Name = 'BusName', str, FieldPriority.SECONDARY | FieldPriority.REQUIRED | FieldPriority.EDITABLE
-        PUVolt = 'BusPUVolt', float, FieldPriority.OPTIONAL | FieldPriority.EDITABLE
-        Angle = 'BusAngle', float, FieldPriority.OPTIONAL
-        AreaNum = 'AreaNum', int, FieldPriority.OPTIONAL
+        BusNum = ("BusNum", int, FieldPriority.PRIMARY)
+        """Number"""
+        BusName_NomVolt = ("BusName_NomVolt", str, FieldPriority.SECONDARY)
+        """Name_Nominal kV"""
+        AreaNum = ("AreaNum", int, FieldPriority.SECONDARY | FieldPriority.REQUIRED | FieldPriority.EDITABLE)
+        """Area Num"""
+        BusName = ("BusName", str, FieldPriority.SECONDARY | FieldPriority.REQUIRED | FieldPriority.EDITABLE)
+        """Name"""
+        BusNomVolt = ("BusNomVolt", float, FieldPriority.SECONDARY | FieldPriority.REQUIRED | FieldPriority.EDITABLE)
+        """The nominal kV voltage specified as part of the input file."""
+        ZoneNum = ("ZoneNum", int, FieldPriority.SECONDARY | FieldPriority.REQUIRED | FieldPriority.EDITABLE)
+        """Number of the Zone"""
+        # ... many more fields
 
 The GObject base class automatically collects these definitions and exposes them via class properties:
 
@@ -221,11 +223,11 @@ The GObject base class automatically collects these definitions and exposes them
 
     Bus.TYPE        # 'Bus' - PowerWorld object type string
     Bus.keys        # ['BusNum'] - primary key fields
-    Bus.fields      # ['BusNum', 'BusName', 'BusPUVolt', ...] - all fields
-    Bus.secondary   # ['BusName'] - secondary identifier fields
-    Bus.editable    # ['BusName', 'BusPUVolt'] - user-modifiable fields
-    Bus.identifiers # {'BusNum', 'BusName'} - all identifier fields (keys + secondary)
-    Bus.settable    # {'BusNum', 'BusName', 'BusPUVolt'} - identifiers + editable
+    Bus.fields      # ['BusNum', 'BusName_NomVolt', 'AreaNum', 'BusName', ...] - all fields
+    Bus.secondary   # ['BusName_NomVolt', 'AreaNum', 'BusName', 'BusNomVolt', 'ZoneNum', ...] - secondary identifier fields
+    Bus.editable    # ['AreaNum', 'BusName', 'BusNomVolt', 'ZoneNum', ...] - user-modifiable fields
+    Bus.identifiers # set of all identifier fields (keys + secondary)
+    Bus.settable    # set of all settable fields (identifiers + editable)
 
 Using Generated Components
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -241,11 +243,11 @@ In user code, components are used for type-safe data access:
     data = wb[Bus, ["BusNum", "BusName", "BusPUVolt"]]
 
     # Use class attributes for field names (IDE autocomplete)
-    data = wb[Bus, [Bus.Number, Bus.Name, Bus.PUVolt]]
+    data = wb[Bus, [Bus.BusNum, Bus.BusName, Bus.BusPUVolt]]
 
     # Check field properties
-    Bus.is_editable('BusPUVolt')  # True
-    Bus.is_settable('BusNum')      # True (it's a key)
+    Bus.is_editable('BusName')  # True
+    Bus.is_settable('BusNum')   # True (it's a key)
 
     # For transient stability, use TS for field intellisense
     from esapp.components import TS
