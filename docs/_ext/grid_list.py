@@ -46,16 +46,16 @@ def _extract_ts_fields(ts_fields_path: str):
                         if isinstance(item, ast.Assign):
                             for target in item.targets:
                                 if isinstance(target, ast.Name):
-                                    field_name = target.name
+                                    field_name = target.id  # ast.Name uses 'id' not 'name'
                                     # Extract TSField arguments
                                     if isinstance(item.value, ast.Call):
-                                        args = item.value.args
+                                        call_args = item.value.args
                                         pw_name = ""
                                         description = ""
-                                        if len(args) >= 1 and isinstance(args[0], ast.Constant):
-                                            pw_name = args[0].value
-                                        if len(args) >= 2 and isinstance(args[1], ast.Constant):
-                                            description = args[1].value
+                                        if len(call_args) >= 1 and isinstance(call_args[0], ast.Constant):
+                                            pw_name = call_args[0].value
+                                        if len(call_args) >= 2 and isinstance(call_args[1], ast.Constant):
+                                            description = call_args[1].value
                                         fields.append((field_name, pw_name, description))
                     if fields:
                         categories[category_name] = sorted(fields, key=lambda x: x[0])
