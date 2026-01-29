@@ -9,20 +9,15 @@ Provides tools for:
 - Binary data formats (B3D electric field data)
 """
 
-from .mathtools import (
+from .mesh import (
     MU0,
     takagi,
     eigmax,
     sorteig,
-    periodiclap,
     pathlap,
-    periodicincidence,
     pathincidence,
     normlap,
     hermitify,
-)
-
-from .mesh import (
     Mesh,
     extract_unique_edges,
     Grid2D,
@@ -31,33 +26,28 @@ from .mesh import (
 
 from .misc import (
     InjectionVector,
-    ybus_with_loads,
+    timing,
 )
 
-from .decorators import timing
-
 from .map import (
-    formatPlot,
+    format_plot,
     darker_hsv_colormap,
     border,
     plot_lines,
     plot_mesh,
     plot_tiles,
-    plot_compass,
     plot_vecfield,
 )
 
 from .b3d import B3D
 
 __all__ = [
-    # mathtools
+    # mathtools (in mesh.py)
     'MU0',
     'takagi',
     'eigmax',
     'sorteig',
-    'periodiclap',
     'pathlap',
-    'periodicincidence',
     'pathincidence',
     'normlap',
     'hermitify',
@@ -68,17 +58,14 @@ __all__ = [
     'GridSelector',
     # misc
     'InjectionVector',
-    'ybus_with_loads',
-    # decorators
     'timing',
     # map
-    'formatPlot',
+    'format_plot',
     'darker_hsv_colormap',
     'border',
     'plot_lines',
     'plot_mesh',
     'plot_tiles',
-    'plot_compass',
     'plot_vecfield',
     # b3d
     'B3D',

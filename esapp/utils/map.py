@@ -1,211 +1,286 @@
-from functools import partial
-from os.path import dirname, abspath, sep
+"""
+Geographic visualization utilities for power system analysis.
+
+Provides plotting functions for transmission lines, tesselation grids,
+vector fields, and geographic boundaries using matplotlib and geopandas.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
 import geopandas as gpd
 import numpy as np
+from numpy.typing import NDArray
 
 from matplotlib.axes import Axes
 from matplotlib.cm import ScalarMappable
-from matplotlib.colors import Normalize, rgb_to_hsv, hsv_to_rgb
+from matplotlib.colors import Normalize, ListedColormap, rgb_to_hsv, hsv_to_rgb
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
+from pandas import DataFrame
+
+__all__ = [
+    'format_plot',
+    'darker_hsv_colormap',
+    'border',
+    'plot_lines',
+    'plot_mesh',
+    'plot_tiles',
+    'plot_vecfield',
+]
+
+_SHAPES_DIR = Path(__file__).resolve().parent / 'shapes'
 
 
-def formatPlot(ax: Axes, 
-               title='Chart Tile',
-               xlabel='X Axis Label', 
-               ylabel="Y Axis Label", 
-               xlim=None, 
-               ylim=None, 
-               grid=True,
-               plotarea='linen', 
-               spineColor='black',
-               xticksep = None,
-               yticksep = None
-               ):
-    '''Generic Axes Formatter'''
+def format_plot(
+    ax: Axes,
+    title: str = 'Chart Title',
+    xlabel: str = 'X Axis Label',
+    ylabel: str = 'Y Axis Label',
+    xlim: tuple[float, float] | None = None,
+    ylim: tuple[float, float] | None = None,
+    grid: bool = True,
+    plotarea: str = 'linen',
+    spine_color: str = 'black',
+    xticksep: float | None = None,
+    yticksep: float | None = None,
+) -> None:
+    """
+    Format a matplotlib axes with standard styling.
 
+    Parameters
+    ----------
+    ax : matplotlib.axes.Axes
+        The axes to format.
+    title : str, default 'Chart Title'
+        Plot title.
+    xlabel, ylabel : str
+        Axis labels.
+    xlim, ylim : tuple of float, optional
+        Axis limits as (min, max).
+    grid : bool, default True
+        Whether to show grid lines.
+    plotarea : str, default 'linen'
+        Background face color.
+    spine_color : str, default 'black'
+        Color for axis spines and ticks.
+    xticksep, yticksep : float, optional
+        Tick separation for x and y axes.
+    """
     ax.set_facecolor(plotarea)
     ax.grid(grid)
 
-    # Grid plotted below all data
     if grid:
         ax.set_axisbelow(True)
 
-    ax.tick_params(color=spineColor, labelcolor=spineColor)
+    ax.tick_params(color=spine_color, labelcolor=spine_color)
     for spine in ax.spines.values():
-        spine.set_edgecolor(spineColor)
+        spine.set_edgecolor(spine_color)
 
-    # Viewport
     if xlim:
         ax.set_xlim(xlim)
         if xticksep:
-            ax.set_xticks(np.arange(*xlim,xticksep))
+            ax.set_xticks(np.arange(*xlim, xticksep))
     if ylim:
         ax.set_ylim(ylim)
         if yticksep:
-            pass
-    
-    # Text
+            ax.set_yticks(np.arange(*ylim, yticksep))
+
     ax.set_title(title)
     ax.set_ylabel(ylabel)
     ax.set_xlabel(xlabel)
 
 
-def darker_hsv_colormap(scale_factor=0.5):
-    """Creates a modified version of the HSV colormap that is darker.
+def darker_hsv_colormap(scale_factor: float = 0.5) -> ListedColormap:
+    """
+    Create a darker version of the HSV colormap.
 
     Parameters
     ----------
-    scale_factor : float, optional
-        Factor to scale the value (brightness), by default 0.5.
-        Should be between 0 and 1. 1 means no change, 0 means
-        complete darkness.
+    scale_factor : float, default 0.5
+        Factor to scale the value (brightness). 1 means no change,
+        0 means complete darkness.
 
     Returns
     -------
-    darker_hsv_cmap
-        A modified colormap that is a darker version of the original
-        HSV colormap.
+    matplotlib.colors.ListedColormap
+        A darker version of the HSV colormap.
     """
-    # Create the HSV colormap in RGB
     hsv_cmap = plt.cm.hsv(np.linspace(0, 1, 256))[:, :3]
     hsv_colors = rgb_to_hsv(hsv_cmap)
-    
-    # Scale the Value component to make it darker
+
     hsv_colors[:, 2] *= scale_factor
     hsv_colors[:, 2] = np.clip(hsv_colors[:, 2], 0, 1)
 
-    darker_rgb_colors = hsv_to_rgb(hsv_colors)
-    darker_hsv_cmap = plt.cm.colors.ListedColormap(darker_rgb_colors)
-    return darker_hsv_cmap
+    darker_rgb = hsv_to_rgb(hsv_colors)
+    return ListedColormap(darker_rgb)
 
 
-def border(ax, shape='Texas'):
-    '''Plot Shape data (Country, State, Etc.) on a Matplotlib Axis'''
-            
-    # Load
-    _DIRNAME = dirname(abspath(__file__))
-    shapepath = _DIRNAME + sep + 'shapes' + sep + shape + sep + 'Shape.shp'
+def border(ax: Axes, shape: str = 'Texas') -> None:
+    """
+    Plot a geographic boundary on a matplotlib axes.
+
+    Parameters
+    ----------
+    ax : matplotlib.axes.Axes
+        The axes to plot on.
+    shape : str, default 'Texas'
+        Name of the shape directory under ``esapp/utils/shapes/``.
+    """
+    shapepath = _SHAPES_DIR / shape / 'Shape.shp'
     shapeobj = gpd.read_file(shapepath)
-#
-    # Plot
     shapeobj.plot(ax=ax, edgecolor='black', facecolor='none')
 
 
-def plot_lines(ax, lines, ms=50, lw=1):
-    '''Draw Transmission Line Geographically 
-    -lines: GWB DataFrame of Line Data
-    -coordsX -> nx2 array of x-coords for TO and FROM repsectively
-    -coordsY -> nx2 array of y-coords for TO and FROM repsectively
-    '''
+def plot_lines(ax: Axes, lines: DataFrame, ms: float = 50, lw: float = 1) -> None:
+    """
+    Draw transmission lines geographically.
 
+    Parameters
+    ----------
+    ax : matplotlib.axes.Axes
+        The axes to plot on.
+    lines : pandas.DataFrame
+        DataFrame with 'Longitude', 'Longitude:1', 'Latitude', 'Latitude:1'.
+    ms : float, default 50
+        Marker size for bus endpoints.
+    lw : float, default 1
+        Line width for transmission lines.
+    """
     cX = lines[['Longitude', 'Longitude:1']].to_numpy()
     cY = lines[['Latitude', 'Latitude:1']].to_numpy()
-    
+
     for i in range(cX.shape[0]):
         ax.plot(cX[i], cY[i], zorder=4, c='k', linewidth=lw)
         ax.scatter(cX[i], cY[i], c='k', zorder=2, s=ms)
 
 
-def plot_mesh(ax, gt, include_lines=True, color='grey', tcolor='red', talpha=0.3):
-    '''Plot a GIC Tool Tesselation Grid. Hx and Hy should be calculated with gt.tesselations before calling.
-    Tile Colors should be a 2D array.'''
+def plot_mesh(
+    ax: Axes,
+    gt,
+    include_lines: bool = True,
+    color: str = 'grey',
+    tcolor: str = 'red',
+    talpha: float = 0.3,
+) -> None:
+    """
+    Plot a GIC tool tesselation grid.
 
-    
+    Parameters
+    ----------
+    ax : matplotlib.axes.Axes
+        The axes to plot on.
+    gt : object
+        GIC tool object with ``tile_info``, ``tile_ids``, and ``lines``.
+    include_lines : bool, default True
+        Whether to overlay transmission lines.
+    color : str, default 'grey'
+        Grid line color.
+    tcolor : str, default 'red'
+        Tile face color.
+    talpha : float, default 0.3
+        Tile transparency.
+    """
     if include_lines:
         plot_lines(ax, gt.lines, ms=2)
 
     X, Y, W = gt.tile_info
 
-    # Plot Horizontal and Vertical Grid Lines
-    for x in X: ax.plot([x, x], [Y.min(), Y.max()], c=color, zorder=1)
-    for y in Y: ax.plot([X.min(), X.max()], [y, y], c=color, zorder=1)
+    for x in X:
+        ax.plot([x, x], [Y.min(), Y.max()], c=color, zorder=1)
+    for y in Y:
+        ax.plot([X.min(), X.max()], [y, y], c=color, zorder=1)
 
-    # Plot Intersections
-    #inter = np.unique(allpnts[:,~np.isnan(allpnts[0])],axis=1)
-    #ax.scatter(inter[0], inter[1])
-
-    # Plot Used Tiles
     tile_ids = gt.tile_ids
     refpnt = np.array([[X.min(), Y.min()]]).T
-    tiles_unique = np.unique(tile_ids[:,~np.isnan(tile_ids[0])],axis=1)
-    tile_pos = tiles_unique*W + refpnt
+    tiles_unique = np.unique(tile_ids[:, ~np.isnan(tile_ids[0])], axis=1)
+    tile_pos = tiles_unique * W + refpnt
 
     for tile in tile_pos.T:
-        ax.add_patch(Rectangle((tile[0],tile[1]), W, W, facecolor=tcolor, alpha=talpha))
+        ax.add_patch(Rectangle((tile[0], tile[1]), W, W, facecolor=tcolor, alpha=talpha))
 
-    plt.axis('scaled')
-    formatPlot(ax, xlabel='Longitude ($^\circ$E)', ylabel='Latitude ($^\circ$N)', title='Geographic Line Plot', plotarea='white', grid=False)
+    format_plot(ax, xlabel=r'Longitude ($^\circ$E)', ylabel=r'Latitude ($^\circ$N)',
+                title='Geographic Line Plot', plotarea='white', grid=False)
 
-def plot_tiles(ax, gt, colors=None):
 
+def plot_tiles(
+    ax: Axes,
+    gt,
+    colors: NDArray | None = None,
+) -> None:
+    """
+    Plot colored tiles on a tesselation grid.
+
+    Parameters
+    ----------
+    ax : matplotlib.axes.Axes
+        The axes to plot on.
+    gt : object
+        GIC tool object with ``tile_info``.
+    colors : np.ndarray, optional
+        2D array of tile colors. If None, uses red.
+    """
     X, Y, W = gt.tile_info
 
-    for i in np.arange(len(X)-1):
-        for j in np.arange(len(Y)-1):
-            ax.add_patch(Rectangle((X[i]*W + 0, Y[j]*W + 0), W, W, facecolor=colors[j,i] if colors is not None else 'red', alpha=0.3))
+    for i in np.arange(len(X) - 1):
+        for j in np.arange(len(Y) - 1):
+            fc = colors[j, i] if colors is not None else 'red'
+            ax.add_patch(Rectangle((X[i] * W, Y[j] * W), W, W, facecolor=fc, alpha=0.3))
 
-    plt.axis('scaled')
-    formatPlot(ax, xlabel='Longitude ($^\circ$E)', ylabel='Latitude ($^\circ$N)', title='Tile Plot', plotarea='white', grid=False)
- 
+    format_plot(ax, xlabel=r'Longitude ($^\circ$E)', ylabel=r'Latitude ($^\circ$N)',
+                title='Tile Plot', plotarea='white', grid=False)
 
-def plot_compass(ax: Axes, cmap=None, center=(-81.75, 33.2), radius=0.4, card_fs=16, band_width=0.1, band_thick=2, comp_thick=100, dir_perc=0.6):
-    '''Plot a compass element on the passed Axes. 
-    Inteded for use as a color legend for vector field plots.
-    :param ax: Matplotlib Axes object to draw compass onto.
-    :type Axes: 
-    :param cmap: Matplotlib Colormap of wheel. Ideally Cyclical.
-    '''
 
-    # Custom Ideal Cmap
+def plot_vecfield(
+    ax: Axes,
+    X: NDArray,
+    Y: NDArray,
+    U: NDArray,
+    V: NDArray,
+    cmap: ListedColormap | None = None,
+    pivot: str = 'mid',
+    scale: float = 70,
+    width: float = 0.001,
+    title: str = '',
+) -> ScalarMappable:
+    """
+    Plot a vector field colored by angle.
+
+    Parameters
+    ----------
+    ax : matplotlib.axes.Axes
+        The axes to plot on.
+    X, Y : np.ndarray
+        Coordinates of vector origins.
+    U, V : np.ndarray
+        Vector components.
+    cmap : matplotlib colormap, optional
+        Colormap for angle encoding. Defaults to a darker HSV.
+    pivot : str, default 'mid'
+        Quiver pivot point.
+    scale : float, default 70
+        Quiver arrow scaling.
+    width : float, default 0.001
+        Quiver arrow width.
+    title : str, default ''
+        Plot title.
+
+    Returns
+    -------
+    matplotlib.cm.ScalarMappable
+        Mappable for creating colorbars.
+    """
     if cmap is None:
         cmap = darker_hsv_colormap(0.8)
 
-    # Smoothness
-    n_points = 400
-
-    theta = np.linspace(-np.pi,np.pi, n_points)
-    shift = np.pi/2
-    xr = radius*np.cos(-theta+shift)
-    yr = radius*np.sin(-theta+shift)
-    norm = Normalize(vmin=-np.pi, vmax=np.pi)
-
-    # Fill White circle
-    circle = plt.Circle(center, radius, color='w')
-    ax.add_patch(circle)
-
-    # Colors in Band
-    ax.scatter(center[0] + xr, center[1] + yr, c=cmap(norm(theta)), s=comp_thick)
-
-    # Black Band
-    ax.scatter(center[0] + (1+band_width)*xr , center[1] + (1+band_width)*yr, c='k', s=band_thick)
-    ax.scatter(center[0] + (1-band_width)*xr , center[1] + (1-band_width)*yr, c='k', s=band_thick)
-
-    # Cardinal Directions
-    dir_rad = radius*dir_perc
-    text = partial(ax.text, horizontalalignment='center', verticalalignment='center', fontsize=card_fs, fontfamily='monospace')
-    text(center[0]  , center[1] + dir_rad ,  'N')
-    text(center[0]  , center[1] - dir_rad , 'S')
-    text(center[0] + dir_rad  , center[1] , 'E')
-    text(center[0] - dir_rad  , center[1] , 'W')
-
-def plot_vecfield(ax: Axes, X, Y, U, V, cmap=None, pivot='mid', scale=70, width=0.001, title=''):
-    '''Plot a vectorfield. A scalar mappable is returned for use in a colorbar or other mpl object.'''
-
-    # Custom Ideal Cmap
-    if cmap is None:
-        cmap = darker_hsv_colormap(0.8)
-    
-    # Coloring via Angle
     norm = Normalize(vmin=-np.pi, vmax=np.pi)
     colors = np.arctan2(U, V)
     colors[np.isnan(colors)] = 0
 
-    # Plot Arrows
-    ax.quiver(X, Y, U, V, colors, norm=norm,pivot=pivot, scale=scale, width=width, cmap=cmap)#, headwidth=2, headlength=3, headaxislength=3)
+    ax.quiver(X, Y, U, V, colors, norm=norm, pivot=pivot, scale=scale, width=width, cmap=cmap)
 
-    # Format
-    formatPlot(ax, xlabel='Longitude ($^\circ$E)', ylabel='Latitude ($^\circ$N)', title=title, plotarea='white', grid=False)
-    plt.axis('scaled')
+    format_plot(ax, xlabel=r'Longitude ($^\circ$E)', ylabel=r'Latitude ($^\circ$N)',
+                title=title, plotarea='white', grid=False)
 
     return ScalarMappable(norm, cmap)

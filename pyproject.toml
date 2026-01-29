@@ -104,14 +104,8 @@ omit = [
     "*/__pycache__/*",
     # Auto-generated component definitions (175k+ lines, inflates coverage)
     "esapp/components/grid.py",
-    # Intentionally untested modules (research/analysis code)
-    "esapp/utils/*",
-    # Apps: exclude all except dynamics.py and gic.py
-    "esapp/apps/__init__.py",
-    "esapp/apps/modes.py",
-    "esapp/apps/static.py",
-    "esapp/apps/network.py",
     "esapp/components/generate_components.py"
+    "esapp/apps/modes.py",
 ]
 
 [tool.coverage.report]

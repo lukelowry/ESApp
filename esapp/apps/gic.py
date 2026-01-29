@@ -44,7 +44,7 @@ from typing import Union, Optional
 
 import numpy as np
 from pandas import DataFrame, read_csv
-from scipy.sparse import csr_matrix, eye_array, hstack, vstack, diags
+from scipy.sparse import csr_matrix, eye as speye, hstack, vstack, diags
 from scipy.sparse.linalg import inv as sinv
 
 from esapp.saw._enums import YesNo
@@ -553,7 +553,7 @@ class GIC(Indexable):
         ]))
 
         # ---- Core computations ----
-        Eff  = hstack([eye_array(nx), diags(highV / lowV), csr_matrix((nx, nl + ng))])
+        Eff  = hstack([speye(nx), diags(highV / lowV), csr_matrix((nx, nl + ng))])
         Px   = _perm(xf['BusNum3W'])[:, ns:].T
         G    = A.T @ Gd @ A + Gs
         Gi   = sinv(G.tocsc()) 

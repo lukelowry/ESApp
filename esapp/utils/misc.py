@@ -1,22 +1,64 @@
 """
-Power system utilities for sensitivity analysis and load modeling.
+Power system utilities and general-purpose helpers.
 
-This module provides tools for constructing injection vectors and
-modifying Y-bus matrices with load/generation models.
+This module provides:
+- Injection vectors for sensitivity analysis and load modeling
+- Function decorators for debugging and profiling
 """
 
-from typing import Optional, Sequence
+from __future__ import annotations
+
+from functools import wraps
+from time import time
+from typing import Callable, TypeVar
 
 import numpy as np
-from numpy import sum as npsum
 from numpy.typing import NDArray
 from pandas import DataFrame
-import scipy.sparse as sp
 
 __all__ = [
     'InjectionVector',
-    'ybus_with_loads',
+    'timing',
 ]
+
+# =============================================================================
+# Decorators
+# =============================================================================
+
+F = TypeVar('F', bound=Callable)
+
+
+def timing(func: F) -> F:
+    """
+    Decorator that prints the execution time of a function.
+
+    Parameters
+    ----------
+    func : callable
+        The function to wrap.
+
+    Returns
+    -------
+    callable
+        Wrapped function that prints timing information.
+
+    Examples
+    --------
+    >>> @timing
+    ... def slow_function():
+    ...     time.sleep(1)
+    ...
+    >>> slow_function()
+    'slow_function' took: 1.0012 sec
+    """
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        start = time()
+        result = func(*args, **kwargs)
+        elapsed = time() - start
+        print(f'{func.__name__!r} took: {elapsed:.4f} sec')
+        return result
+    return wrapper
 
 
 class InjectionVector:
@@ -111,103 +153,12 @@ class InjectionVector:
         """
         alpha = self.vec
         is_supply = alpha > 0
-        is_demand = ~is_supply
+        is_demand = alpha < 0
 
-        supply_sum = npsum(alpha[is_supply])
-        demand_sum = -npsum(alpha[is_demand])
+        supply_sum = np.sum(alpha[is_supply])
+        demand_sum = -np.sum(alpha[is_demand])
 
         if supply_sum > 0:
             self.loaddf.loc[is_supply, 'Alpha'] /= supply_sum / (1 + self.losscomp)
         if demand_sum > 0:
             self.loaddf.loc[is_demand, 'Alpha'] /= demand_sum
-
-
-def ybus_with_loads(
-    Y: sp.spmatrix,
-    buses: Sequence,
-    loads: Sequence,
-    gens: Optional[Sequence] = None
-) -> sp.spmatrix:
-    """
-    Modify Y-bus matrix to include constant impedance load/generation models.
-
-    Converts P/Q injections at each bus into equivalent shunt admittances
-    based on bus voltages and adds them to the Y-bus diagonal. This creates
-    a linearized load model suitable for small-signal analysis.
-
-    Parameters
-    ----------
-    Y : scipy.sparse matrix
-        Original Y-bus admittance matrix.
-    buses : sequence
-        Bus component objects with attributes:
-        - BusNum: Bus number
-        - BusLoadMW: Active load (MW)
-        - BusLoadMVR: Reactive load (MVAr)
-        - BusPUVolt: Per-unit voltage magnitude
-    loads : sequence
-        Load component objects (currently unused, load data comes from buses).
-    gens : sequence, optional
-        Generator component objects. Generators without dynamic models
-        (not GENROU) are treated as negative constant impedance loads.
-        Each must have: BusNum, GenMW, GenMVR, BusPUVolt, TSGenMachineName,
-        GenStatus.
-
-    Returns
-    -------
-    scipy.sparse matrix
-        Modified Y-bus matrix with load/generation admittances added.
-
-    Notes
-    -----
-    - Uses 100 MVA base for per-unit conversion.
-    - Constant impedance model: Y_load = S* / |V|^2
-    - Generators with GENROU models and 'Closed' status are skipped
-      (assumed handled by dynamic simulation).
-
-    Examples
-    --------
-    >>> Y_modified = ybus_with_loads(Ybus, buses, loads, gens=generators)
-    """
-    Y = Y.copy()
-    basemva = 100.0
-
-    # Map bus number to Y-bus index
-    bus_to_idx = {b.BusNum: i for i, b in enumerate(buses)}
-
-    for bus in buses:
-        idx = bus_to_idx[bus.BusNum]
-
-        # Net load at bus (per-unit)
-        p_pu = bus.BusLoadMW / basemva if bus.BusLoadMW > 0 else 0.0
-        q_pu = bus.BusLoadMVR / basemva
-        s_pu = p_pu + 1j * q_pu
-
-        # Voltage magnitude
-        vmag = bus.BusPUVolt
-
-        # Constant impedance admittance
-        y_load = s_pu.conjugate() / vmag**2
-
-        Y[idx, idx] += y_load
-
-    # Add generators without dynamic models as negative load
-    if gens is not None:
-        for gen in gens:
-            # Skip generators with dynamic models
-            if gen.TSGenMachineName == 'GENROU' and gen.GenStatus == 'Closed':
-                continue
-
-            idx = bus_to_idx[gen.BusNum]
-
-            p_pu = gen.GenMW / basemva
-            q_pu = gen.GenMVR / basemva
-            s_pu = p_pu + 1j * q_pu
-
-            vmag = gen.BusPUVolt
-            y_gen = s_pu.conjugate() / vmag**2
-
-            # Negative admittance (generation = negative load)
-            Y[idx, idx] -= y_gen
-
-    return Y
