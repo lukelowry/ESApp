@@ -9,18 +9,17 @@ from ._helpers import format_list, get_temp_filepath, load_ts_csv_results, pack_
 class TransientMixin:
 
     def TSTransferStateToPowerFlow(self, calculate_mismatch: bool = False):
-        """Transfers the current transient stability state to the power flow.
+        """Transfers the transient stability state to the power flow.
 
         After running a transient stability simulation, this allows the
         state of the system at the final time step to be loaded into the
         power flow solver for steady-state analysis.
 
-        This is a wrapper for the ``TSTransferStateToPowerFlow`` script command.
-        
         Parameters
         ----------
         calculate_mismatch : bool, optional
-            Set to True to calculate power mismatch when transferring. Defaults to False.
+            If True, calculates power mismatch when transferring transient state
+            to the power flow case. Defaults to False (no mismatch calculation).
         """
         cm = YesNo.from_bool(calculate_mismatch)
         self.RunScriptCommand(f"TSTransferStateToPowerFlow({cm});")
@@ -94,9 +93,9 @@ class TransientMixin:
             self.RunScriptCommand(f'TSSolve("{ctgname}")')
 
     def TSSolveAll(self):
-        """Solves all defined transient stability contingencies.
-        
-        This is a wrapper for the ``TSSolveAll`` script command.
+        """Solves all defined transient contingencies that are not set to skip.
+
+        Distributed computing is not enabled by default.
         """
         self.RunScriptCommand("TSSolveAll()")
 
@@ -191,15 +190,24 @@ class TransientMixin:
         self.TSClearResultsFromRAM()
 
     def TSAutoCorrect(self):
-        """Runs auto correction of parameters for transient stability."""
+        """Runs auto correction of parameters for transient stability.
+
+        Attempts to automatically fix common model parameter issues.
+        """
         return self.RunScriptCommand("TSAutoCorrect;")
 
     def TSClearAllModels(self):
-        """Clears all transient stability models."""
+        """Clears all transient stability models from the case."""
         return self.RunScriptCommand("TSClearAllModels;")
 
     def TSValidate(self):
-        """Validate transient stability models and input values."""
+        """Validates transient stability models and input values.
+
+        Useful for examining model errors and warnings when preparing a case
+        for analysis. Validation is done automatically when running transient
+        analysis, so this command does not need to be run manually prior to
+        analysis.
+        """
         return self.RunScriptCommand("TSValidate;")
 
     def TSWriteOptions(
@@ -228,15 +236,33 @@ class TransientMixin:
         return self.RunScriptCommand(f'TSWriteOptions("{filename}", {opt_str}, {key_field});')
 
     def TSLoadPTI(self, filename: str):
-        """Loads transient stability data in the PTI format."""
+        """Loads transient stability data in the PTI DYR format.
+
+        Parameters
+        ----------
+        filename : str
+            Path to the PTI DYR file to load.
+        """
         return self.RunScriptCommand(f'TSLoadPTI("{filename}");')
 
     def TSLoadGE(self, filename: str):
-        """Loads transient stability data stored in the GE DYD format."""
+        """Loads transient stability data stored in the GE DYD format.
+
+        Parameters
+        ----------
+        filename : str
+            Path to the GE DYD file to load.
+        """
         return self.RunScriptCommand(f'TSLoadGE("{filename}");')
 
     def TSLoadBPA(self, filename: str):
-        """Loads transient stability data stored in the BPA format."""
+        """Loads transient stability data stored in the BPA format.
+
+        Parameters
+        ----------
+        filename : str
+            Path to the BPA file to load.
+        """
         return self.RunScriptCommand(f'TSLoadBPA("{filename}");')
 
     def TSAutoInsertDistRelay(
@@ -397,17 +423,41 @@ class TransientMixin:
         self.RunScriptCommand(f'TSRunUntilSpecifiedTime("{ctg_name}", {opt_str});')
 
     def TSSaveBPA(self, filename: str, diff_case_modified_only: bool = False):
-        """Save transient stability data stored in the BPA IPF format."""
+        """Saves transient stability data in the BPA IPF format.
+
+        Parameters
+        ----------
+        filename : str
+            Path for the output file.
+        diff_case_modified_only : bool, optional
+            If True, only saves models modified from base case. Defaults to False.
+        """
         dc = YesNo.from_bool(diff_case_modified_only)
         self.RunScriptCommand(f'TSSaveBPA("{filename}", {dc});')
 
     def TSSaveGE(self, filename: str, diff_case_modified_only: bool = False):
-        """Save transient stability data stored in the GE DYD format."""
+        """Saves transient stability data in the GE DYD format.
+
+        Parameters
+        ----------
+        filename : str
+            Path for the output file.
+        diff_case_modified_only : bool, optional
+            If True, only saves models modified from base case. Defaults to False.
+        """
         dc = YesNo.from_bool(diff_case_modified_only)
         self.RunScriptCommand(f'TSSaveGE("{filename}", {dc});')
 
     def TSSavePTI(self, filename: str, diff_case_modified_only: bool = False):
-        """Save transient stability data stored in the PTI DYR format."""
+        """Saves transient stability data in the PTI DYR format.
+
+        Parameters
+        ----------
+        filename : str
+            Path for the output file.
+        diff_case_modified_only : bool, optional
+            If True, only saves models modified from base case. Defaults to False.
+        """
         dc = YesNo.from_bool(diff_case_modified_only)
         self.RunScriptCommand(f'TSSavePTI("{filename}", {dc});')
 
@@ -416,7 +466,16 @@ class TransientMixin:
         self.RunScriptCommand(f'TSSaveTwoBusEquivalent("{filename}", {bus_identifier});')
 
     def TSWriteModels(self, filename: str, diff_case_modified_only: bool = False):
-        """Save transient stability dynamic model records only the auxiliary file format."""
+        """Saves transient stability dynamic model records to an auxiliary file.
+
+        Parameters
+        ----------
+        filename : str
+            Name and path for the output file. Typically with ``.aux`` extension.
+        diff_case_modified_only : bool, optional
+            If True, only saves models that are new or have had a parameter modified
+            compared to the difference case tool base case. Defaults to False.
+        """
         dc = YesNo.from_bool(diff_case_modified_only)
         self.RunScriptCommand(f'TSWriteModels("{filename}", {dc});')
 

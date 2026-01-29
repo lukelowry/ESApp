@@ -32,11 +32,11 @@ class ContingencyMixin:
         return self.RunScriptCommand(f'CTGSolve("{ctg_name}");')
 
     def SolveContingencies(self):
-        """Solves all defined contingencies in the PowerWorld case.
+        """Solves all contingencies that are not marked to be skipped.
 
-        This method is a wrapper for the `CTGSolveAll` script command, which
-        iterates through all active contingencies, applies their actions, and
-        solves the power flow for each.
+        Iterates through all active contingencies, applies their actions, and
+        solves the power flow for each. All existing contingency results will
+        be cleared before solving. Distributed methods are not used.
 
         Returns
         -------
@@ -50,8 +50,10 @@ class ContingencyMixin:
         return self.RunScriptCommand("CTGSolveAll(NO, YES);")
 
     def CTGAutoInsert(self):
-        """Auto-inserts contingencies based on the `Ctg_AutoInsert_Options` configured in PowerWorld.
+        """Auto-inserts contingencies based on the Ctg_AutoInsert_Options configured in PowerWorld.
 
+        Prior to calling this action, all options for this action must be specified
+        in the Ctg_AutoInsert_Options object using the SetData method or DATA sections.
         This typically generates N-1 contingencies for lines, transformers, and generators.
 
         Returns
@@ -146,9 +148,12 @@ class ContingencyMixin:
         return self.RunScriptCommand(f'CTGApply("{contingency_name}");')
 
     def CTGCalculateOTDF(self, seller: str, buyer: str, linear_method: Union[LinearMethod, str] = LinearMethod.DC):
-        """Computes OTDFs using the specified linear method.
+        """Computes OTDFs (Outage Transfer Distribution Factors) for contingency violations.
 
-        OTDFs quantify the impact of an outage on power transfers between a seller and buyer.
+        This action first performs the same action as CalculatePTDF for the specified
+        seller and buyer. It then goes through all the violations found by the
+        contingency analysis tool and determines the OTDF values for the various
+        contingency/violation pairs.
 
         Parameters
         ----------
@@ -732,10 +737,21 @@ class ContingencyMixin:
     def CTGSort(self, sort_field_list: List[str] = None):
         """Sorts the contingencies stored in Simulator's internal data structure.
 
+        This is different than sorting contingencies in case information displays
+        in the GUI or sorting data when it is written to an auxiliary file.
+        Contingencies are processed in the order in which they are stored in
+        the internal data structure, and they are not sorted by default;
+        contingencies are added in the order in which they are created.
+        This could be significant for other actions like CTGJoinActiveCTGs
+        if the goal is to join contingencies alphabetically.
+
         Parameters
         ----------
         sort_field_list : List[str], optional
-            A list of fields to sort the contingencies by. Defaults to None (no specific sort).
+            A list of fields to sort by. If None, sorts alphabetically by
+            contingency name. Format: ``["fieldname1:+:0", "fieldname2:-:1"]``
+            where + is ascending, - is descending, 0 is case insensitive,
+            1 is case sensitive.
 
         Returns
         -------

@@ -53,18 +53,40 @@ class FaultMixin:
         return self.RunScriptCommand(f"Fault({args});")
 
     def FaultClear(self):
-        """Clears a single fault that has been calculated."""
+        """Clears a single fault that has been calculated with the Fault command."""
         return self.RunScriptCommand("FaultClear;")
 
     def FaultAutoInsert(self):
-        """Inserts multiple fault definitions based on auto-insert options."""
+        """Inserts multiple fault definitions using the Ctg_AutoInsert_Options object.
+
+        Multiple fault definitions are inserted using the options in the
+        Ctg_AutoInsert_Options object that are relevant for fault analysis.
+        Faults can only be inserted for transmission lines or buses.
+        """
         return self.RunScriptCommand("FaultAutoInsert;")
 
     def FaultMultiple(self, use_dummy_bus: bool = False):
-        """Runs fault analysis on a list of defined faults."""
+        """Runs fault analysis on a list of defined faults.
+
+        Parameters
+        ----------
+        use_dummy_bus : bool, optional
+            If True, dummy buses are created and inserted at the specified
+            percent location for branch faults, and faults are calculated at
+            the dummy buses. If False, the fault is calculated at the branch
+            terminal bus closest to the specified location. Defaults to False.
+        """
         dummy = YesNo.from_bool(use_dummy_bus)
         return self.RunScriptCommand(f"FaultMultiple({dummy});")
 
     def LoadPTISEQData(self, filename: str, version: int = 33):
-        """Loads sequence data in the PTI format."""
+        """Loads sequence data in the PTI format.
+
+        Parameters
+        ----------
+        filename : str
+            Name of the file containing sequence data (typically ``.seq`` extension).
+        version : int, optional
+            Integer representing the PTI version of the SEQ file. Defaults to 33.
+        """
         return self.RunScriptCommand(f'LoadPTISEQData("{filename}", {version});')
