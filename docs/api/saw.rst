@@ -31,10 +31,10 @@ enums instead of raw strings provides IDE autocomplete, type checking, and preve
     saw.SolvePowerFlow(SolverMethod.RECTNEWT)
     saw.GetParametersMultipleElement("Bus", ["BusNum", "BusPUVolt"], FilterKeyword.ALL)
 
-SolverMethod
-~~~~~~~~~~~~
+Power Flow & Analysis
+~~~~~~~~~~~~~~~~~~~~~
 
-Power flow solution algorithms for the ``SolvePowerFlow`` command.
+**SolverMethod** - Power flow solution algorithms
 
 .. list-table::
    :header-rows: 1
@@ -55,10 +55,7 @@ Power flow solution algorithms for the ``SolvePowerFlow`` command.
    * - ``DC``
      - DC power flow (linear approximation)
 
-LinearMethod
-~~~~~~~~~~~~
-
-Linear calculation methods for sensitivity analysis (PTDF, LODF, shift factors).
+**LinearMethod** - Sensitivity analysis methods (PTDF, LODF, shift factors)
 
 .. list-table::
    :header-rows: 1
@@ -73,10 +70,25 @@ Linear calculation methods for sensitivity analysis (PTDF, LODF, shift factors).
    * - ``DCPS``
      - DC linear with post-solution adjustment
 
-FilterKeyword
-~~~~~~~~~~~~~
+**JacobianForm** - Jacobian matrix coordinate forms
 
-Special filter keywords passed unquoted to PowerWorld commands.
+.. list-table::
+   :header-rows: 1
+   :widths: 25 75
+
+   * - Value
+     - Description
+   * - ``RECTANGULAR``
+     - AC Jacobian in Rectangular coordinates ("R")
+   * - ``POLAR``
+     - AC Jacobian in Polar coordinates ("P")
+   * - ``DC``
+     - B' matrix / DC approximation
+
+Filtering & Selection
+~~~~~~~~~~~~~~~~~~~~~
+
+**FilterKeyword** - Special filter keywords (passed unquoted)
 
 .. list-table::
    :header-rows: 1
@@ -91,10 +103,7 @@ Special filter keywords passed unquoted to PowerWorld commands.
    * - ``AREAZONE``
      - Objects in the active area/zone filter
 
-YesNo
-~~~~~
-
-Boolean flag values for PowerWorld commands that use "YES"/"NO" strings.
+**YesNo** - Boolean flags for PowerWorld commands
 
 .. list-table::
    :header-rows: 1
@@ -109,52 +118,7 @@ Boolean flag values for PowerWorld commands that use "YES"/"NO" strings.
 
 Use ``YesNo.from_bool(value)`` to convert Python booleans.
 
-FileFormat
-~~~~~~~~~~
-
-File format types for import/export operations.
-
-.. list-table::
-   :header-rows: 1
-   :widths: 25 75
-
-   * - Value
-     - Description
-   * - ``CSV``
-     - Comma-separated values
-   * - ``CSVCOLHEADER``
-     - CSV with column headers
-   * - ``CSVNOHEADER``
-     - CSV without headers
-   * - ``AUX``
-     - PowerWorld auxiliary format
-   * - ``AUXCSV``
-     - Hybrid auxiliary/CSV format
-   * - ``TAB``
-     - Tab-separated format
-   * - ``PTI``
-     - PTI/PSS-E format
-   * - ``TXT``
-     - Text format
-   * - ``PWB``
-     - PowerWorld case format
-   * - ``AXD``
-     - Oneline diagram format
-   * - ``GE``
-     - GE EPC format
-   * - ``CF``
-     - Custom format
-   * - ``UCTE``
-     - UCTE format
-   * - ``AREVAHDB``
-     - AREVA HDB format
-   * - ``OPENNETEMS``
-     - OPENNET EMS format
-
-ObjectType
-~~~~~~~~~~
-
-PowerWorld object type identifiers for filtering and operations.
+**ObjectType** - PowerWorld object type identifiers
 
 .. list-table::
    :header-rows: 1
@@ -193,10 +157,7 @@ PowerWorld object type identifiers for filtering and operations.
    * - ``SUPERAREA``
      - Super area (aggregated)
 
-KeyFieldType
-~~~~~~~~~~~~
-
-Key field types for result output formatting.
+**KeyFieldType** - Result output key field types
 
 .. list-table::
    :header-rows: 1
@@ -211,10 +172,93 @@ Key field types for result output formatting.
    * - ``LABEL``
      - Label-based identification
 
-IslandReference
+File Operations
 ~~~~~~~~~~~~~~~
 
-Island reference options for sensitivity analysis.
+**FileFormat** - Import/export file formats
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 75
+
+   * - Value
+     - Description
+   * - ``CSV``
+     - Comma-separated values
+   * - ``CSVCOLHEADER``
+     - CSV with column headers
+   * - ``CSVNOHEADER``
+     - CSV without headers
+   * - ``AUX``
+     - PowerWorld auxiliary format
+   * - ``AUXCSV``
+     - Hybrid auxiliary/CSV format
+   * - ``TAB``
+     - Tab-separated format
+   * - ``PTI``
+     - PTI/PSS-E format
+   * - ``TXT``
+     - Text format
+   * - ``PWB``
+     - PowerWorld case format
+   * - ``AXD``
+     - Oneline diagram format
+   * - ``GE``
+     - GE EPC format
+   * - ``CF``
+     - Custom format
+   * - ``UCTE``
+     - UCTE format
+   * - ``AREVAHDB``
+     - AREVA HDB format
+   * - ``OPENNETEMS``
+     - OPENNET EMS format
+
+**ObjectIDHandling** - Contingency export object ID modes
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 75
+
+   * - Value
+     - Description
+   * - ``NO``
+     - Standard object references
+   * - ``YES_MS_3W``
+     - Include multi-section and 3-winding IDs
+
+Topology & Network
+~~~~~~~~~~~~~~~~~~
+
+**BranchDistanceMeasure** - Distance metrics for topology analysis
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 75
+
+   * - Value
+     - Description
+   * - ``REACTANCE``
+     - Use reactance (X) as distance measure
+   * - ``IMPEDANCE``
+     - Use impedance magnitude (Z) as distance measure
+
+**BranchFilterMode** - Branch filter modes for topology traversal
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 75
+
+   * - Value
+     - Description
+   * - ``ALL``
+     - All branches
+   * - ``SELECTED``
+     - Only selected branches
+   * - ``CLOSED``
+     - Only closed branches
+
+**IslandReference** - Island reference options
 
 .. list-table::
    :header-rows: 1
@@ -227,10 +271,21 @@ Island reference options for sensitivity analysis.
    * - ``NO``
      - No area reference
 
-Other Enumerations
-~~~~~~~~~~~~~~~~~~
+Modification & Scaling
+~~~~~~~~~~~~~~~~~~~~~~
 
-Additional specialized enumerations for specific operations:
+**ScalingBasis** - Load/generation scaling basis
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 75
+
+   * - Value
+     - Description
+   * - ``MW``
+     - Absolute MW/MVAR values
+   * - ``FACTOR``
+     - Multiplier factor
 
 **InterfaceLimitSetting** - Interface limit configuration
 
@@ -244,6 +299,35 @@ Additional specialized enumerations for specific operations:
      - Automatic limit calculation
    * - ``NONE``
      - No limit applied
+
+**ShuntModel** - Shunt model types for line tapping
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 75
+
+   * - Value
+     - Description
+   * - ``CAPACITANCE``
+     - Capacitive shunt model
+   * - ``INDUCTANCE``
+     - Inductive shunt model
+
+**BranchDeviceType** - Branch device types for bus splitting
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 75
+
+   * - Value
+     - Description
+   * - ``Line``
+     - Transmission line
+   * - ``Breaker``
+     - Circuit breaker
+
+Case Operations
+~~~~~~~~~~~~~~~
 
 **StarBusHandling** - Star bus handling for case append
 
@@ -284,7 +368,10 @@ Additional specialized enumerations for specific operations:
    * - ``NUMBERS``
      - Link objects by numbers
 
-**ShuntModel** - Shunt model types for line tapping
+Weather & Ratings
+~~~~~~~~~~~~~~~~~
+
+**RatingSetPrecedence** - Rating set precedence for weather-based ratings
 
 .. list-table::
    :header-rows: 1
@@ -292,12 +379,12 @@ Additional specialized enumerations for specific operations:
 
    * - Value
      - Description
-   * - ``CAPACITANCE``
-     - Capacitive shunt model
-   * - ``INDUCTANCE``
-     - Inductive shunt model
+   * - ``NORMAL``
+     - Use normal rating set
+   * - ``CTG``
+     - Use contingency rating set
 
-**BranchDeviceType** - Branch device types for bus splitting
+**RatingSet** - Rating set identifiers (A-O, DEFAULT, NO)
 
 .. list-table::
    :header-rows: 1
@@ -305,10 +392,15 @@ Additional specialized enumerations for specific operations:
 
    * - Value
      - Description
-   * - ``Line``
-     - Transmission line
-   * - ``Breaker``
-     - Circuit breaker
+   * - ``DEFAULT``
+     - Use default rating
+   * - ``NO``
+     - Don't update rating
+   * - ``A`` - ``O``
+     - Rating sets A through O
+
+Transient Stability
+~~~~~~~~~~~~~~~~~~~
 
 **TSGetResultsMode** - Transient stability results save mode
 
@@ -339,20 +431,54 @@ Functions for formatting filter parameters:
 Exceptions
 ----------
 
-.. autoclass:: esapp.saw.PowerWorldError
-   :show-inheritance:
+Exception classes for handling PowerWorld and COM errors.
 
-.. autoclass:: esapp.saw.COMError
-   :show-inheritance:
+.. list-table::
+   :header-rows: 1
+   :widths: 30 70
 
-.. autoclass:: esapp.saw.CommandNotRespectedError
-   :show-inheritance:
+   * - Exception
+     - Description
+   * - ``Error``
+     - Base class for all ESA++ exceptions
+   * - ``PowerWorldError``
+     - Generic error from PowerWorld following a SimAuto call. Parses error messages to extract source and details.
+   * - ``SimAutoFeatureError``
+     - Raised when a SimAuto feature is not supported for the given object or context (e.g., object types that don't support ``GetParameters``)
+   * - ``PowerWorldPrerequisiteError``
+     - Raised when a command fails due to missing prerequisite data (e.g., no contingencies defined for ``CTGSolve``)
+   * - ``PowerWorldAddonError``
+     - Raised when a command requires an unlicensed PowerWorld add-on (e.g., TransLineCalc)
+   * - ``COMError``
+     - Raised when COM communication fails (SimAuto crash, unresponsive, or invalid function call)
+   * - ``CommandNotRespectedError``
+     - Raised when PowerWorld silently ignores a command (e.g., setting a value outside allowed limits)
 
-.. autoclass:: esapp.saw.SimAutoFeatureError
-   :show-inheritance:
+Exception Hierarchy
+~~~~~~~~~~~~~~~~~~~
 
-.. autoclass:: esapp.saw.PowerWorldPrerequisiteError
-   :show-inheritance:
+.. code-block:: text
 
-.. autoclass:: esapp.saw.PowerWorldAddonError
-   :show-inheritance:
+    Exception
+    └── Error (base for all ESA++ exceptions)
+        ├── COMError
+        └── PowerWorldError
+            ├── SimAutoFeatureError
+            ├── PowerWorldPrerequisiteError
+            ├── PowerWorldAddonError
+            └── CommandNotRespectedError
+
+Usage Example
+~~~~~~~~~~~~~
+
+.. code-block:: python
+
+    from esapp.saw import SAW, PowerWorldError, PowerWorldPrerequisiteError
+
+    try:
+        saw.CTGSolveAll()
+    except PowerWorldPrerequisiteError:
+        print("No contingencies defined - add contingencies first")
+    except PowerWorldError as e:
+        print(f"PowerWorld error: {e.message}")
+        print(f"Source: {e.source}")

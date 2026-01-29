@@ -95,6 +95,22 @@ exclude_patterns = [
 nbsphinx_execute = 'never'
 nbsphinx_allow_errors = True
 html_sourcelink_suffix = ''
+
+# nbsphinx styling configuration
+nbsphinx_input_prompt = 'In [%s]:'
+nbsphinx_output_prompt = 'Out[%s]:'
+nbsphinx_prompt_width = '0pt'  # Hide prompt in PDF for cleaner look
+
+# Custom CSS classes for notebook cells (used by nbsphinx)
+nbsphinx_prolog = r"""
+{% set docname = env.doc2path(env.docname, base=None) %}
+
+.. only:: html
+
+    .. role:: raw-html(raw)
+        :format: html
+
+"""
 master_doc = "index"
 
 project = "ESA++"
@@ -160,6 +176,14 @@ latex_elements = {
 \definecolor{warningborder}{RGB}{255, 183, 77}
 \definecolor{tipgreen}{RGB}{232, 245, 233}
 \definecolor{tipborder}{RGB}{102, 187, 106}
+
+% Notebook cell colors
+\definecolor{nbinputbg}{RGB}{247, 247, 247}
+\definecolor{nbinputborder}{RGB}{207, 207, 207}
+\definecolor{nboutputbg}{RGB}{255, 255, 255}
+\definecolor{nboutputborder}{RGB}{221, 221, 221}
+\definecolor{nbinputlabel}{RGB}{48, 63, 159}
+\definecolor{nboutputlabel}{RGB}{211, 47, 47}
 
 % Sphinx code-block styling
 \sphinxsetup{
@@ -294,6 +318,69 @@ latex_elements = {
 
 % Style the head rule
 \renewcommand{\headrule}{\vspace{-4pt}\hbox to\headwidth{\color{codeborder}\leaders\hrule height 0.5pt\hfill}}
+
+% ============================================================================
+% Jupyter Notebook Cell Styling for nbsphinx
+% ============================================================================
+
+% Style for notebook input cells (code cells)
+\tcbset{
+  nbinputstyle/.style={
+    enhanced,
+    breakable,
+    colback=nbinputbg,
+    colframe=nbinputborder,
+    boxrule=0.5pt,
+    arc=2pt,
+    outer arc=2pt,
+    left=4pt,
+    right=4pt,
+    top=4pt,
+    bottom=4pt,
+    fontupper=\ttfamily\small,
+    before skip=8pt,
+    after skip=4pt
+  },
+  nboutputstyle/.style={
+    enhanced,
+    breakable,
+    colback=nboutputbg,
+    colframe=nboutputborder,
+    boxrule=0.5pt,
+    arc=2pt,
+    outer arc=2pt,
+    left=4pt,
+    right=4pt,
+    top=4pt,
+    bottom=4pt,
+    fontupper=\ttfamily\small,
+    before skip=2pt,
+    after skip=8pt
+  }
+}
+
+% Redefine nbsphinx input/output environments if they exist
+\AtBeginDocument{%
+  % Override nbsphinx input cell styling
+  \@ifundefined{nbsphinxcellcode}{}{%
+    \renewenvironment{nbsphinxcellcode}{%
+      \begin{tcolorbox}[nbinputstyle]%
+    }{%
+      \end{tcolorbox}%
+    }%
+  }%
+  % Override nbsphinx output cell styling
+  \@ifundefined{nbsphinxcelloutput}{}{%
+    \renewenvironment{nbsphinxcelloutput}{%
+      \begin{tcolorbox}[nboutputstyle]%
+    }{%
+      \end{tcolorbox}%
+    }%
+  }%
+}
+
+% Style for DataFrame/table output in notebooks
+\renewcommand{\sphinxstyletheadfamily}{\sffamily\bfseries\small}
 """,
     "figure_align": "H",
     "sphinxsetup": "hmargin={1in,1in}, vmargin={1in,1in}",

@@ -9,7 +9,6 @@ with PowerWorld Simulator.
    :caption: Contents
 
    overview
-   guide/index
    examples/examples
    api/index
    dev/index

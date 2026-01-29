@@ -168,6 +168,65 @@ class TSGetResultsMode(str, Enum):
     JSIS = "JSIS"
 
 
+class JacobianForm(str, Enum):
+    """Jacobian matrix coordinate forms."""
+    RECTANGULAR = "R"  # AC Jacobian in Rectangular coordinates
+    POLAR = "P"        # AC Jacobian in Polar coordinates
+    DC = "DC"          # B' matrix (DC approximation)
+
+
+class BranchDistanceMeasure(str, Enum):
+    """Branch distance measurement types for topology analysis."""
+    REACTANCE = "X"   # Use reactance as distance measure
+    IMPEDANCE = "Z"   # Use impedance magnitude as distance measure
+
+
+class BranchFilterMode(str, Enum):
+    """Branch filter modes for topology traversal."""
+    ALL = "ALL"         # All branches
+    SELECTED = "SELECTED"  # Only selected branches
+    CLOSED = "CLOSED"   # Only closed branches
+
+
+class ScalingBasis(str, Enum):
+    """Scaling basis for load/generation scaling operations."""
+    MW = "MW"       # Absolute MW/MVAR values
+    FACTOR = "FACTOR"  # Multiplier factor
+
+
+class ObjectIDHandling(str, Enum):
+    """Object ID handling modes for contingency export."""
+    NO = "NO"           # Standard object references
+    YES_MS_3W = "YES_MS_3W"  # Include multi-section and 3-winding IDs
+
+
+class RatingSetPrecedence(str, Enum):
+    """Rating set precedence for weather-based ratings."""
+    NORMAL = "NORMAL"  # Use normal rating set
+    CTG = "CTG"        # Use contingency rating set
+
+
+class RatingSet(str, Enum):
+    """Rating set identifiers for branch limits."""
+    DEFAULT = "DEFAULT"  # Use default rating
+    NO = "NO"           # Don't update rating
+    A = "A"
+    B = "B"
+    C = "C"
+    D = "D"
+    E = "E"
+    F = "F"
+    G = "G"
+    H = "H"
+    I = "I"
+    J = "J"
+    K = "K"
+    L = "L"
+    M = "M"
+    N = "N"
+    O = "O"
+
+
 # Type aliases for flexibility - allows either enum or raw string
 FilterType = Union[FilterKeyword, str]
 

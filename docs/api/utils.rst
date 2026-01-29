@@ -43,16 +43,6 @@ Mesh generation for GIC and geographic analysis.
 .. automodule:: esapp.utils.mesh
    :members:
 
-Wavelet Plotting
-----------------
-
-Wavelet analysis visualization tools.
-
-.. currentmodule:: esapp.utils.plotwavelet
-
-.. automodule:: esapp.utils.plotwavelet
-   :members:
-
 Decorators
 ----------
 
