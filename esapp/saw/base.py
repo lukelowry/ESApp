@@ -3,7 +3,6 @@ import locale
 import logging
 import os
 import re
-from pathlib import Path
 from typing import List, Tuple, Union
 
 import numpy as np
@@ -11,9 +10,9 @@ import pandas as pd
 import pythoncom
 import win32com
 
+from ._enums import FieldListColumn, SpecificFieldListColumn
 from ._exceptions import (
     COMError,
-    CommandNotRespectedError,
     Error,
     PowerWorldError,
     RPC_S_UNKNOWN_IF,
@@ -32,56 +31,6 @@ locale.setlocale(locale.LC_ALL, "")
 # noinspection PyPep8Naming
 class SAWBase(object):
     """Base class for the SimAuto Wrapper, containing core COM functionality."""
-
-    POWER_FLOW_FIELDS = {
-        "bus": ["BusNum", "BusName", "BusPUVolt", "BusAngle", "BusNetMW", "BusNetMVR"],
-        "gen": ["BusNum", "GenID", "GenMW", "GenMVR"],
-        "load": ["BusNum", "LoadID", "LoadMW", "LoadMVR"],
-        "shunt": ["BusNum", "ShuntID", "ShuntMW", "ShuntMVR"],
-        "branch": [
-            "BusNum",
-            "BusNum:1",
-            "LineCircuit",
-            "LineMW",
-            "LineMW:1",
-            "LineMVR",
-            "LineMVR:1",
-        ],
-    }
-
-    FIELD_LIST_COLUMNS = [
-        "key_field",
-        "internal_field_name",
-        "field_data_type",
-        "description",
-        "display_name",
-    ]
-
-    FIELD_LIST_COLUMNS_OLD = FIELD_LIST_COLUMNS[0:-1]
-
-    FIELD_LIST_COLUMNS_NEW = [
-        "key_field",
-        "internal_field_name",
-        "field_data_type",
-        "description",
-        "display_name",
-        "enterable",
-    ]
-
-    SPECIFIC_FIELD_LIST_COLUMNS = [
-        "variablename:location",
-        "field",
-        "column header",
-        "field description",
-    ]
-
-    SPECIFIC_FIELD_LIST_COLUMNS_NEW = [
-        "variablename:location",
-        "field",
-        "column header",
-        "field description",
-        "enterable",
-    ]
 
     SIMAUTO_PROPERTIES = {
         "CreateIfNotFound": bool,
@@ -163,7 +112,6 @@ class SAWBase(object):
                 'CaseInfo_Options_Value (Option,Value)\n{"UseDefinedNamesInVariables" "YES"}'
             )
 
-        self.lodf = None
         self._object_fields = {}
 
 
@@ -467,27 +415,29 @@ class SAWBase(object):
             result = self._call_simauto("GetFieldList", ObjectType)
             result_arr = np.array(result)
 
+            # Try standard 5-column format first, fall back to old/new formats
+            base_cols = FieldListColumn.base_columns()
+            old_cols = FieldListColumn.old_columns()
+            new_cols = FieldListColumn.new_columns()
+
             try:
-                output = pd.DataFrame(result_arr, columns=self.FIELD_LIST_COLUMNS)
+                output = pd.DataFrame(result_arr, columns=base_cols)
             except ValueError as e:
                 exp_base = r"\([0-9]+,\s"
                 exp_end = r"{}\)"
-                nf_old = len(self.FIELD_LIST_COLUMNS_OLD)
-                nf_default = len(self.FIELD_LIST_COLUMNS)
-                nf_new = len(self.FIELD_LIST_COLUMNS_NEW)
-                r1 = re.search(exp_base + exp_end.format(nf_old), e.args[0])
-                r2 = re.search(exp_base + exp_end.format(nf_default), e.args[0])
-                r3 = re.search(exp_base + exp_end.format(nf_new), e.args[0])
+                r1 = re.search(exp_base + exp_end.format(len(old_cols)), e.args[0])
+                r2 = re.search(exp_base + exp_end.format(len(base_cols)), e.args[0])
+                r3 = re.search(exp_base + exp_end.format(len(new_cols)), e.args[0])
 
                 if (r1 is None) or (r2 is None):
                     if r3 is None:
                         raise e
                     else:
-                        output = pd.DataFrame(result_arr, columns=self.FIELD_LIST_COLUMNS_NEW)
+                        output = pd.DataFrame(result_arr, columns=new_cols)
                 else:
-                    output = pd.DataFrame(result_arr, columns=self.FIELD_LIST_COLUMNS_OLD)
+                    output = pd.DataFrame(result_arr, columns=old_cols)
 
-            output.sort_values(by=["internal_field_name"], inplace=True)
+            output.sort_values(by=[FieldListColumn.INTERNAL_FIELD_NAME.value], inplace=True)
             self._object_fields[object_type] = output
 
         return output.copy(deep=True) if copy else output
@@ -674,22 +624,26 @@ class SAWBase(object):
         PowerWorldError
             If the SimAuto call fails.
         """
+        base_cols = SpecificFieldListColumn.base_columns()
+        new_cols = SpecificFieldListColumn.new_columns()
+        sort_col = SpecificFieldListColumn.VARIABLENAME_LOCATION.value
+
         try:
             df = (
                 pd.DataFrame(
                     self._call_simauto("GetSpecificFieldList", ObjectType, convert_list_to_variant(FieldList)),
-                    columns=self.SPECIFIC_FIELD_LIST_COLUMNS,
+                    columns=base_cols,
                 )
-                .sort_values(by=self.SPECIFIC_FIELD_LIST_COLUMNS[0])
+                .sort_values(by=sort_col)
                 .reset_index(drop=True)
             )
         except ValueError:
             df = (
                 pd.DataFrame(
                     self._call_simauto("GetSpecificFieldList", ObjectType, convert_list_to_variant(FieldList)),
-                    columns=self.SPECIFIC_FIELD_LIST_COLUMNS_NEW,
+                    columns=new_cols,
                 )
-                .sort_values(by=self.SPECIFIC_FIELD_LIST_COLUMNS_NEW[0])
+                .sort_values(by=sort_col)
                 .reset_index(drop=True)
             )
         return df
@@ -745,20 +699,23 @@ class SAWBase(object):
             If the SimAuto call fails.
         """
         # Get key field metadata to know column names
+        key_col = FieldListColumn.KEY_FIELD.value
+        name_col = FieldListColumn.INTERNAL_FIELD_NAME.value
+
         field_list = self.GetFieldList(ObjectType=ObjType, copy=False)
-        key_field_mask = field_list["key_field"].str.match(r"\*[0-9]+[A-Z]*\*").to_numpy()
+        key_field_mask = field_list[key_col].str.match(r"\*[0-9]+[A-Z]*\*").to_numpy()
         key_field_df = field_list.loc[key_field_mask].copy()
-        key_field_df["key_field"] = key_field_df["key_field"].str.replace(r"\*", "", regex=True)
-        key_field_df["key_field"] = key_field_df["key_field"].str.replace("[A-Z]*", "", regex=True)
-        key_field_series = key_field_df["key_field"]
+        key_field_df[key_col] = key_field_df[key_col].str.replace(r"\*", "", regex=True)
+        key_field_df[key_col] = key_field_df[key_col].str.replace("[A-Z]*", "", regex=True)
+        key_field_series = key_field_df[key_col]
         if self.decimal_delimiter != ".":
             try:
                 key_field_series = key_field_series.str.replace(self.decimal_delimiter, ".")
             except AttributeError:
                 pass
-        key_field_df["key_field_index"] = pd.to_numeric(key_field_series, errors='coerce').fillna(key_field_df["key_field"]) - 1
+        key_field_df["key_field_index"] = pd.to_numeric(key_field_series, errors='coerce').fillna(key_field_df[key_col]) - 1
         key_field_df.sort_values(by="key_field_index", inplace=True)
-        column_names = key_field_df["internal_field_name"].to_numpy()
+        column_names = key_field_df[name_col].to_numpy()
 
         output = self._call_simauto("ListOfDevices", ObjType, FilterName)
 

@@ -227,6 +227,86 @@ class RatingSet(str, Enum):
     O = "O"
 
 
+class FieldListColumn(str, Enum):
+    """Column names for GetFieldList results.
+
+    PowerWorld returns field metadata with these column headers. Different
+    Simulator versions may return different subsets of these columns.
+    """
+    KEY_FIELD = "key_field"
+    INTERNAL_FIELD_NAME = "internal_field_name"
+    FIELD_DATA_TYPE = "field_data_type"
+    DESCRIPTION = "description"
+    DISPLAY_NAME = "display_name"
+    ENTERABLE = "enterable"
+
+    @classmethod
+    def base_columns(cls) -> list:
+        """Returns the standard 5-column format (most common)."""
+        return [
+            cls.KEY_FIELD.value,
+            cls.INTERNAL_FIELD_NAME.value,
+            cls.FIELD_DATA_TYPE.value,
+            cls.DESCRIPTION.value,
+            cls.DISPLAY_NAME.value,
+        ]
+
+    @classmethod
+    def old_columns(cls) -> list:
+        """Returns the legacy 4-column format (older Simulator versions)."""
+        return [
+            cls.KEY_FIELD.value,
+            cls.INTERNAL_FIELD_NAME.value,
+            cls.FIELD_DATA_TYPE.value,
+            cls.DESCRIPTION.value,
+        ]
+
+    @classmethod
+    def new_columns(cls) -> list:
+        """Returns the extended 6-column format (newer Simulator versions)."""
+        return [
+            cls.KEY_FIELD.value,
+            cls.INTERNAL_FIELD_NAME.value,
+            cls.FIELD_DATA_TYPE.value,
+            cls.DESCRIPTION.value,
+            cls.DISPLAY_NAME.value,
+            cls.ENTERABLE.value,
+        ]
+
+
+class SpecificFieldListColumn(str, Enum):
+    """Column names for GetSpecificFieldList results.
+
+    PowerWorld returns specific field metadata with these column headers.
+    """
+    VARIABLENAME_LOCATION = "variablename:location"
+    FIELD = "field"
+    COLUMN_HEADER = "column header"
+    FIELD_DESCRIPTION = "field description"
+    ENTERABLE = "enterable"
+
+    @classmethod
+    def base_columns(cls) -> list:
+        """Returns the standard 4-column format."""
+        return [
+            cls.VARIABLENAME_LOCATION.value,
+            cls.FIELD.value,
+            cls.COLUMN_HEADER.value,
+            cls.FIELD_DESCRIPTION.value,
+        ]
+
+    @classmethod
+    def new_columns(cls) -> list:
+        """Returns the extended 5-column format (newer Simulator versions)."""
+        return [
+            cls.VARIABLENAME_LOCATION.value,
+            cls.FIELD.value,
+            cls.COLUMN_HEADER.value,
+            cls.FIELD_DESCRIPTION.value,
+            cls.ENTERABLE.value,
+        ]
+
+
 # Type aliases for flexibility - allows either enum or raw string
 FilterType = Union[FilterKeyword, str]
 
