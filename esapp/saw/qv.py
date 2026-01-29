@@ -1,9 +1,11 @@
 """QV (Reactive Power-Voltage) Analysis specific functions."""
 import os
-import tempfile
 from pathlib import Path
 
 import pandas as pd
+
+from esapp.saw._enums import YesNo
+from ._helpers import get_temp_filepath, pack_args
 
 
 class QVMixin:
@@ -32,8 +34,9 @@ class QVMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        app = "YES" if append else "NO"
-        return self.RunScriptCommand(f'QVDataWriteOptionsAndResults("{filename}", {app}, {key_field});')
+        app = YesNo.from_bool(append)
+        args = pack_args(f'"{filename}"', app, key_field)
+        return self.RunScriptCommand(f"QVDataWriteOptionsAndResults({args});")
 
     def QVDeleteAllResults(self):
         """Deletes all QV results from memory.
@@ -76,8 +79,7 @@ class QVMixin:
             self.RunScriptCommand(f'QVRun("{filename}", YES, NO);')
             return None
         else:
-            with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as tmp:
-                temp_path = Path(tmp.name).as_posix()
+            temp_path = get_temp_filepath(".csv")
 
             try:
                 self.RunScriptCommand(f'QVRun("{temp_path}", YES, NO);')
@@ -128,9 +130,10 @@ class QVMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        iq = "YES" if include_quantities else "NO"
-        app = "YES" if append else "NO"
-        return self.RunScriptCommand(f'QVWriteCurves("{filename}", {iq}, "{filter_name}", {app});')
+        iq = YesNo.from_bool(include_quantities)
+        app = YesNo.from_bool(append)
+        args = pack_args(f'"{filename}"', iq, f'"{filter_name}"', app)
+        return self.RunScriptCommand(f"QVWriteCurves({args});")
 
     def QVWriteResultsAndOptions(self, filename: str, append: bool = True):
         """Writes out all information related to QV analysis to an auxiliary file.
@@ -151,5 +154,6 @@ class QVMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        app = "YES" if append else "NO"
-        return self.RunScriptCommand(f'QVWriteResultsAndOptions("{filename}", {app});')
+        app = YesNo.from_bool(append)
+        args = pack_args(f'"{filename}"', app)
+        return self.RunScriptCommand(f"QVWriteResultsAndOptions({args});")

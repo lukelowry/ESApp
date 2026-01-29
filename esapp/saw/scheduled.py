@@ -1,6 +1,10 @@
 """Scheduled Actions specific functions."""
 
 
+from esapp.saw._enums import YesNo
+from esapp.saw._helpers import pack_args
+
+
 class ScheduledActionsMixin:
     """Mixin for Scheduled Actions functions."""
 
@@ -32,9 +36,10 @@ class ScheduledActionsMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        rev = "YES" if revert else "NO"
+        rev = YesNo.from_bool(revert)
         filt = f'"{filter_name}"' if filter_name else ""
-        return self.RunScriptCommand(f'ApplyScheduledActionsAt("{start_time}", "{end_time}", {filt}, {rev});')
+        args = pack_args(f'"{start_time}"', f'"{end_time}"', filt, rev)
+        return self.RunScriptCommand(f"ApplyScheduledActionsAt({args});")
 
     def IdentifyBreakersForScheduledActions(self, identify_from_normal: bool = True):
         """Identifies breakers for scheduled actions.
@@ -56,7 +61,7 @@ class ScheduledActionsMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        ifn = "YES" if identify_from_normal else "NO"
+        ifn = YesNo.from_bool(identify_from_normal)
         return self.RunScriptCommand(f"IdentifyBreakersForScheduledActions({ifn});")
 
     def RevertScheduledActionsAt(self, start_time: str, end_time: str = "", filter_name: str = ""):
@@ -137,7 +142,8 @@ class ScheduledActionsMixin:
         aa = "YES" if apply_actions else "NO" if apply_actions is not None else ""
         uns = "YES" if use_normal_status else "NO" if use_normal_status is not None else ""
         aw = "YES" if apply_window else "NO" if apply_window is not None else ""
-        return self.RunScriptCommand(f'SetScheduleView("{view_time}", {aa}, {uns}, {aw});')
+        args = pack_args(f'"{view_time}"', aa, uns, aw)
+        return self.RunScriptCommand(f"SetScheduleView({args});")
 
     def SetScheduleWindow(
         self, start_time: str, end_time: str, resolution: float = None, resolution_units: str = None
@@ -170,4 +176,5 @@ class ScheduledActionsMixin:
         """
         res = str(resolution) if resolution is not None else ""
         units = resolution_units if resolution_units else ""
-        return self.RunScriptCommand(f'SetScheduleWindow("{start_time}", "{end_time}", {res}, {units});')
+        args = pack_args(f'"{start_time}"', f'"{end_time}"', res, units)
+        return self.RunScriptCommand(f"SetScheduleWindow({args});")

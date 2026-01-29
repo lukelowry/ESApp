@@ -11,7 +11,6 @@ from .fault import FaultMixin
 from .gic import GICMixin
 from .matrices import MatrixMixin
 from .modify import ModifyMixin
-from .oneline import OnelineMixin
 from .opf import OPFMixin
 from .powerflow import PowerflowMixin
 from .pv import PVMixin
@@ -32,7 +31,6 @@ class SAW(
     GeneralMixin,
     MatrixMixin,
     ModifyMixin,
-    OnelineMixin,
     PowerflowMixin,
     RegionsMixin,
     SensitivityMixin,

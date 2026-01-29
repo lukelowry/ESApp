@@ -186,7 +186,7 @@ def pytest_collection_modifyitems(config, items):
 def get_all_gobject_subclasses():
     """Recursively find all GObject subclasses with a _TYPE attribute."""
     try:
-        from esapp import grid
+        from esapp import components as grid
     except ImportError:
         return []
 
@@ -217,7 +217,7 @@ def get_sample_gobject_subclasses(require_keys=False, require_multiple_editable=
         If True, only return classes with at least 1 editable non-key field.
     """
     try:
-        from esapp import grid
+        from esapp import components as grid
         all_classes = get_all_gobject_subclasses()
 
         if not all_classes:

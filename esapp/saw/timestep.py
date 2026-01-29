@@ -1,5 +1,6 @@
 """Time Step Simulation specific functions."""
 from typing import List
+from ._helpers import format_list, pack_args
 
 
 class TimeStepMixin:
@@ -21,9 +22,9 @@ class TimeStepMixin:
         str
             The result of the script command.
         """
-        args = ""
-        if start_time and end_time:
-            args = f"{start_time}, {end_time}"
+        # Treat empty strings as None for pack_args to handle trailing logic if needed,
+        # or just pass them if they are valid empty arguments. Here we want to omit them if empty.
+        args = pack_args(start_time or None, end_time or None)
         return self.RunScriptCommand(f"TimeStepDoRun({args});")
 
     def TimeStepDoSinglePoint(self, time_point: str):
@@ -58,9 +59,7 @@ class TimeStepMixin:
         str
             The result of the script command.
         """
-        args = ""
-        if start_time and end_time:
-            args = f"{start_time}, {end_time}"
+        args = pack_args(start_time or None, end_time or None)
         return self.RunScriptCommand(f"TimeStepClearResults({args});")
 
     def TimeStepDeleteAll(self):
@@ -224,9 +223,7 @@ class TimeStepMixin:
         str
             The result of the script command.
         """
-        args = f'{object_type}, "{filename}"'
-        if start_time and end_time:
-            args += f", {start_time}, {end_time}"
+        args = pack_args(object_type, f'"{filename}"', start_time or None, end_time or None)
         return self.RunScriptCommand(f"TimeStepSaveResultsByTypeCSV({args});")
 
     def TimeStepSavePWWRange(self, filename: str, start_time: str, end_time: str):
@@ -271,8 +268,8 @@ class TimeStepMixin:
         str
             The result of the script command.
         """
-        fields = "[" + ", ".join(field_list) + "]"
-        args = f'"{filename}", {fields}, {start_time}, {end_time}'
+        fields = format_list(field_list)
+        args = pack_args(f'"{filename}"', fields, start_time, end_time)
         return self.RunScriptCommand(f"TIMESTEPSaveInputCSV({args});")
 
     def TimeStepSaveFieldsSet(self, object_type: str, field_list: List[str], filter_name: str = "ALL"):
@@ -293,7 +290,7 @@ class TimeStepMixin:
         str
             The result of the script command.
         """
-        fields = "[" + ", ".join(field_list) + "]"
+        fields = format_list(field_list)
         filt = f'"{filter_name}"' if filter_name != "ALL" and filter_name != "SELECTED" else filter_name
         return self.RunScriptCommand(f"TimeStepSaveFieldsSet({object_type}, {fields}, {filt});")
 
@@ -311,9 +308,7 @@ class TimeStepMixin:
         str
             The result of the script command.
         """
-        objs = ""
-        if object_types:
-            objs = "[" + ", ".join(object_types) + "]"
+        objs = format_list(object_types) if object_types else ""
         return self.RunScriptCommand(f"TimeStepSaveFieldsClear({objs});")
 
     def TimeStepLoadTSB(self, filename: str):

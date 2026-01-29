@@ -3,7 +3,7 @@ from .apps.network import Network
 from .apps.modes import ForcedOscillation
 from .apps.dynamics import Dynamics
 from .indexable import Indexable
-from .grid import Bus, Branch, Gen, Load, Shunt, Area, Zone, Substation, Sim_Solution_Options
+from .components import Bus, Branch, Gen, Load, Shunt, Area, Zone, Substation, Sim_Solution_Options
 from .saw import create_object_string
 
 import numpy as np
@@ -805,16 +805,6 @@ class GridWorkBench(Indexable):
         >>> islands = wb.islands()
         """
         return self.esa.DetermineBranchesThatCreateIslands()
-
-    def refresh_onelines(self):
-        """
-        Relinks all open oneline diagrams.
-
-        Examples
-        --------
-        >>> wb.refresh_onelines()
-        """
-        self.esa.RelinkAllOpenOnelines()
 
     # --- Sensitivity & Faults ---
 

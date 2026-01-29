@@ -1,7 +1,10 @@
 """General script commands and data interaction functions."""
 from typing import List
-import tempfile, os, re, uuid
+import os, re
 import pandas as pd
+
+from ._enums import YesNo, format_filter, format_filter_areazone
+from ._helpers import format_list, get_temp_filepath, pack_args
 
 
 class GeneralMixin:
@@ -140,7 +143,7 @@ class GeneralMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        yn = "YES" if show else "NO"
+        yn = YesNo.from_bool(show)
         return self.RunScriptCommand(f"LogShow({yn});")
 
     def LogSave(self, filename: str, append: bool = False):
@@ -163,7 +166,7 @@ class GeneralMixin:
         PowerWorldError
             If the SimAuto call fails (e.g., permission issues).
         """
-        app = "YES" if append else "NO"
+        app = YesNo.from_bool(append)
         return self.RunScriptCommand(f'LogSave("{filename}", {app});')
 
     def SetCurrentDirectory(self, directory: str, create_if_not_found: bool = False):
@@ -187,7 +190,7 @@ class GeneralMixin:
         PowerWorldError
             If the SimAuto call fails (e.g., invalid path, permission issues).
         """
-        c = "YES" if create_if_not_found else "NO"
+        c = YesNo.from_bool(create_if_not_found)
         return self.RunScriptCommand(f'SetCurrentDirectory("{directory}", {c});')
 
     def EnterMode(self, mode: str) -> None:
@@ -292,7 +295,7 @@ class GeneralMixin:
         PowerWorldError
             If the SimAuto call fails (e.g., file not found, syntax error in aux file).
         """
-        c = "YES" if create_if_not_found else "NO"
+        c = YesNo.from_bool(create_if_not_found)
         return self.RunScriptCommand(f'LoadAux("{filename}", {c});')
 
     def ImportData(self, filename: str, filetype: str, header_line: int = 1, create_if_not_found: bool = False):
@@ -318,7 +321,7 @@ class GeneralMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        c = "YES" if create_if_not_found else "NO"
+        c = YesNo.from_bool(create_if_not_found)
         return self.RunScriptCommand(f'ImportData("{filename}", {filetype}, {header_line}, {c});')
 
     def LoadCSV(self, filename: str, create_if_not_found: bool = False):
@@ -340,7 +343,7 @@ class GeneralMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        c = "YES" if create_if_not_found else "NO"
+        c = YesNo.from_bool(create_if_not_found)
         return self.RunScriptCommand(f'LoadCSV("{filename}", {c});')
 
     def LoadScript(self, filename: str, script_name: str = ""):
@@ -411,24 +414,17 @@ class GeneralMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        fields = "[" + ", ".join(fieldlist) + "]"
-        subs = "[" + ", ".join(subdatalist) if subdatalist else "[]"
-        if subdatalist:
-            subs += "]"
+        fields = format_list(fieldlist)
+        subs = format_list(subdatalist)
+        sorts = format_list(sortfieldlist)
 
-        sorts = "[" + ", ".join(sortfieldlist) if sortfieldlist else "[]"
-        if sortfieldlist:
-            sorts += "]"
+        filt = format_filter_areazone(filter_name)
 
-        filt = f'"{filter_name}"' if filter_name and filter_name not in ["SELECTED", "AREAZONE"] else filter_name
+        trans = YesNo.from_bool(transpose)
+        app = YesNo.from_bool(append)
 
-        trans = "YES" if transpose else "NO"
-        app = "YES" if append else "NO"
-
-        cmd = (
-            f'SaveData("{filename}", {filetype}, {objecttype}, {fields}, {subs}, '
-            f'{filt}, {sorts}, {trans}, {app});'
-        )
+        args = pack_args(f'"{filename}"', filetype, objecttype, fields, subs, filt, sorts, trans, app)
+        cmd = f"SaveData({args});"
         return self.RunScriptCommand(cmd)
 
     def SaveDataWithExtra(self, filename: str, filetype: str, objecttype: str, fieldlist: List[str], subdatalist: List[str] = None, filter_name: str = "", sortfieldlist: List[str] = None, header_list: List[str] = None, header_value_list: List[str] = None, transpose: bool = False, append: bool = True):
@@ -471,21 +467,18 @@ class GeneralMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        fields = "[" + ", ".join(fieldlist) + "]"
-        subs = "[" + ", ".join(subdatalist) if subdatalist else "[]"
-        if subdatalist: subs += "]"
-        sorts = "[" + ", ".join(sortfieldlist) if sortfieldlist else "[]"
-        if sortfieldlist: sorts += "]"
-        headers = "[" + ", ".join([f'"{h}"' for h in header_list]) if header_list else "[]"
-        if header_list: headers += "]"
-        values = "[" + ", ".join([f'"{v}"' for v in header_value_list]) if header_value_list else "[]"
-        if header_value_list: values += "]"
+        fields = format_list(fieldlist)
+        subs = format_list(subdatalist)
+        sorts = format_list(sortfieldlist)
+        headers = format_list(header_list, quote_items=True)
+        values = format_list(header_value_list, quote_items=True)
         
-        filt = f'"{filter_name}"' if filter_name and filter_name not in ["SELECTED", "AREAZONE"] else filter_name
-        trans = "YES" if transpose else "NO"
-        app = "YES" if append else "NO"
-        
-        cmd = f'SaveDataWithExtra("{filename}", {filetype}, {objecttype}, {fields}, {subs}, {filt}, {sorts}, {headers}, {values}, {trans}, {app});'
+        filt = format_filter_areazone(filter_name)
+        trans = YesNo.from_bool(transpose)
+        app = YesNo.from_bool(append)
+
+        args = pack_args(f'"{filename}"', filetype, objecttype, fields, subs, filt, sorts, headers, values, trans, app)
+        cmd = f"SaveDataWithExtra({args});"
         return self.RunScriptCommand(cmd)
 
     def SetData(self, objecttype: str, fieldlist: List[str], valuelist: List[str], filter_name: str = ""):
@@ -513,9 +506,9 @@ class GeneralMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        fields = "[" + ", ".join(fieldlist) + "]"
-        values = "[" + ", ".join([str(v) for v in valuelist]) + "]"
-        filt = f'"{filter_name}"' if filter_name and filter_name not in ["SELECTED", "AREAZONE", "ALL"] else filter_name
+        fields = format_list(fieldlist)
+        values = format_list(valuelist, stringify=True)
+        filt = format_filter(filter_name)
         return self.RunScriptCommand(f"SetData({objecttype}, {fields}, {values}, {filt});")
 
     def CreateData(self, objecttype: str, fieldlist: List[str], valuelist: List[str]):
@@ -540,8 +533,8 @@ class GeneralMixin:
         PowerWorldError
             If the SimAuto call fails (e.g., object already exists, invalid parameters).
         """
-        fields = "[" + ", ".join(fieldlist) + "]"
-        values = "[" + ", ".join([str(v) for v in valuelist]) + "]"
+        fields = format_list(fieldlist)
+        values = format_list(valuelist, stringify=True)
         return self.RunScriptCommand(f"CreateData({objecttype}, {fields}, {values});")
 
     def GetSubData(self, objecttype: str, fieldlist: List[str], subdatalist: List[str] = None, filter_name: str = "") -> pd.DataFrame:
@@ -575,8 +568,7 @@ class GeneralMixin:
         ...     print(f"Gen {row['BusNum']}: {len(row['BidCurve'])} bid points")
         """
         subdatalist = subdatalist or []
-        tmp = tempfile.NamedTemporaryFile(suffix=".aux", delete=False)
-        tmp.close()
+        tmp_path = get_temp_filepath(".aux")
 
         def parse_line(line: str) -> List[str]:
             """Parse a line detecting bracket [x,y] or space-delimited format."""
@@ -587,10 +579,10 @@ class GeneralMixin:
                 return [x.replace('"', '') for x in re.findall(r'(?:[^\s"]|"(?:\\.|[^"])*")+', line)]
 
         try:
-            self.SaveData(tmp.name, "AUX", objecttype, fieldlist, subdatalist, filter_name, append=False)
+            self.SaveData(tmp_path, "AUX", objecttype, fieldlist, subdatalist, filter_name, append=False)
 
-            if not os.path.exists(tmp.name): return pd.DataFrame(columns=fieldlist + subdatalist)
-            with open(tmp.name, 'r') as f: content = f.read()
+            if not os.path.exists(tmp_path): return pd.DataFrame(columns=fieldlist + subdatalist)
+            with open(tmp_path, 'r') as f: content = f.read()
 
             match = re.search(r'DATA\s*\(\w+,\s*\[(.*?)\]\)\s*\{(.*)\}', content, re.DOTALL | re.IGNORECASE)
             if not match: return pd.DataFrame(columns=fieldlist + subdatalist)
@@ -617,7 +609,7 @@ class GeneralMixin:
             return pd.DataFrame(records)
 
         finally:
-            if os.path.exists(tmp.name): os.remove(tmp.name)
+            if os.path.exists(tmp_path): os.remove(tmp_path)
 
     def SetSubData(self, objecttype: str, fieldlist: List[str],
                    records: List[dict], subdatatype: str = None) -> None:
@@ -705,7 +697,7 @@ class GeneralMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        fields = "[" + ", ".join(fieldlist) + "]"
+        fields = format_list(fieldlist)
         return self.RunScriptCommand(f'SaveObjectFields("{filename}", {objecttype}, {fields});')
 
     def Delete(self, objecttype: str, filter_name: str = ""):
@@ -727,7 +719,7 @@ class GeneralMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        filt = f'"{filter_name}"' if filter_name and filter_name not in ["SELECTED", "AREAZONE"] else filter_name
+        filt = format_filter_areazone(filter_name)
         return self.RunScriptCommand(f"Delete({objecttype}, {filt});")
 
     def SelectAll(self, objecttype: str, filter_name: str = ""):
@@ -749,7 +741,7 @@ class GeneralMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        filt = f'"{filter_name}"' if filter_name and filter_name not in ["SELECTED", "AREAZONE"] else filter_name
+        filt = format_filter_areazone(filter_name)
         return self.RunScriptCommand(f"SelectAll({objecttype}, {filt});")
 
     def UnSelectAll(self, objecttype: str, filter_name: str = ""):
@@ -771,7 +763,7 @@ class GeneralMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        filt = f'"{filter_name}"' if filter_name and filter_name not in ["SELECTED", "AREAZONE"] else filter_name
+        filt = format_filter_areazone(filter_name)
         return self.RunScriptCommand(f"UnSelectAll({objecttype}, {filt});")
 
     def SendToExcelAdvanced(self, objecttype: str, fieldlist: List[str], filter_name: str = "", use_column_headers: bool = True, workbook: str = "", worksheet: str = "", sortfieldlist: List[str] = None, header_list: List[str] = None, header_value_list: List[str] = None, clear_existing: bool = True, row_shift: int = 0, col_shift: int = 0):
@@ -824,18 +816,16 @@ class GeneralMixin:
         --------
         SendToExcel : Basic version with fewer parameters for simple exports.
         """
-        fields = "[" + ", ".join(fieldlist) + "]"
-        filt = f'"{filter_name}"' if filter_name and filter_name not in ["SELECTED", "AREAZONE"] else filter_name
-        uch = "YES" if use_column_headers else "NO"
-        sorts = "[" + ", ".join(sortfieldlist) if sortfieldlist else "[]"
-        if sortfieldlist: sorts += "]"
-        headers = "[" + ", ".join([f'"{h}"' for h in header_list]) if header_list else "[]"
-        if header_list: headers += "]"
-        values = "[" + ", ".join([f'"{v}"' for v in header_value_list]) if header_value_list else "[]"
-        if header_value_list: values += "]"
-        ce = "YES" if clear_existing else "NO"
-        
-        cmd = f'SendtoExcel({objecttype}, {fields}, {filt}, {uch}, "{workbook}", "{worksheet}", {sorts}, {headers}, {values}, {ce}, {row_shift}, {col_shift});'
+        fields = format_list(fieldlist)
+        filt = format_filter_areazone(filter_name)
+        uch = YesNo.from_bool(use_column_headers)
+        sorts = format_list(sortfieldlist)
+        headers = format_list(header_list, quote_items=True)
+        values = format_list(header_value_list, quote_items=True)
+        ce = YesNo.from_bool(clear_existing)
+
+        args = pack_args(objecttype, fields, filt, uch, f'"{workbook}"', f'"{worksheet}"', sorts, headers, values, ce, row_shift, col_shift)
+        cmd = f"SendtoExcel({args});"
         return self.RunScriptCommand(cmd)
 
     def LogAddDateTime(
@@ -875,9 +865,9 @@ class GeneralMixin:
         >>> saw.LogAddDateTime("DateTime", True, True, True)
         # Adds a log entry labeled "DateTime" with current date, time, and milliseconds.
         """
-        id = "YES" if include_date else "NO"
-        it = "YES" if include_time else "NO"
-        im = "YES" if include_milliseconds else "NO"
+        id = YesNo.from_bool(include_date)
+        it = YesNo.from_bool(include_time)
+        im = YesNo.from_bool(include_milliseconds)
         return self.RunScriptCommand(f'LogAddDateTime("{label}", {id}, {it}, {im});')
 
     def LoadAuxDirectory(
@@ -916,7 +906,7 @@ class GeneralMixin:
         >>> saw.LoadAuxDirectory("C:/SimCases/AuxFiles", "*.aux", True)
         # Loads all .aux files from the directory in alphabetical order.
         """
-        c = "YES" if create_if_not_found else "NO"
+        c = YesNo.from_bool(create_if_not_found)
         if filter_string:
             return self.RunScriptCommand(f'LoadAuxDirectory("{file_directory}", "{filter_string}", {c});')
         else:
@@ -946,7 +936,7 @@ class GeneralMixin:
         PowerWorldError
             If the SimAuto call fails (e.g., file or data section not found).
         """
-        c = "YES" if create_if_not_found else "NO"
+        c = YesNo.from_bool(create_if_not_found)
         return self.RunScriptCommand(f'LoadData("{filename}", {data_name}, {c});')
 
     def StopAuxFile(self):

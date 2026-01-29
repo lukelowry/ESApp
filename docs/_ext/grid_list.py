@@ -1,6 +1,6 @@
 """Sphinx extension that renders a compact list of grid component classes.
 
-Parses ``esapp/grid.py`` with the :mod:`ast` module (no import required) and
+Parses ``esapp/components/grid.py`` with the :mod:`ast` module (no import required) and
 generates a multi-column HTML/LaTeX table of class names via the
 ``.. grid-component-list::`` directive.
 """
@@ -32,9 +32,9 @@ class GridComponentList(Directive):
     optional_arguments = 0
 
     def run(self):
-        # Locate esapp/grid.py relative to the docs/ directory
+        # Locate esapp/components/grid.py relative to the docs/ directory
         docs_dir = os.path.dirname(self.state.document.settings.env.app.srcdir)
-        grid_path = os.path.join(docs_dir, "esapp", "grid.py")
+        grid_path = os.path.join(docs_dir, "esapp", "components", "grid.py")
 
         if not os.path.isfile(grid_path):
             error = self.state_machine.reporter.error(

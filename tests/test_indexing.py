@@ -15,8 +15,8 @@ from pandas.testing import assert_frame_equal
 import numpy as np
 
 from esapp.indexable import Indexable
-from esapp import grid
-from conftest import get_sample_gobject_subclasses
+from esapp import components as grid
+from tests.conftest import get_sample_gobject_subclasses
 
 
 def pytest_generate_tests(metafunc):

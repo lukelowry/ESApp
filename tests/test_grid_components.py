@@ -10,8 +10,8 @@ USAGE:
 import pytest
 from typing import Type
 
-from esapp import grid
-from conftest import get_all_gobject_subclasses
+from esapp import components as grid
+from tests.conftest import get_all_gobject_subclasses
 
 
 @pytest.fixture(scope="module")

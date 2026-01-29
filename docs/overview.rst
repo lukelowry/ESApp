@@ -25,7 +25,8 @@ Key Features
 - **Comprehensive SimAuto Wrapper**: Full coverage of PowerWorld's API through the ``SAW`` class, organized into modular mixins for power flow, contingencies, transients, and more.
 - **High-Level Adapter Interface**: A collection of simplified "one-liner" functions for common tasks like GIC calculation, fault analysis, and voltage violation detection.
 - **Native Pandas Integration**: Every data retrieval operation returns a Pandas DataFrame or Series, enabling immediate analysis, filtering, and visualization.
-- **Advanced Analysis Apps**: Built-in specialized modules for Network topology analysis, Geomagnetically Induced Currents (GIC), and Forced Oscillation detection.
+- **Advanced Analysis Apps**: Built-in specialized modules for Network topology analysis, Geomagnetically Induced Currents (GIC), Transient Stability simulation, and Forced Oscillation detection.
+- **Transient Stability Intellisense**: The ``TS`` class provides IDE autocomplete for all transient stability result fields, organized by object type (e.g., ``TS.Gen.P``, ``TS.Bus.Voltage``).
 
 Installation
 ------------
@@ -44,7 +45,7 @@ Here is a quick example of how ESA++ simplifies data access and power flow analy
 .. code-block:: python
 
     from esapp import GridWorkBench
-    from esapp.grid import *
+    from esapp.components import *
 
     # Open Case
     wb = GridWorkBench("path/to/case.pwb")
@@ -79,6 +80,7 @@ The `docs/examples/ <https://github.com/lukelowry/ESApp/tree/main/docs/examples>
 
 - **Object Field Access**: Reduce the time you spend searching for field names with ESA++ IDE typehints for objects and fields.
 - **Matrix Extraction**: Retrieving Y-Bus, Jacobian, and GIC conductance matrices for external mathematical modeling.
+- **Transient Stability**: Running dynamic simulations with the fluent ``Dynamics`` API and ``TS`` field constants.
 
 Testing
 -------

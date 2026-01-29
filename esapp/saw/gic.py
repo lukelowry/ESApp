@@ -1,6 +1,9 @@
 """Geomagnetically Induced Current (GIC) specific functions."""
 from typing import List
 
+from ._enums import YesNo
+from ._helpers import pack_args
+
 
 class GICMixin:
     """Mixin for GIC analysis functions."""
@@ -30,8 +33,9 @@ class GICMixin:
         PowerWorldError
             If the SimAuto call fails (e.g., GIC not enabled, invalid parameters).
         """
-        spf = "YES" if solve_pf else "NO"
-        return self.RunScriptCommand(f"GICCalculate({max_field}, {direction}, {spf});")
+        spf = YesNo.from_bool(solve_pf)
+        args = pack_args(max_field, direction, spf)
+        return self.RunScriptCommand(f"GICCalculate({args});")
 
     def ClearGIC(self):
         """Clears GIC (Geomagnetically Induced Current) values from the case.
@@ -66,8 +70,9 @@ class GICMixin:
         PowerWorldError
             If the SimAuto call fails (e.g., file not found, invalid format).
         """
-        sol = "YES" if setup_on_load else "NO"
-        return self.RunScriptCommand(f'GICLoad3DEfield({file_type}, "{filename}", {sol});')
+        sol = YesNo.from_bool(setup_on_load)
+        args = pack_args(file_type, f'"{filename}"', sol)
+        return self.RunScriptCommand(f"GICLoad3DEfield({args});")
 
     def GICReadFilePSLF(self, filename: str):
         """Reads GIC supplemental data from a GMD text file format.
@@ -129,7 +134,8 @@ class GICMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        return self.RunScriptCommand(f'GICSaveGMatrix("{gmatrix_filename}", "{gmatrix_id_filename}");')
+        args = pack_args(f'"{gmatrix_filename}"', f'"{gmatrix_id_filename}"')
+        return self.RunScriptCommand(f"GICSaveGMatrix({args});")
 
     def GICSetupTimeVaryingSeries(self, start: float = 0.0, end: float = 0.0, delta: float = 0.0):
         """Creates a set of Branch series DC input voltages for time-varying GIC analysis.
@@ -155,7 +161,8 @@ class GICMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        return self.RunScriptCommand(f"GICSetupTimeVaryingSeries({start}, {end}, {delta});")
+        args = pack_args(start, end, delta)
+        return self.RunScriptCommand(f"GICSetupTimeVaryingSeries({args});")
 
     def GICShiftOrStretchInputPoints(
         self,
@@ -193,10 +200,9 @@ class GICMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        update = "YES" if update_time_varying_series else "NO"
-        return self.RunScriptCommand(
-            f"GICShiftOrStretchInputPoints({lat_shift}, {lon_shift}, {mag_scalar}, {stretch_scalar}, {update});"
-        )
+        update = YesNo.from_bool(update_time_varying_series)
+        args = pack_args(lat_shift, lon_shift, mag_scalar, stretch_scalar, update)
+        return self.RunScriptCommand(f"GICShiftOrStretchInputPoints({args});")
 
     def GICTimeVaryingCalculate(self, the_time: float, solve_pf: bool = True):
         """Calculates GIC values using the 'Time-Varying Series Voltage Inputs' calculation mode.
@@ -221,8 +227,9 @@ class GICMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        spf = "YES" if solve_pf else "NO"
-        return self.RunScriptCommand(f"GICTimeVaryingCalculate({the_time}, {spf});")
+        spf = YesNo.from_bool(solve_pf)
+        args = pack_args(the_time, spf)
+        return self.RunScriptCommand(f"GICTimeVaryingCalculate({args});")
 
     def GICTimeVaryingAddTime(self, new_time: float):
         """Adds a new time point to the time-varying voltage input series.
@@ -277,8 +284,9 @@ class GICMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        spf = "YES" if solve_pf else "NO"
-        return self.RunScriptCommand(f"GICTimeVaryingEFieldCalculate({the_time}, {spf});")
+        spf = YesNo.from_bool(solve_pf)
+        args = pack_args(the_time, spf)
+        return self.RunScriptCommand(f"GICTimeVaryingEFieldCalculate({args});")
 
     def GICTimeVaryingElectricFieldsDeleteAllTimes(self):
         """Clears all time-varying electric field input values.
@@ -313,8 +321,9 @@ class GICMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        uf = "YES" if use_filters else "NO"
-        return self.RunScriptCommand(f'GICWriteFilePSLF("{filename}", {uf});')
+        uf = YesNo.from_bool(use_filters)
+        args = pack_args(f'"{filename}"', uf)
+        return self.RunScriptCommand(f"GICWriteFilePSLF({args});")
 
     def GICWriteFilePTI(self, filename: str, use_filters: bool = False, version: int = 4):
         """Writes GIC supplemental data to a GIC text file format (PTI).
@@ -337,8 +346,9 @@ class GICMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        uf = "YES" if use_filters else "NO"
-        return self.RunScriptCommand(f'GICWriteFilePTI("{filename}", {uf}, {version});')
+        uf = YesNo.from_bool(use_filters)
+        args = pack_args(f'"{filename}"', uf, version)
+        return self.RunScriptCommand(f"GICWriteFilePTI({args});")
 
     def GICWriteOptions(self, filename: str, key_field: str = "PRIMARY"):
         """Writes the current GIC solution options to an auxiliary file.
@@ -360,21 +370,5 @@ class GICMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        return self.RunScriptCommand(f'GICWriteOptions("{filename}", {key_field});')
-
-    def GICWriteOptions(self, filename: str, key_field: str = "PRIMARY"):
-        """Writes the current GIC solution options to an auxiliary file.
-
-        Parameters
-        ----------
-        filename : str
-            The name (path) of the auxiliary file to write the options to.
-        key_field : str, optional
-            The identifier to use for the data in the auxiliary file
-            ("PRIMARY", "SECONDARY", or "LABEL"). Defaults to "PRIMARY".
-
-        Returns
-        -------
-        None
-        """
-        return self.RunScriptCommand(f'GICWriteOptions("{filename}", {key_field});')
+        args = pack_args(f'"{filename}"', key_field)
+        return self.RunScriptCommand(f"GICWriteOptions({args});")

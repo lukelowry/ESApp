@@ -2,6 +2,9 @@
 import pandas as pd
 from typing import List
 
+from ._enums import YesNo
+from ._helpers import format_list, pack_args
+
 
 class ATCMixin:
     """Mixin for ATC analysis functions."""
@@ -38,11 +41,10 @@ class ATCMixin:
         PowerWorldError
             If the SimAuto call fails (e.g., invalid seller/buyer, calculation error).
         """
-        dist = "YES" if distributed else "NO"
-        mult = "YES" if multiple_scenarios else "NO"
-        return self.RunScriptCommand(
-            f"ATCDetermine({seller}, {buyer}, {dist}, {mult});"
-        )
+        dist = YesNo.from_bool(distributed)
+        mult = YesNo.from_bool(multiple_scenarios)
+        args = pack_args(seller, buyer, dist, mult)
+        return self.RunScriptCommand(f"ATCDetermine({args});")
 
     def DetermineATCMultipleDirections(
         self, distributed: bool = False, multiple_scenarios: bool = False
@@ -69,11 +71,10 @@ class ATCMixin:
         PowerWorldError
             If the SimAuto call fails (e.g., no directions defined, calculation error).
         """
-        dist = "YES" if distributed else "NO"
-        mult = "YES" if multiple_scenarios else "NO"
-        return self.RunScriptCommand(
-            f"ATCDetermineMultipleDirections({dist}, {mult});"
-        )
+        dist = YesNo.from_bool(distributed)
+        mult = YesNo.from_bool(multiple_scenarios)
+        args = pack_args(dist, mult)
+        return self.RunScriptCommand(f"ATCDetermineMultipleDirections({args});")
 
     def GetATCResults(self, fields: list = None) -> pd.DataFrame:
         """Retrieves Transfer Limiter results from the case after an ATC calculation.
@@ -147,7 +148,7 @@ class ATCMixin:
             The indices start at 0.
 
         """
-        ir = "[" + ", ".join(index_range) + "]"
+        ir = format_list(index_range)
         return self.RunScriptCommand(f"ATCDeleteScenarioChangeIndexRange({scenario_change_type}, {ir});")
 
     def ATCDetermineATCFor(self, rl: int, g: int, i: int, apply_transfer: bool = False):
@@ -166,7 +167,7 @@ class ATCMixin:
             Defaults to False.
 
         """
-        at = "YES" if apply_transfer else "NO"
+        at = YesNo.from_bool(apply_transfer)
         return self.RunScriptCommand(f"ATCDetermineATCFor({rl}, {g}, {i}, {at});")
 
     def ATCDetermineMultipleDirectionsATCFor(self, rl: int, g: int, i: int):
@@ -265,7 +266,7 @@ class ATCMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        app = "YES" if append else "NO"
+        app = YesNo.from_bool(append)
         return self.RunScriptCommand(f'ATCDataWriteOptionsAndResults("{filename}", {app}, {key_field});')
 
     def ATCWriteAllOptions(self, filename: str, append: bool = True, key_field: str = "PRIMARY"):
@@ -314,7 +315,7 @@ class ATCMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        app = "YES" if append else "NO"
+        app = YesNo.from_bool(append)
         return self.RunScriptCommand(f'ATCWriteResultsAndOptions("{filename}", {app});')
 
     def ATCWriteScenarioLog(self, filename: str, append: bool = False, filter_name: str = ""):
@@ -342,7 +343,7 @@ class ATCMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        app = "YES" if append else "NO"
+        app = YesNo.from_bool(append)
         filt = f'"{filter_name}"' if filter_name else ""
         return self.RunScriptCommand(f'ATCWriteScenarioLog("{filename}", {app}, {filt});')
 
@@ -389,16 +390,11 @@ class ATCMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        app = "YES" if append else "NO"
-        gs = "YES" if group_scenario else "NO"
-        fields = ""
-        if fieldlist:
-            fields = "[" + ", ".join(fieldlist) + "]"
-        else:
-            fields = "[]"
-        return self.RunScriptCommand(
-            f'ATCWriteScenarioMinMax("{filename}", {filetype}, {app}, {fields}, {operation}, {operation_field}, {gs});'
-        )
+        app = YesNo.from_bool(append)
+        gs = YesNo.from_bool(group_scenario)
+        fields = format_list(fieldlist)
+        args = pack_args(f'"{filename}"', filetype, app, fields, operation, operation_field, gs)
+        return self.RunScriptCommand(f"ATCWriteScenarioMinMax({args});")
 
     def ATCWriteToExcel(self, worksheet_name: str, fieldlist: List[str] = None):
         """Sends ATC analysis results to an Excel spreadsheet for Multiple Scenarios ATC analysis.
@@ -419,9 +415,7 @@ class ATCMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        fields = ""
-        if fieldlist:
-            fields = ", [" + ", ".join(fieldlist) + "]"
+        fields = ", " + format_list(fieldlist) if fieldlist else ""
         return self.RunScriptCommand(f'ATCWriteToExcel("{worksheet_name}"{fields});')
 
     def ATCWriteToText(self, filename: str, filetype: str = "TAB", fieldlist: List[str] = None):
@@ -445,7 +439,5 @@ class ATCMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        fields = ""
-        if fieldlist:
-            fields = ", [" + ", ".join(fieldlist) + "]"
+        fields = ", " + format_list(fieldlist) if fieldlist else ""
         return self.RunScriptCommand(f'ATCWriteToText("{filename}", {filetype}{fields});')

@@ -1,6 +1,10 @@
 """Weather related functions."""
 from typing import List
 
+from ._enums import YesNo
+from ._helpers import format_list, pack_args
+
+
 class WeatherMixin:
     """Mixin for Weather functions."""
 
@@ -20,9 +24,10 @@ class WeatherMixin:
         str
             The response from the PowerWorld script command.
         """
-        umax = "YES" if update_max else "NO"
-        umin = "YES" if update_min else "NO"
-        return self.RunScriptCommand(f"WeatherLimitsGenUpdate({umax}, {umin});")
+        umax = YesNo.from_bool(update_max)
+        umin = YesNo.from_bool(update_min)
+        args = pack_args(umax, umin)
+        return self.RunScriptCommand(f"WeatherLimitsGenUpdate({args});")
 
     def TemperatureLimitsBranchUpdate(
         self, rating_set_precedence: str = "NORMAL", normal_rating_set: str = "DEFAULT", ctg_rating_set: str = "DEFAULT"
@@ -44,9 +49,8 @@ class WeatherMixin:
         str
             The response from the PowerWorld script command.
         """
-        return self.RunScriptCommand(
-            f"TemperatureLimitsBranchUpdate({rating_set_precedence}, {normal_rating_set}, {ctg_rating_set});"
-        )
+        args = pack_args(rating_set_precedence, normal_rating_set, ctg_rating_set)
+        return self.RunScriptCommand(f"TemperatureLimitsBranchUpdate({args});")
 
     def WeatherPFWModelsSetInputs(self):
         """
@@ -73,7 +77,7 @@ class WeatherMixin:
         str
             The response from the PowerWorld script command.
         """
-        spf = "YES" if solve_pf else "NO"
+        spf = YesNo.from_bool(solve_pf)
         return self.RunScriptCommand(f"WeatherPFWModelsSetInputsAndApply({spf});")
 
     def WeatherPWWFileAllMeasValid(self, filename: str, field_list: List[str], start_time: str = "", end_time: str = ""):
@@ -96,8 +100,9 @@ class WeatherMixin:
         str
             The response from the PowerWorld script command.
         """
-        fields = "[" + ", ".join(field_list) + "]"
-        return self.RunScriptCommand(f'WeatherPWWFileAllMeasValid("{filename}", {fields}, {start_time}, {end_time});')
+        fields = format_list(field_list)
+        args = pack_args(f'"{filename}"', fields, start_time, end_time)
+        return self.RunScriptCommand(f"WeatherPWWFileAllMeasValid({args});")
 
     def WeatherPFWModelsRestoreDesignValues(self):
         """
@@ -142,7 +147,7 @@ class WeatherMixin:
         str
             The response from the PowerWorld script command.
         """
-        sub = "YES" if include_subdirs else "NO"
+        sub = YesNo.from_bool(include_subdirs)
         return self.RunScriptCommand(f'WeatherPWWSetDirectory("{directory}", {sub});')
 
     def WeatherPWWFileCombine2(self, source1: str, source2: str, dest: str):
@@ -191,6 +196,5 @@ class WeatherMixin:
         str
             The response from the PowerWorld script command.
         """
-        return self.RunScriptCommand(
-            f'WeatherPWWFileGeoReduce("{source}", "{dest}", {min_lat}, {max_lat}, {min_lon}, {max_lon});'
-        )
+        args = pack_args(f'"{source}"', f'"{dest}"', min_lat, max_lat, min_lon, max_lon)
+        return self.RunScriptCommand(f"WeatherPWWFileGeoReduce({args});")

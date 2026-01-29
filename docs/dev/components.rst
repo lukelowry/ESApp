@@ -23,36 +23,53 @@ The System
 
 The component system consists of:
 
-1. **GObject Base Class** (``esapp/gobject.py``)
-   
-   A metaclass-based foundation that provides:
-   
-   - Field definition collection from class attributes
-   - Primary key information management
-   - Field priority marking (required, optional)
-   - Informative string representations
+1. **GObject Base Class** (``esapp/components/gobject.py``)
 
-2. **Field Definitions** (``esapp/grid.py``)
-   
+   An Enum-based foundation that dynamically builds component schemas from class definitions:
+
+   - Uses custom ``__new__`` to parse member definitions at class creation time
+   - Collects fields into ``_FIELDS``, ``_KEYS``, ``_SECONDARY``, and ``_EDITABLE`` lists
+   - Provides class properties for accessing schema information (``keys``, ``fields``, ``editable``, etc.)
+   - Supports composable ``FieldPriority`` flags (PRIMARY, SECONDARY, REQUIRED, OPTIONAL, EDITABLE)
+
+2. **Field Definitions** (``esapp/components/grid.py``)
+
    Auto-generated classes defining all PowerWorld objects:
-   
+
    .. code-block:: python
-   
+
        class Bus(GObject):
            """A power system bus/node"""
-           BusNum = (FieldPriority.PRIMARY_KEY, np.int32)
-           BusName = (FieldPriority.OPTIONAL, str)
-           BusPUVolt = (FieldPriority.OPTIONAL, np.float64)
+           # First member defines the PowerWorld object type
+           _ = 'Bus'
 
-3. **Generation Script** (``esapp/dev/generate_components.py``)
-   
+           # Fields: (PowerWorld name, data type, priority flags)
+           Number = 'BusNum', int, FieldPriority.PRIMARY
+           Name = 'BusName', str, FieldPriority.REQUIRED | FieldPriority.EDITABLE
+           PUVolt = 'BusPUVolt', float, FieldPriority.OPTIONAL
+
+3. **Transient Stability Fields** (``esapp/components/ts_fields.py``)
+
+   Auto-generated constants for TS result field intellisense:
+
+   .. code-block:: python
+
+       from esapp.components import TS
+
+       # IDE autocomplete for all TS fields
+       TS.Gen.P       # Generator active power
+       TS.Gen.W       # Generator rotor speed
+       TS.Bus.VPU     # Bus voltage magnitude
+
+4. **Generation Script** (``esapp/components/generate_components.py``)
+
    Python script that:
    - Parses PowerWorld field export (PWRaw format)
-   - Generates component class definitions
-   - Handles field name sanitization
-   - Assigns priority levels automatically
+   - Generates ``grid.py`` with GObject subclasses for all object types
+   - Generates ``ts_fields.py`` with TS field constants for IDE intellisense
+   - Handles field name sanitization and priority assignment
 
-4. **Indexable Mixin** (``esapp/indexable.py``)
+5. **Indexable Mixin** (``esapp/indexable.py``)
    
    Translates Python indexing syntax into SimAuto calls:
    
@@ -80,7 +97,7 @@ Step 2: Prepare the Raw Data
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 1. Rename the exported file to ``PWRaw``
-2. Place it in the ``esapp/dev/`` folder, overwriting the existing one
+2. Place it in the ``esapp/components/`` folder, overwriting the existing one
 
 The PWRaw file format is tab-delimited with columns:
 
@@ -99,20 +116,23 @@ Execute the generation script from the project root:
 
 .. code-block:: bash
 
-    python esapp/dev/generate_components.py
+    python esapp/components/generate_components.py
 
 The script will:
 
 1. Parse the PWRaw file
 2. Generate Python class definitions
 3. Assign field priorities based on PowerWorld metadata:
-   
-   - **PRIMARY_KEY**: Component identifier (e.g., BusNum for Bus objects)
+
+   - **PRIMARY**: Primary key field that identifies the object
+   - **SECONDARY**: Alternate identifier field (e.g., names)
    - **REQUIRED**: Must be specified when creating new objects
    - **OPTIONAL**: Can be read/written but not required
-   
-4. Create ``esapp/grid.py`` with all component classes
-5. Print progress to console including any warnings or excluded fields
+   - **EDITABLE**: User-modifiable field
+
+4. Create ``esapp/components/grid.py`` with all GObject component classes
+5. Create ``esapp/components/ts_fields.py`` with TS field constants
+6. Print progress to console including any warnings or excluded fields
 
 Step 4: Verify the Changes
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -153,12 +173,16 @@ Identifiers
 
 **Priority Assignment**
 
-PRIMARY_KEY
-    Fields marked as KeyType="KEY" in PWRaw
+PRIMARY
+    Fields marked as primary keys in PWRaw (identifies the object)
+SECONDARY
+    Fields that serve as alternate identifiers (e.g., name fields)
 REQUIRED
-    Fields marked as KeyType="REQUIRED"
+    Fields that must be specified when creating objects
 OPTIONAL
-    Remaining fields
+    Fields that can be read/written but are not required
+EDITABLE
+    Fields that users can modify (combined with other flags)
 
 **Conflict Resolution**
   - Fields with invalid names are excluded (rare)
@@ -166,31 +190,42 @@ OPTIONAL
   - Output includes summary of excluded fields
 
 **Component Class Generation**
-  - Creates class for each ObjectType in PWRaw
-  - Adds docstring with description
-  - Defines field tuple ``(priority, data_type)`` for each field
-  - Adds special attributes like ``_object_type``, ``_fields``, ``_keys``
+  - Creates GObject subclass for each ObjectType in PWRaw
+  - First member ``_`` defines the PowerWorld object type string
+  - Subsequent members define fields as ``(PowerWorld name, data type, priority flags)``
+  - The GObject ``__new__`` method dynamically populates ``_FIELDS``, ``_KEYS``, ``_SECONDARY``, ``_EDITABLE``
 
 Example Generated Component
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-A generated component class looks like:
+A generated component class follows this pattern:
 
 .. code-block:: python
 
     class Bus(GObject):
         """A power system bus/node - represents a point of electrical connection"""
-        
-        BusNum = (FieldPriority.PRIMARY_KEY, np.int32)
-        BusName = (FieldPriority.OPTIONAL, str)
-        BusPUVolt = (FieldPriority.OPTIONAL, np.float64)
-        BusAngle = (FieldPriority.OPTIONAL, np.float64)
-        AreaNum = (FieldPriority.OPTIONAL, np.int32)
-        ZoneNum = (FieldPriority.OPTIONAL, np.int32)
-        
-        _object_type = "Bus"
-        _fields = ["BusNum", "BusName", "BusPUVolt", ...]
-        _keys = ["BusNum"]
+
+        # First member defines the PowerWorld object type
+        _ = 'Bus'
+
+        # Fields: (PowerWorld field name, Python type, composable priority flags)
+        Number = 'BusNum', int, FieldPriority.PRIMARY
+        Name = 'BusName', str, FieldPriority.SECONDARY | FieldPriority.REQUIRED | FieldPriority.EDITABLE
+        PUVolt = 'BusPUVolt', float, FieldPriority.OPTIONAL | FieldPriority.EDITABLE
+        Angle = 'BusAngle', float, FieldPriority.OPTIONAL
+        AreaNum = 'AreaNum', int, FieldPriority.OPTIONAL
+
+The GObject base class automatically collects these definitions and exposes them via class properties:
+
+.. code-block:: python
+
+    Bus.TYPE        # 'Bus' - PowerWorld object type string
+    Bus.keys        # ['BusNum'] - primary key fields
+    Bus.fields      # ['BusNum', 'BusName', 'BusPUVolt', ...] - all fields
+    Bus.secondary   # ['BusName'] - secondary identifier fields
+    Bus.editable    # ['BusName', 'BusPUVolt'] - user-modifiable fields
+    Bus.identifiers # {'BusNum', 'BusName'} - all identifier fields (keys + secondary)
+    Bus.settable    # {'BusNum', 'BusName', 'BusPUVolt'} - identifiers + editable
 
 Using Generated Components
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -199,13 +234,26 @@ In user code, components are used for type-safe data access:
 
 .. code-block:: python
 
-    from esapp.grid import Bus
-    
-    data = wb[Bus, [Bus.BusNum, Bus.BusName, Bus.BusPUVolt]]
+    from esapp.components import Bus, Gen
+    from esapp import TS
+
+    # Access data using component classes
     data = wb[Bus, ["BusNum", "BusName", "BusPUVolt"]]
 
+    # Use class attributes for field names (IDE autocomplete)
+    data = wb[Bus, [Bus.Number, Bus.Name, Bus.PUVolt]]
+
+    # Check field properties
+    Bus.is_editable('BusPUVolt')  # True
+    Bus.is_settable('BusNum')      # True (it's a key)
+
+    # For transient stability, use TS for field intellisense
+    from esapp.components import TS
+    wb.dyn.watch(Gen, [TS.Gen.P, TS.Gen.W, TS.Gen.Delta])
+
 .. note::
-   IDE provides autocompletion for all fields when using class attributes.
+   IDE provides autocompletion for all fields when using class attributes. The ``TS`` class
+   provides organized access to transient stability result fields.
 
 Maintenance Recommendations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -267,7 +315,7 @@ ESA++ maintains semantic versioning:
 The public API includes:
 
 - GridWorkBench class and all public methods
-- Component classes in ``esapp.grid``
+- Component classes in ``esapp.components``
 - Exception types in ``esapp.saw.exceptions``
 
 Internal APIs (subject to change):

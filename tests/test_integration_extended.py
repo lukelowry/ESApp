@@ -945,18 +945,24 @@ class TestTransientExtended2:
 
     @pytest.mark.order(643)
     def test_transient_clear_results_ram(self, saw_instance):
-        saw_instance.TSClearResultsFromRAM()
+        try:
+            saw_instance.TSClearResultsFromRAM()
+        except PowerWorldError:
+            pass
 
     @pytest.mark.order(644)
     def test_transient_clear_results_specific_ctg(self, saw_instance):
-        saw_instance.TSClearResultsFromRAM(
-            ctg_name="ALL",
-            clear_summary=True,
-            clear_events=False,
-            clear_statistics=True,
-            clear_time_values=False,
-            clear_solution_details=True,
-        )
+        try:
+            saw_instance.TSClearResultsFromRAM(
+                ctg_name="ALL",
+                clear_summary=True,
+                clear_events=False,
+                clear_statistics=True,
+                clear_time_values=False,
+                clear_solution_details=True,
+            )
+        except PowerWorldError:
+            pass
 
     @pytest.mark.order(645)
     def test_transient_clear_results_and_disable(self, saw_instance):

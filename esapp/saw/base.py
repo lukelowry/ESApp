@@ -3,7 +3,6 @@ import locale
 import logging
 import os
 import re
-import tempfile
 from pathlib import Path
 from typing import List, Tuple, Union
 
@@ -25,11 +24,10 @@ from ._helpers import (
     convert_list_to_variant,
     convert_nested_list_to_variant,
     convert_to_windows_path,
+    get_temp_filepath,
 )
 # Set up locale
 locale.setlocale(locale.LC_ALL, "")
-
-logging.basicConfig(format="%(asctime)s [%(levelname)s] [%(name)s]: %(message)s", datefmt="%H:%M:%S", level=logging.INFO)
 
 # noinspection PyPep8Naming
 class SAWBase(object):
@@ -151,9 +149,9 @@ class SAWBase(object):
         self.pw_order = pw_order
 
         # Initialize temporary file for UI updates
-        self.ntf = tempfile.NamedTemporaryFile(mode="w", suffix=".axd", delete=False)
-        self.empty_aux = Path(self.ntf.name).as_posix()
-        self.ntf.close()
+        self.empty_aux = get_temp_filepath(".axd")
+        with open(self.empty_aux, "w") as f:
+            pass
 
         self.OpenCase(FileName=FileName)
 
@@ -175,7 +173,8 @@ class SAWBase(object):
         This method should be called when the SimAuto session is no longer needed
         to ensure proper cleanup and resource release.
         """
-        os.unlink(self.ntf.name)
+        if os.path.exists(self.empty_aux):
+            os.unlink(self.empty_aux)
         self.CloseCase()
         del self._pwcom
         self._pwcom = None
@@ -922,6 +921,7 @@ class SAWBase(object):
         PowerWorldError
             If any of the script commands fail.
         """
+        self.log.debug(f"RunScriptCommand: {Statements}")
         return self._call_simauto("RunScriptCommand", Statements)
 
     def RunScriptCommand2(self, Statements: str, StatusMessage: str):
@@ -1131,71 +1131,6 @@ class SAWBase(object):
 
         return output[1] if len(output) == 2 else output[1:]
 
-    def _change_parameters_multiple_element_df(self, ObjectType: str, command_df: pd.DataFrame) -> pd.DataFrame:
-        """Internal helper to prepare and execute `ChangeParametersMultipleElement` using a DataFrame.
-
-        This method cleans the input DataFrame and then calls the SimAuto method
-        to apply the changes.
-
-        Parameters
-        ----------
-        ObjectType : str
-            The PowerWorld object type.
-        command_df : pandas.DataFrame
-            The DataFrame containing the data to update.
-
-        Returns
-        -------
-        pandas.DataFrame
-            The cleaned DataFrame that was sent to PowerWorld.
-        """
-        cleaned_df = command_df.copy()
-
-        self.ChangeParametersMultipleElement(
-            ObjectType=ObjectType,
-            ParamList=cleaned_df.columns.tolist(),
-            ValueList=cleaned_df.to_numpy().tolist(),
-        )
-        return cleaned_df
-
-    def _to_numeric(
-        self, data: Union[pd.DataFrame, pd.Series], errors="ignore"
-    ) -> Union[pd.DataFrame, pd.Series]:
-        """Internal helper to convert DataFrame or Series columns to numeric types.
-
-        Handles locale-specific decimal delimiters before conversion.
-
-        Parameters
-        ----------
-        data : Union[pandas.DataFrame, pandas.Series]
-            The data to convert.
-        errors : str, optional
-            How to handle errors during conversion ('ignore', 'raise', 'coerce').
-            Defaults to 'ignore'.
-
-        Returns
-        -------
-        Union[pandas.DataFrame, pandas.Series]
-            The data with numeric columns converted.
-        """
-        if isinstance(data, pd.DataFrame):
-            df_flag = True
-        elif isinstance(data, pd.Series):
-            df_flag = False
-        else:
-            raise TypeError("data must be either a DataFrame or Series.")
-
-        if self.decimal_delimiter != ".":
-            if df_flag:
-                data = data.apply(self._replace_decimal_delimiter)
-            else:
-                data = self._replace_decimal_delimiter(data)
-
-        if df_flag:
-            return data.apply(lambda x: pd.to_numeric(x, errors='coerce')).fillna(data)
-        else:
-            return pd.to_numeric(data, errors='coerce').fillna(data)
-
     def _replace_decimal_delimiter(self, data: pd.Series):
         """Internal helper to replace locale-specific decimal delimiters with '.' in a Series.
 
@@ -1230,11 +1165,11 @@ class SAWBase(object):
         """
         if use_double_quotes:
             aux = aux.replace("'", '"')
-        file = tempfile.NamedTemporaryFile(mode="wt", suffix=".aux", delete=False)
-        file.write(aux)
-        file.close()
-        self.ProcessAuxFile(file.name)
-        os.unlink(file.name)
+        fpath = get_temp_filepath(".aux")
+        with open(fpath, "w") as f:
+            f.write(aux)
+        self.ProcessAuxFile(fpath)
+        os.unlink(fpath)
 
     def update_ui(self) -> None:
         """Triggers a refresh of the PowerWorld Simulator user interface.
@@ -1242,3 +1177,13 @@ class SAWBase(object):
         This can be useful after making programmatic changes that might not immediately reflect in the GUI.
         """
         return self.ProcessAuxFile(self.empty_aux)
+
+    def set_logging_level(self, level: Union[int, str]) -> None:
+        """Sets the logging level for the SAW instance logger.
+
+        Parameters
+        ----------
+        level : int or str
+            The logging level (e.g., logging.DEBUG, "DEBUG").
+        """
+        self.log.setLevel(level)

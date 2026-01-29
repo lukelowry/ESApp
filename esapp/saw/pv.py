@@ -1,6 +1,10 @@
 """PV (Power-Voltage) Analysis specific functions."""
 
 
+from esapp.saw._enums import YesNo
+from esapp.saw._helpers import pack_args
+
+
 class PVMixin:
     """Mixin for PV analysis functions."""
 
@@ -31,7 +35,8 @@ class PVMixin:
         str
             The response from the PowerWorld script command.
         """
-        return self.RunScriptCommand(f"PVRun({source}, {sink});")
+        args = pack_args(source, sink)
+        return self.RunScriptCommand(f"PVRun({args});")
 
     def PVDataWriteOptionsAndResults(self, filename: str, append: bool = True, key_field: str = "PRIMARY"):
         """
@@ -51,8 +56,9 @@ class PVMixin:
         str
             The response from the PowerWorld script command.
         """
-        app = "YES" if append else "NO"
-        return self.RunScriptCommand(f'PVDataWriteOptionsAndResults("{filename}", {app}, {key_field});')
+        app = YesNo.from_bool(append)
+        args = pack_args(f'"{filename}"', app, key_field)
+        return self.RunScriptCommand(f"PVDataWriteOptionsAndResults({args});")
 
     def PVDestroy(self):
         """
@@ -92,7 +98,8 @@ class PVMixin:
         str
             The response from the PowerWorld script command.
         """
-        return self.RunScriptCommand(f"PVSetSourceAndSink({source}, {sink});")
+        args = pack_args(source, sink)
+        return self.RunScriptCommand(f"PVSetSourceAndSink({args});")
 
     def PVStartOver(self):
         """
@@ -123,8 +130,9 @@ class PVMixin:
         str
             The response from the PowerWorld script command.
         """
-        app = "YES" if append else "NO"
-        return self.RunScriptCommand(f'PVWriteInadequateVoltages("{filename}", {app}, {inadequate_type});')
+        app = YesNo.from_bool(append)
+        args = pack_args(f'"{filename}"', app, inadequate_type)
+        return self.RunScriptCommand(f"PVWriteInadequateVoltages({args});")
 
     def PVWriteResultsAndOptions(self, filename: str, append: bool = True):
         """
@@ -142,8 +150,9 @@ class PVMixin:
         str
             The response from the PowerWorld script command.
         """
-        app = "YES" if append else "NO"
-        return self.RunScriptCommand(f'PVWriteResultsAndOptions("{filename}", {app});')
+        app = YesNo.from_bool(append)
+        args = pack_args(f'"{filename}"', app)
+        return self.RunScriptCommand(f"PVWriteResultsAndOptions({args});")
 
     def RefineModel(self, object_type: str, filter_name: str, action: str, tolerance: float):
         """
@@ -166,4 +175,5 @@ class PVMixin:
             The response from the PowerWorld script command.
         """
         filt = f'"{filter_name}"' if filter_name else ""
-        return self.RunScriptCommand(f'RefineModel({object_type}, {filt}, {action}, {tolerance});')
+        args = pack_args(object_type, filt, action, tolerance)
+        return self.RunScriptCommand(f"RefineModel({args});")

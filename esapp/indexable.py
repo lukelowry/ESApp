@@ -1,5 +1,5 @@
 from .saw import SAW, PowerWorldPrerequisiteError
-from .gobject import GObject
+from .components import GObject
 from .utils import timing
 from typing import Type, Optional
 from pandas import DataFrame
@@ -242,8 +242,8 @@ class Indexable:
                 )
             change_df = DataFrame(data_dict)
         
-        # For objects with keys, we first get the keys of all existing objects
-        # to ensure we only modify what's already there.
+        # For objects with keys, we first get the keys (primary keys)
+        # of all existing objects to ensure we only modify what's already there.
         else:
             keys = gtype.keys
             change_df = self[gtype, keys]

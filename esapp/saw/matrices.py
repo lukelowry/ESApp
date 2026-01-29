@@ -1,11 +1,13 @@
 import os
 import re
-import tempfile
 from pathlib import Path
 from typing import Union
 
 import numpy as np
 from scipy.sparse import csr_matrix
+
+from ._enums import YesNo
+from ._helpers import get_temp_filepath, pack_args
 
 
 class MatrixMixin:
@@ -40,9 +42,7 @@ class MatrixMixin:
         if file:
             _tempfile_path = file
         else:
-            _tempfile = tempfile.NamedTemporaryFile(mode="w", suffix=".mat", delete=False)
-            _tempfile_path = Path(_tempfile.name).as_posix()
-            _tempfile.close()
+            _tempfile_path = get_temp_filepath(".mat")
             cmd = f'SaveYbusInMatlabFormat("{_tempfile_path}", NO)'
             self.RunScriptCommand(cmd)
         with open(_tempfile_path, "r") as f:
@@ -161,12 +161,8 @@ class MatrixMixin:
         Tuple[str, str]
             A tuple containing the paths to the temporary matrix file and ID file.
         """
-        mat_file = tempfile.NamedTemporaryFile(mode="w", suffix=".m", delete=False)
-        mat_file_path = Path(mat_file.name).as_posix()
-        mat_file.close()
-        id_file = tempfile.NamedTemporaryFile(mode="w", delete=False)
-        id_file_path = Path(id_file.name).as_posix()
-        id_file.close()
+        mat_file_path = get_temp_filepath(".m")
+        id_file_path = get_temp_filepath(".txt")
         return mat_file_path, id_file_path
 
     def _parse_real_matrix(self, mat_str, matrix_name="Jac"):
@@ -221,9 +217,11 @@ class MatrixMixin:
         jac_form : str, optional
             "R" for AC Jacobian in Rectangular coordinates, "P" for Polar, "DC" for B' matrix. Defaults to "R".
         """
-        return self.RunScriptCommand(f'SaveJacobian("{jac_filename}", "{jid_filename}", {file_type}, {jac_form});')
+        args = pack_args(f'"{jac_filename}"', f'"{jid_filename}"', file_type, jac_form)
+        return self.RunScriptCommand(f"SaveJacobian({args});")
 
     def SaveYbusInMatlabFormat(self, filename: str, include_voltages: bool = False):
         """Saves the YBus to a file formatted for use with Matlab."""
-        iv = "YES" if include_voltages else "NO"
-        return self.RunScriptCommand(f'SaveYbusInMatlabFormat("{filename}", {iv});')
+        iv = YesNo.from_bool(include_voltages)
+        args = pack_args(f'"{filename}"', iv)
+        return self.RunScriptCommand(f"SaveYbusInMatlabFormat({args});")

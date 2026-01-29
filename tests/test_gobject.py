@@ -5,8 +5,8 @@ Tests the schema construction, field access, and string representation.
 """
 import pytest
 
-from esapp.gobject import GObject, FieldPriority
-from esapp import grid
+from esapp.components.gobject import GObject, FieldPriority
+from esapp import components as grid
 
 
 class TestGObjectReprStr:
@@ -77,10 +77,10 @@ class TestGObjectProperties:
 
     def test_secondary_property(self):
         """secondary property returns secondary identifier fields."""
-        # Gen has secondary identifiers
+        # Gen has secondary identifiers (alternate keys, base values)
         assert isinstance(grid.Gen.secondary, list)
-        # GenID is a secondary identifier
-        assert "GenID" in grid.Gen.secondary
+        # BusName_NomVolt is a secondary identifier (alternate key)
+        assert "BusName_NomVolt" in grid.Gen.secondary
 
     def test_editable_property(self):
         """editable property returns editable fields."""
@@ -90,8 +90,8 @@ class TestGObjectProperties:
         """identifiers includes both primary and secondary keys."""
         identifiers = grid.Gen.identifiers
         assert isinstance(identifiers, set)
-        assert "BusNum" in identifiers  # Primary
-        assert "GenID" in identifiers   # Secondary
+        assert "BusNum" in identifiers  # Primary key
+        assert "GenID" in identifiers   # Primary key (composite)
 
     def test_settable_property(self):
         """settable includes identifiers and editable fields."""

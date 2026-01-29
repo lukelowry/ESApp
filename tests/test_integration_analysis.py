@@ -244,22 +244,6 @@ class TestTransientAdvanced:
         """Test clearing play-in signals."""
         saw_instance.TSClearPlayInSignals()
 
-    @pytest.mark.order(97)
-    def test_transient_get_contingency_results(self, saw_instance):
-        """Test getting transient contingency results."""
-        # TSGetContingencyResults(CtgName, ObjFieldList, ...) - contingency name first
-        # Need an actual contingency name; skip if none available
-        try:
-            ctgs = saw_instance.ListOfDevices("TSContingency")
-            if ctgs is not None and not ctgs.empty:
-                ctg_name = ctgs.iloc[0].iloc[0]  # First column, first row
-                meta, data = saw_instance.TSGetContingencyResults(ctg_name, ["BusNum", "BusPUVolt"])
-                assert meta is None or isinstance(meta, pd.DataFrame)
-            else:
-                pytest.skip("No transient contingencies defined")
-        except (PowerWorldPrerequisiteError, PowerWorldError):
-            pytest.skip("No transient results available")
-
     @pytest.mark.order(98)
     def test_transient_validate(self, saw_instance):
         """Test TSValidate for model validation."""
@@ -283,8 +267,8 @@ class TestTransientAdvanced:
         """Test writing transient results to CSV file."""
         tmp_csv = temp_file(".csv")
         try:
-            # TSWriteResultsToCSV(filename, mode, contingencies, plots_fields)
-            saw_instance.TSWriteResultsToCSV(tmp_csv, "CSV", ["ALL"], ["GenMW"])
+            # TSGetResults(mode, contingencies, plots_fields, filename)
+            saw_instance.TSGetResults("CSV", ["ALL"], ["GenMW"], filename=tmp_csv)
             assert os.path.exists(tmp_csv)
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("No transient results to write")

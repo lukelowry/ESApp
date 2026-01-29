@@ -6,7 +6,7 @@ from numpy.random import random
 
 # WorkBench Imports
 from ..indexable import Indexable
-from ..grid import Contingency, Gen, Load, Bus
+from ..components import Contingency, Gen, Load, Bus
 from ..utils.exceptions import *
 
 # Annoying FutureWarnings

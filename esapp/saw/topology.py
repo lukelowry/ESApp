@@ -1,7 +1,9 @@
 import os
-import tempfile
 from pathlib import Path
 import pandas as pd
+
+from ._enums import YesNo, format_filter
+from ._helpers import format_list, get_temp_filepath, pack_args
 
 
 class TopologyMixin:
@@ -32,10 +34,11 @@ class TopologyMixin:
         pd.DataFrame
             DataFrame containing BusNum and the calculated distance.
         """
-        self.RunScriptCommand(f"DeterminePathDistance({start}, {BranchDistMeas}, {BranchFilter}, {BusField});")
+        args = pack_args(start, BranchDistMeas, BranchFilter, BusField)
+        self.RunScriptCommand(f"DeterminePathDistance({args});")
 
     def DetermineBranchesThatCreateIslands(
-        self, Filter: str = "ALL", StoreBuses: str = "YES", SetSelectedOnLines: str = "NO"
+        self, Filter: str = "ALL", StoreBuses: bool = True, SetSelectedOnLines: bool = False
     ) -> pd.DataFrame:
         """
         Determine the branches whose outage results in island formation.
@@ -44,21 +47,23 @@ class TopologyMixin:
         ----------
         Filter : str, optional
             Filter to apply to branches. Defaults to "ALL".
-        StoreBuses : str, optional
-            Whether to store bus information. Defaults to "YES".
-        SetSelectedOnLines : str, optional
-            Whether to set the Selected field on lines. Defaults to "NO".
+        StoreBuses : bool, optional
+            Whether to store bus information. Defaults to True.
+        SetSelectedOnLines : bool, optional
+            Whether to set the Selected field on lines. Defaults to False.
 
         Returns
         -------
         pd.DataFrame
             DataFrame containing the results.
         """
-        with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as tmp:
-            filename = Path(tmp.name).as_posix()
-        
+        filename = get_temp_filepath(".csv")
+
+        sb = YesNo.from_bool(StoreBuses)
+        ssl = YesNo.from_bool(SetSelectedOnLines)
         try:
-            statement = f'DetermineBranchesThatCreateIslands({Filter},{StoreBuses},"{filename}",{SetSelectedOnLines},CSV);'
+            args = pack_args(Filter, sb, f'"{filename}"', ssl, "CSV")
+            statement = f"DetermineBranchesThatCreateIslands({args});"
             self.RunScriptCommand(statement)
             return pd.read_csv(filename, header=0)
         finally:
@@ -87,11 +92,11 @@ class TopologyMixin:
         pd.DataFrame
             DataFrame describing the shortest path.
         """
-        with tempfile.NamedTemporaryFile(suffix=".txt", delete=False) as tmp:
-            filename = Path(tmp.name).as_posix()
+        filename = get_temp_filepath(".txt")
             
         try:
-            statement = f'DetermineShortestPath({start}, {end}, {BranchDistanceMeasure}, {BranchFilter}, "{filename}");'
+            args = pack_args(start, end, BranchDistanceMeasure, BranchFilter, f'"{filename}"')
+            statement = f"DetermineShortestPath({args});"
             self.RunScriptCommand(statement)
             df = pd.read_csv(
                 filename, header=None, sep=r'\s+', names=["BusNum", BranchDistanceMeasure, "BusName"]
@@ -120,8 +125,9 @@ class TopologyMixin:
         str
             The response from the PowerWorld script command.
         """
-        yn = "YES" if set_selected else "NO"
-        return self.RunScriptCommand(f'DoFacilityAnalysis("{filename}", {yn});')
+        yn = YesNo.from_bool(set_selected)
+        args = pack_args(f'"{filename}"', yn)
+        return self.RunScriptCommand(f"DoFacilityAnalysis({args});")
 
     def FindRadialBusPaths(
         self,
@@ -148,9 +154,10 @@ class TopologyMixin:
         str
             The response from the PowerWorld script command.
         """
-        ign = "YES" if ignore_status else "NO"
-        treat = "YES" if treat_parallel_as_not_radial else "NO"
-        return self.RunScriptCommand(f"FindRadialBusPaths({ign}, {treat}, {bus_or_superbus});")
+        ign = YesNo.from_bool(ignore_status)
+        treat = YesNo.from_bool(treat_parallel_as_not_radial)
+        args = pack_args(ign, treat, bus_or_superbus)
+        return self.RunScriptCommand(f"FindRadialBusPaths({args});")
 
     def SetBusFieldFromClosest(self, variable_name: str, bus_filter_set_to: str, bus_filter_from_these: str, branch_filter_traverse: str, branch_dist_meas: str):
         """
@@ -174,9 +181,8 @@ class TopologyMixin:
         str
             The response from the PowerWorld script command.
         """
-        return self.RunScriptCommand(
-            f'SetBusFieldFromClosest("{variable_name}", "{bus_filter_set_to}", "{bus_filter_from_these}", {branch_filter_traverse}, {branch_dist_meas});'
-        )
+        args = pack_args(f'"{variable_name}"', f'"{bus_filter_set_to}"', f'"{bus_filter_from_these}"', branch_filter_traverse, branch_dist_meas)
+        return self.RunScriptCommand(f"SetBusFieldFromClosest({args});")
 
     def SetSelectedFromNetworkCut(
         self,
@@ -233,25 +239,20 @@ class TopologyMixin:
         str
             The response from the PowerWorld script command.
         """
-        sh = "YES" if set_how else "NO"
-        en = "YES" if energized else "NO"
-        init = "YES" if initialize_selected else "NO"
-        uaz = "YES" if use_area_zone else "NO"
-        ukv = "YES" if use_kv else "NO"
+        sh = YesNo.from_bool(set_how)
+        en = YesNo.from_bool(energized)
+        init = YesNo.from_bool(initialize_selected)
+        uaz = YesNo.from_bool(use_area_zone)
+        ukv = YesNo.from_bool(use_kv)
 
-        objs = ""
-        if objects_to_select:
-            objs = "[" + ", ".join(objects_to_select) + "]"
+        objs = format_list(objects_to_select) if objects_to_select else ""
 
-        bf = f'"{branch_filter}"' if branch_filter and branch_filter not in ["SELECTED", "AREAZONE", "ALL"] else branch_filter
-        inf = f'"{interface_filter}"' if interface_filter and interface_filter not in ["SELECTED", "AREAZONE", "ALL"] else interface_filter
-        dcf = f'"{dc_line_filter}"' if dc_line_filter and dc_line_filter not in ["SELECTED", "AREAZONE", "ALL"] else dc_line_filter
+        bf = format_filter(branch_filter)
+        inf = format_filter(interface_filter)
+        dcf = format_filter(dc_line_filter)
 
-        cmd = (
-            f"SetSelectedFromNetworkCut({sh}, {bus_on_cut_side}, {bf}, {inf}, "
-            f"{dcf}, {en}, {num_tiers}, {init}, {objs}, {uaz}, {ukv}, "
-            f"{min_kv}, {max_kv}, {lower_min_kv}, {lower_max_kv});"
-        )
+        args = pack_args(sh, bus_on_cut_side, bf, inf, dcf, en, num_tiers, init, objs, uaz, ukv, min_kv, max_kv, lower_min_kv, lower_max_kv)
+        cmd = f"SetSelectedFromNetworkCut({args});"
         return self.RunScriptCommand(cmd)
 
     def CreateNewAreasFromIslands(self):
@@ -292,7 +293,8 @@ class TopologyMixin:
         str
             The response from the PowerWorld script command.
         """
-        return self.RunScriptCommand(f'ExpandBusTopology({bus_identifier}, {topology_type});')
+        args = pack_args(bus_identifier, topology_type)
+        return self.RunScriptCommand(f"ExpandBusTopology({args});")
 
     def SaveConsolidatedCase(self, filename: str, filetype: str = "PWB", bus_format: str = "Number", truncate_ctg_labels: bool = False, add_comments: bool = False):
         """
@@ -316,9 +318,10 @@ class TopologyMixin:
         str
             The response from the PowerWorld script command.
         """
-        tcl = "YES" if truncate_ctg_labels else "NO"
-        ac = "YES" if add_comments else "NO"
-        return self.RunScriptCommand(f'SaveConsolidatedCase("{filename}", {filetype}, [{bus_format}, {tcl}, {ac}]);')
+        tcl = YesNo.from_bool(truncate_ctg_labels)
+        ac = YesNo.from_bool(add_comments)
+        args = pack_args(f'"{filename}"', filetype, f'[{bus_format}, {tcl}, {ac}]')
+        return self.RunScriptCommand(f"SaveConsolidatedCase({args});")
 
     def CloseWithBreakers(self, object_type: str, filter_val: str, only_specified: bool = False, switching_types: list = None, close_normally_closed: bool = False):
         """
@@ -342,12 +345,10 @@ class TopologyMixin:
         str
             The response from the PowerWorld script command.
         """
-        only = "YES" if only_specified else "NO"
-        cnc = "YES" if close_normally_closed else "NO"
-        sw_types = '["Breaker"]'
-        if switching_types:
-            sw_types = "[" + ", ".join([f'"{t}"' for t in switching_types]) + "]"
-        
+        only = YesNo.from_bool(only_specified)
+        cnc = YesNo.from_bool(close_normally_closed)
+        sw_types = format_list(switching_types, quote_items=True) if switching_types else '["Breaker"]'
+
         # This command has a unique syntax where the object type is the first argument
         # and the second argument is an identifier with keys *only*, not the full object string.
         # This block handles cases where a full object string (e.g., from create_object_string)
@@ -359,7 +360,8 @@ class TopologyMixin:
             keys_part = filter_val.strip()[len(prefix_to_check):-1].strip()
             processed_val = f"[{keys_part}]"
 
-        return self.RunScriptCommand(f'CloseWithBreakers({object_type}, {processed_val}, {only}, {sw_types}, {cnc});')
+        args = pack_args(object_type, processed_val, only, sw_types, cnc)
+        return self.RunScriptCommand(f"CloseWithBreakers({args});")
 
     def OpenWithBreakers(self, object_type: str, filter_val: str, switching_types: list = None, open_normally_open: bool = False):
         """
@@ -381,10 +383,8 @@ class TopologyMixin:
         str
             The response from the PowerWorld script command.
         """
-        ono = "YES" if open_normally_open else "NO"
-        sw_types = '["Breaker"]'
-        if switching_types:
-            sw_types = "[" + ", ".join([f'"{t}"' for t in switching_types]) + "]"
+        ono = YesNo.from_bool(open_normally_open)
+        sw_types = format_list(switching_types, quote_items=True) if switching_types else '["Breaker"]'
 
         # This command has a unique syntax where the object type is the first argument
         # and the second argument is an identifier with keys *only*, not the full object string.
@@ -396,4 +396,5 @@ class TopologyMixin:
             keys_part = filter_val.strip()[len(prefix_to_check):-1].strip()
             processed_val = f"[{keys_part}]"
 
-        return self.RunScriptCommand(f'OpenWithBreakers({object_type}, {processed_val}, {sw_types}, {ono});')
+        args = pack_args(object_type, processed_val, sw_types, ono)
+        return self.RunScriptCommand(f"OpenWithBreakers({args});")

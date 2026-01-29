@@ -1,15 +1,66 @@
 Objects & Fields
 ================
 
-The ``esapp.gobject`` module provides the base classes for defining grid component schemas.
+The ``esapp.components`` module provides the base classes for defining grid component schemas
+and transient stability field constants.
 
-.. automodule:: esapp.gobject
+GObject Base Class
+------------------
+
+.. automodule:: esapp.components.gobject
    :members:
+
+FieldPriority Flags
+~~~~~~~~~~~~~~~~~~~
+
+The ``FieldPriority`` flag enum is used to categorize field attributes. Flags can be combined
+using the ``|`` operator:
+
+- **PRIMARY**: Field is part of the primary key for the object
+- **SECONDARY**: Field is a secondary identifier (e.g., names)
+- **REQUIRED**: Field must be specified when creating objects
+- **OPTIONAL**: Field is not required
+- **EDITABLE**: Field can be modified by users
+
+Example:
+
+.. code-block:: python
+
+    from esapp.components.gobject import FieldPriority
+
+    # A field that is both required and editable
+    priority = FieldPriority.REQUIRED | FieldPriority.EDITABLE
+
+Transient Stability Fields
+--------------------------
+
+The ``TS`` class provides IDE intellisense for transient stability result fields, organized
+by object type. Use these constants with ``wb.dyn.watch()`` to specify which fields to record
+during simulation.
+
+.. code-block:: python
+
+    from esapp import TS
+    from esapp.components import Gen, Bus
+
+    # Watch generator fields
+    wb.dyn.watch(Gen, [TS.Gen.P, TS.Gen.W, TS.Gen.Delta])
+
+    # Watch bus fields
+    wb.dyn.watch(Bus, [TS.Bus.VPU, TS.Bus.Freq])
+
+Available TS field categories include:
+
+- ``TS.Gen``: Generator fields (P, Q, W, Delta, etc.)
+- ``TS.Bus``: Bus fields (VPU, Freq, Angle, etc.)
+- ``TS.Branch``: Branch fields (P, Q, I, etc.)
+- ``TS.Load``: Load fields (P, Q, etc.)
+- ``TS.Area``: Area fields (Frequency, etc.)
 
 Available Grid Object Types
 ----------------------------
 
-The following component types are available in ``esapp.grid``.
+The following component types are available in ``esapp.components``.
 Each class represents a PowerWorld object type that can be used with
 the :class:`~esapp.GridWorkBench` indexing syntax (e.g., ``wb[Bus, "BusNum"]``).
 

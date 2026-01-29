@@ -1,68 +1,14 @@
 """Case Actions specific functions."""
 from typing import List
 
+from ._enums import YesNo
+from ._helpers import format_list, pack_args
+
 
 class CaseActionsMixin:
     """Mixin for Case Actions functions."""
 
-    def AppendCase(
-        self,
-        filename: str,
-        filetype: str,
-        star_bus: str = "NEAR",
-        estimate_voltages: bool = True,
-        ms_line: str = "MAINTAIN",
-        var_lim_dead: float = 2.0,
-        post_ctg_agc: bool = False,
-    ):
-        """Merges another case file into the currently open PowerWorld case.
 
-        This action is used to combine the network and data from an external
-        case file with the currently loaded case.
-
-        Parameters
-        ----------
-        filename : str
-            The file name of the case to be appended.
-        filetype : str
-            The format of the file to append (e.g., "PWB", "GE", "PTI", "CF", "AUX",
-            "UCTE", "AREVAHDB", "OPENNETEMS").
-        star_bus : str, optional
-            For PTI RAW format, specifies how to handle star buses ("NEAR", "MAX", or a numeric value).
-            Defaults to "NEAR".
-        estimate_voltages : bool, optional
-            For GE EPC or PTI RAW format, if True, estimates voltages and angles for new buses
-            introduced by the append. Angle smoothing is done across new lines.
-            Defaults to True.
-        ms_line : str, optional
-            For GE EPC format, specifies how to handle multisection lines ("MAINTAIN" or "EQUIVALENCE").
-            Defaults to "MAINTAIN".
-        var_lim_dead : float, optional
-            For GE EPC format, sets the var limit deadband. Defaults to 2.0.
-        post_ctg_agc : bool, optional
-            For GE EPC format, if True, populates the generator field 'Post-CTG Prevent Response'
-            based on the EPC file's generator base load flag. Defaults to False.
-
-        Returns
-        -------
-        None
-
-        Raises
-        ------
-        PowerWorldError
-            If the SimAuto call fails (e.g., file not found, invalid parameters).
-        """
-        est = "YES" if estimate_voltages else "NO"
-        pc_agc = "YES" if post_ctg_agc else "NO"
-
-        if "PTI" in filetype.upper():
-            args = f'"{filename}", {filetype}, [{star_bus}, {est}]'
-        elif "GE" in filetype.upper():
-            args = f'"{filename}", {filetype}, [{ms_line}, {var_lim_dead}, {pc_agc}, {est}]'
-        else:
-            args = f'"{filename}", {filetype}'
-
-        return self.RunScriptCommand(f"AppendCase({args});")
 
     def CaseDescriptionClear(self):
         """Clears the case description.
@@ -100,7 +46,7 @@ class CaseActionsMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        app = "YES" if append else "NO"
+        app = YesNo.from_bool(append)
         return self.RunScriptCommand(f'CaseDescriptionSet("{text}", {app});')
 
     def DeleteExternalSystem(self):
@@ -335,7 +281,7 @@ class CaseActionsMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        wt = "YES" if with_ties else "NO"
+        wt = YesNo.from_bool(with_ties)
         return self.RunScriptCommand(f'SaveExternalSystem("{filename}", {filetype}, {wt});')
 
     def SaveMergedFixedNumBusCase(self, filename: str, filetype: str = "PWB"):
@@ -397,5 +343,5 @@ class CaseActionsMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        params = "[" + ", ".join([str(p) for p in parameters]) + "]"
+        params = format_list(parameters, stringify=True)
         return self.RunScriptCommand(f"Scale({scale_type}, {based_on}, {params}, {scale_marker});")

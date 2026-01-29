@@ -1,6 +1,10 @@
 """Fault analysis specific functions."""
 
 
+from esapp.saw._enums import YesNo
+from esapp.saw._helpers import pack_args
+
+
 class FaultMixin:
     """Mixin for fault analysis functions."""
 
@@ -41,12 +45,12 @@ class FaultMixin:
         PowerWorldError
             If the SimAuto call fails (e.g., invalid element, fault type, or location).
         """
+        # If location is None, it is omitted from the arguments
         if location is not None:
-            return self.RunScriptCommand(
-                f"Fault({element}, {location}, {fault_type}, {r}, {x});"
-            )
+            args = pack_args(element, location, fault_type, r, x)
         else:
-            return self.RunScriptCommand(f"Fault({element}, {fault_type}, {r}, {x});")
+            args = pack_args(element, fault_type, r, x)
+        return self.RunScriptCommand(f"Fault({args});")
 
     def FaultClear(self):
         """Clears a single fault that has been calculated."""
@@ -58,7 +62,7 @@ class FaultMixin:
 
     def FaultMultiple(self, use_dummy_bus: bool = False):
         """Runs fault analysis on a list of defined faults."""
-        dummy = "YES" if use_dummy_bus else "NO"
+        dummy = YesNo.from_bool(use_dummy_bus)
         return self.RunScriptCommand(f"FaultMultiple({dummy});")
 
     def LoadPTISEQData(self, filename: str, version: int = 33):

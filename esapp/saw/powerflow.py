@@ -2,30 +2,34 @@ from typing import List, Union
 import pandas as pd
 
 from ._exceptions import PowerWorldError
+from ._enums import YesNo, SolverMethod, format_filter
+from ._helpers import pack_args
 
 
 class PowerflowMixin:
 
-    def SolvePowerFlow(self, SolMethod: str = "RECTNEWT") -> None:
+    def SolvePowerFlow(self, SolMethod: Union[SolverMethod, str] = SolverMethod.RECTNEWT) -> None:
         """Solves the power flow using the specified solution method.
 
         Parameters
         ----------
-        SolMethod : str, optional
-            The solution method to use. Valid options include "RECTNEWT" (Rectangular Newton-Raphson),
-            "POLARNEWT" (Polar Newton-Raphson), "GAUSSSEIDEL" (Gauss-Seidel), "FASTDEC" (Fast Decoupled),
-            "ROBUST", and "DC". Defaults to "RECTNEWT".
-        
+        SolMethod : Union[SolverMethod, str], optional
+            The solution method to use. Valid options include SolverMethod.RECTNEWT (Rectangular Newton-Raphson),
+            SolverMethod.POLARNEWT (Polar Newton-Raphson), SolverMethod.GAUSSSEIDEL (Gauss-Seidel),
+            SolverMethod.FASTDEC (Fast Decoupled), SolverMethod.ROBUST, and SolverMethod.DC.
+            Defaults to SolverMethod.RECTNEWT.
+
         Returns
         -------
         None
-        
+
         Raises
         ------
         PowerWorldError
             If the SimAuto call fails or the power flow does not converge.
         """
-        script_command = f"SolvePowerFlow({SolMethod.upper()})"
+        method = SolMethod.value if isinstance(SolMethod, SolverMethod) else SolMethod.upper()
+        script_command = f"SolvePowerFlow({method})"
         return self.RunScriptCommand(script_command)
 
     def ClearPowerFlowSolutionAidValues(self):
@@ -81,7 +85,7 @@ class PowerflowMixin:
         enable : bool, optional
             If True, power flow will only perform one iteration. Defaults to True.
         """
-        value = "YES" if enable else "NO"
+        value = YesNo.from_bool(enable)
         self.ChangeParametersSingleElement("Sim_Solution_Options", ["DoOneIteration"], [value])
 
     def SetInnerLoopCheckMVars(self, enable: bool = True) -> None:
@@ -93,7 +97,7 @@ class PowerflowMixin:
             If True, the inner loop of the power flow will check Mvar limits
             before proceeding to the outer loop. Defaults to True.
         """
-        value = "YES" if enable else "NO"
+        value = YesNo.from_bool(enable)
         self.ChangeParametersSingleElement("Sim_Solution_Options", ["ChkVars"], [value])
 
     def GetMinPUVoltage(self) -> float:
@@ -117,14 +121,13 @@ class PowerflowMixin:
 
     def ConditionVoltagePockets(self, voltage_threshold: float, angle_threshold: float, filter_name: str = "ALL"):
         """Finds pockets of buses that may have bad initial voltage estimates."""
-        filt = f'"{filter_name}"' if filter_name and filter_name not in ["SELECTED", "AREAZONE", "ALL"] else filter_name
-        return self.RunScriptCommand(
-            f"ConditionVoltagePockets({voltage_threshold}, {angle_threshold}, {filt});"
-        )
+        filt = format_filter(filter_name)
+        args = pack_args(voltage_threshold, angle_threshold, filt)
+        return self.RunScriptCommand(f"ConditionVoltagePockets({args});")
 
     def EstimateVoltages(self, filter_name: str):
         """Estimates voltages and angles at buses meeting the filter."""
-        filt = f'"{filter_name}"' if filter_name and filter_name not in ["SELECTED", "AREAZONE", "ALL"] else filter_name
+        filt = format_filter(filter_name)
         return self.RunScriptCommand(f'EstimateVoltages({filt});')
 
     def GenForceLDC_RCC(self, filter_name: str = ""):
@@ -149,7 +152,7 @@ class PowerflowMixin:
 
     def DiffCaseShowPresentAndBase(self, show: bool):
         """Toggles 'Show Present|Base in Difference and Change Mode'."""
-        yn = "YES" if show else "NO"
+        yn = YesNo.from_bool(show)
         return self.RunScriptCommand(f"DiffCaseShowPresentAndBase({yn});")
 
     def DiffCaseMode(self, mode: str):
@@ -162,42 +165,45 @@ class PowerflowMixin:
 
     def DiffCaseWriteCompleteModel(self, filename: str, append: bool = False, save_added: bool = True, save_removed: bool = True, save_both: bool = True, key_fields: str = "PRIMARY", export_format: str = "", use_area_zone: bool = False, use_data_maintainer: bool = False, assume_base_meet: bool = True, include_clear_pf_aids: bool = True, delete_branches_flip: bool = False):
         """Creates an auxiliary file with difference case information."""
-        app = "YES" if append else "NO"
-        sa = "YES" if save_added else "NO"
-        sr = "YES" if save_removed else "NO"
-        sb = "YES" if save_both else "NO"
-        uaz = "YES" if use_area_zone else "NO"
-        udm = "YES" if use_data_maintainer else "NO"
-        abm = "YES" if assume_base_meet else "NO"
-        icp = "YES" if include_clear_pf_aids else "NO"
-        dbf = "YES" if delete_branches_flip else "NO"
-        
-        cmd = f'DiffCaseWriteCompleteModel("{filename}", {app}, {sa}, {sr}, {sb}, {key_fields}, "{export_format}", {uaz}, {udm}, {abm}, {icp}, {dbf});'
-        return self.RunScriptCommand(cmd)
+        app = YesNo.from_bool(append)
+        sa = YesNo.from_bool(save_added)
+        sr = YesNo.from_bool(save_removed)
+        sb = YesNo.from_bool(save_both)
+        uaz = YesNo.from_bool(use_area_zone)
+        udm = YesNo.from_bool(use_data_maintainer)
+        abm = YesNo.from_bool(assume_base_meet)
+        icp = YesNo.from_bool(include_clear_pf_aids)
+        dbf = YesNo.from_bool(delete_branches_flip)
+
+        args = pack_args(f'"{filename}"', app, sa, sr, sb, key_fields, f'"{export_format}"', uaz, udm, abm, icp, dbf)
+        return self.RunScriptCommand(f"DiffCaseWriteCompleteModel({args});")
 
     def DiffCaseWriteBothEPC(self, filename: str, ge_file_type: str = "GE", use_area_zone: bool = False, base_area_zone_meet: bool = True, append: bool = False, export_format: str = "", use_data_maintainer: bool = False):
         """Saves elements in both base and present cases in GE EPC format."""
-        uaz = "YES" if use_area_zone else "NO"
-        baz = "YES" if base_area_zone_meet else "NO"
-        app = "YES" if append else "NO"
-        udm = "YES" if use_data_maintainer else "NO"
-        return self.RunScriptCommand(f'DiffCaseWriteBothEPC("{filename}", {ge_file_type}, {uaz}, {baz}, {app}, "{export_format}", {udm});')
+        uaz = YesNo.from_bool(use_area_zone)
+        baz = YesNo.from_bool(base_area_zone_meet)
+        app = YesNo.from_bool(append)
+        udm = YesNo.from_bool(use_data_maintainer)
+        args = pack_args(f'"{filename}"', ge_file_type, uaz, baz, app, f'"{export_format}"', udm)
+        return self.RunScriptCommand(f"DiffCaseWriteBothEPC({args});")
 
     def DiffCaseWriteNewEPC(self, filename: str, ge_file_type: str = "GE", use_area_zone: bool = False, base_area_zone_meet: bool = True, append: bool = False, use_data_maintainer: bool = False):
         """Saves new elements in GE EPC format."""
-        uaz = "YES" if use_area_zone else "NO"
-        baz = "YES" if base_area_zone_meet else "NO"
-        app = "YES" if append else "NO"
-        udm = "YES" if use_data_maintainer else "NO"
-        return self.RunScriptCommand(f'DiffCaseWriteNewEPC("{filename}", {ge_file_type}, {uaz}, {baz}, {app}, {udm});')
+        uaz = YesNo.from_bool(use_area_zone)
+        baz = YesNo.from_bool(base_area_zone_meet)
+        app = YesNo.from_bool(append)
+        udm = YesNo.from_bool(use_data_maintainer)
+        args = pack_args(f'"{filename}"', ge_file_type, uaz, baz, app, udm)
+        return self.RunScriptCommand(f"DiffCaseWriteNewEPC({args});")
 
     def DiffCaseWriteRemovedEPC(self, filename: str, ge_file_type: str = "GE", use_area_zone: bool = False, base_area_zone_meet: bool = True, append: bool = False, use_data_maintainer: bool = False):
         """Saves removed elements in GE EPC format."""
-        uaz = "YES" if use_area_zone else "NO"
-        baz = "YES" if base_area_zone_meet else "NO"
-        app = "YES" if append else "NO"
-        udm = "YES" if use_data_maintainer else "NO"
-        return self.RunScriptCommand(f'DiffCaseWriteRemovedEPC("{filename}", {ge_file_type}, {uaz}, {baz}, {app}, {udm});')
+        uaz = YesNo.from_bool(use_area_zone)
+        baz = YesNo.from_bool(base_area_zone_meet)
+        app = YesNo.from_bool(append)
+        udm = YesNo.from_bool(use_data_maintainer)
+        args = pack_args(f'"{filename}"', ge_file_type, uaz, baz, app, udm)
+        return self.RunScriptCommand(f"DiffCaseWriteRemovedEPC({args});")
 
     def DoCTGAction(self, action: str):
         """Applies a contingency action."""
