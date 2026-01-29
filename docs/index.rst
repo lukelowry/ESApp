@@ -1,28 +1,15 @@
-.. only:: html
+ESA++
+=====
 
-   .. include:: overview.rst
+An open-source Python toolkit for power system automation and analysis
+with PowerWorld Simulator.
 
-   .. toctree::
-      :maxdepth: 2
-      :caption: Contents
-      :hidden:
+.. toctree::
+   :maxdepth: 2
+   :caption: Contents
 
-      overview
-      guide/index
-      examples/examples
-      api/index
-      dev/index
-
-.. only:: latex
-
-   ESA++
-   =====
-
-   .. toctree::
-      :maxdepth: 2
-
-      overview
-      guide/index
-      examples/examples
-      api/index
-      dev/index
+   overview
+   guide/index
+   examples/examples
+   api/index
+   dev/index
