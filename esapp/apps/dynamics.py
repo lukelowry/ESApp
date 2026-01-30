@@ -41,7 +41,7 @@ Basic bus fault simulation::
     ...        .at(1.1).clear_fault("101"))
     >>>
     >>> meta, results = wb.dyn.solve("Bus_Fault")
-    >>> wb.dyn.plot(meta, results)
+    >>> plot_dynamics(meta, results)  # from plot_helpers
 
 See Also
 --------
@@ -53,7 +53,6 @@ import logging
 import os
 import re
 import numpy as np
-import matplotlib.pyplot as plt
 from enum import Enum
 from typing import List, Tuple, Dict, Union, Optional, Any, Type
 
@@ -572,77 +571,3 @@ class Dynamics(Indexable):
 
         return final_meta, final_data
 
-    def plot(self, meta: DataFrame, df: DataFrame, xlim: Optional[Tuple[float, float]] = None, **kwargs):
-        """
-        Plots simulation results grouped by Object and Metric.
-
-        Parameters
-        ----------
-        meta : DataFrame
-            Metadata DataFrame returned by solve().
-        df : DataFrame
-            Time-series DataFrame returned by solve().
-        xlim : tuple, optional
-            Tuple (min, max) for x-axis limits.
-        kwargs : dict
-            Additional arguments passed to plt.subplots().
-        """
-        if meta.empty or df.empty:
-            logger.warning("No results to plot.")
-            return
-
-        grouped = meta.groupby(['Object', 'Metric'])
-        n_groups = len(grouped)
-        
-        if n_groups == 0:
-            logger.warning("No data groups found to plot.")
-            return
-
-        if xlim is None:
-            xlim = (df.index.min(), df.index.max())
-
-        # Intelligent figure sizing
-        fig_height = max(n_groups * 3.0, 5)
-        fig, axes = plt.subplots(n_groups, 1, sharex=True,
-                                 figsize=(10, fig_height),
-                                 squeeze=False, **kwargs)
-        axes_flat = axes.flatten()
-
-        for ax, ((obj, metric), grp) in zip(axes_flat, grouped):
-            # Iterate through contingencies (Top level of MultiIndex columns)
-            ctg_list = df.columns.get_level_values(0).unique()
-            
-            for ctg in ctg_list:
-                # Subset data for this contingency
-                ctg_data = df[ctg]
-                
-                # Find columns in this contingency that match the current group (Object/Metric)
-                # matching_cols are the specific "ColHeader" strings (e.g., "Bus 5 | Volt")
-                matching_cols = grp.index.intersection(ctg_data.columns)
-                
-                for col in matching_cols:
-                    # Construct label safely
-                    id_a = grp.at[col, 'ID-A']
-                    id_b = grp.at[col, 'ID-B'] if 'ID-B' in grp.columns else None
-                    
-                    # Handle NaNs purely for string formatting
-                    id_a_str = str(id_a) if id_a is not None and str(id_a).lower() != 'nan' else ""
-                    id_b_str = str(id_b) if id_b is not None and str(id_b).lower() != 'nan' else ""
-                    
-                    label_parts = [p for p in [id_a_str, id_b_str] if p]
-                    lbl = " ".join(label_parts)
-                    
-                    plot_label = f"{ctg} | {lbl}" if lbl else ctg
-                    ax.plot(ctg_data.index, ctg_data[col], label=plot_label, linewidth=1.5)
-
-            ax.set_ylabel(f"{obj}\n{metric}", fontsize=10, fontweight='bold')
-            ax.grid(True, which='major', linestyle='-', linewidth=0.75, alpha=0.7)
-            ax.grid(True, which='minor', linestyle=':', linewidth=0.5, alpha=0.5)
-            ax.minorticks_on()
-            
-            if xlim:
-                ax.set_xlim(xlim)
-
-        axes_flat[-1].set_xlabel("Time (s)", fontsize=10, fontweight='bold')
-        plt.tight_layout(pad=2.0)
-        plt.show()

@@ -171,6 +171,7 @@ The ``Dynamics`` app provides a fluent interface for time-domain simulation.
 
     from esapp import GridWorkBench, TS
     from esapp.components import Gen, Bus
+    from plot_helpers import plot_dynamics
 
     wb = GridWorkBench("path/to/case.pwb")
 
@@ -186,4 +187,4 @@ The ``Dynamics`` app provides a fluent interface for time-domain simulation.
 
     # Solve and plot
     meta, results = wb.dyn.solve("BusFault")
-    wb.dyn.plot(meta, results)
+    plot_dynamics(meta, results)

@@ -40,9 +40,6 @@ from .dynamics import Dynamics, ContingencyBuilder, SimAction
 # Network Analysis
 from .network import Network, BranchType
 
-# Experimental
-from .modes import ForcedOscillation
-
 __all__ = [
     # GIC
     "GIC",
@@ -55,6 +52,4 @@ __all__ = [
     # Network
     "Network",
     "BranchType",
-    # Modes (experimental)
-    "ForcedOscillation",
 ]

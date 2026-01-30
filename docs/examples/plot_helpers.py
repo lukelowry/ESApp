@@ -777,6 +777,66 @@ def plot_b3d_components(LON, LAT, Ex, Ey, shape, suptitle='',
 # Dynamics
 # ---------------------------------------------------------------------------
 
+def plot_dynamics(meta, df, xlim=None, figsize_width=10, **kwargs):
+    """Plot transient stability results grouped by Object and Metric.
+
+    Parameters
+    ----------
+    meta : DataFrame
+        Metadata DataFrame returned by ``Dynamics.solve()``.
+    df : DataFrame
+        Time-series DataFrame returned by ``Dynamics.solve()``.
+    xlim : tuple, optional
+        (min, max) for x-axis limits.
+    figsize_width : float, default 10
+        Figure width in inches.
+    kwargs : dict
+        Additional arguments passed to ``plt.subplots()``.
+    """
+    if meta.empty or df.empty:
+        return
+
+    grouped = meta.groupby(['Object', 'Metric'])
+    n_groups = len(grouped)
+    if n_groups == 0:
+        return
+
+    if xlim is None:
+        xlim = (df.index.min(), df.index.max())
+
+    fig_height = max(n_groups * 3.0, 5)
+    fig, axes = plt.subplots(n_groups, 1, sharex=True,
+                             figsize=(figsize_width, fig_height),
+                             squeeze=False, **kwargs)
+    axes_flat = axes.flatten()
+
+    for ax, ((obj, metric), grp) in zip(axes_flat, grouped):
+        ctg_list = df.columns.get_level_values(0).unique()
+        for ctg in ctg_list:
+            ctg_data = df[ctg]
+            matching_cols = grp.index.intersection(ctg_data.columns)
+            for col in matching_cols:
+                id_a = grp.at[col, 'ID-A']
+                id_b = grp.at[col, 'ID-B'] if 'ID-B' in grp.columns else None
+                id_a_str = str(id_a) if id_a is not None and str(id_a).lower() != 'nan' else ""
+                id_b_str = str(id_b) if id_b is not None and str(id_b).lower() != 'nan' else ""
+                label_parts = [p for p in [id_a_str, id_b_str] if p]
+                lbl = " ".join(label_parts)
+                plot_label = f"{ctg} | {lbl}" if lbl else ctg
+                ax.plot(ctg_data.index, ctg_data[col], label=plot_label, linewidth=1.5)
+
+        ax.set_ylabel(f"{obj}\n{metric}", fontsize=10, fontweight='bold')
+        ax.grid(True, which='major', linestyle='-', linewidth=0.75, alpha=0.7)
+        ax.grid(True, which='minor', linestyle=':', linewidth=0.5, alpha=0.5)
+        ax.minorticks_on()
+        if xlim:
+            ax.set_xlim(xlim)
+
+    axes_flat[-1].set_xlabel("Time (s)", fontsize=10, fontweight='bold')
+    plt.tight_layout(pad=2.0)
+    plt.show()
+
+
 def plot_comparative_dynamics(ctg_names, all_results, figsize=None):
     """Stacked subplots of generator power for each contingency (multi-row)."""
     n = len(ctg_names)

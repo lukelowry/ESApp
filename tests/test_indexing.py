@@ -444,11 +444,11 @@ def test_setitem_broadcast_none_dataframe(indexable_instance: Indexable):
 
 
 def test_bulk_update_not_found_missing_identifiers(indexable_instance: Indexable):
-    """ValueError when bulk update fails with missing identifiers."""
+    """ValueError when bulk update fails with missing primary keys."""
     from esapp.saw import PowerWorldPrerequisiteError
     mock_esa = indexable_instance.esa
 
-    # Create a DataFrame missing the secondary identifier (GenID)
+    # Create a DataFrame missing the primary key (GenID)
     update_df = pd.DataFrame({
         "BusNum": [1, 2],
         "GenMW": [100.0, 200.0]
@@ -459,29 +459,35 @@ def test_bulk_update_not_found_missing_identifiers(indexable_instance: Indexable
         "Object not found in case"
     )
 
-    with pytest.raises(ValueError, match="Missing required identifier field"):
+    with pytest.raises(ValueError, match="Missing required primary key field"):
         indexable_instance[grid.Gen] = update_df
 
 
-def test_bulk_update_not_found_all_identifiers_present(indexable_instance: Indexable):
-    """PowerWorldPrerequisiteError re-raised when all identifiers present but still not found."""
+def test_bulk_update_not_found_all_keys_present_falls_back(indexable_instance: Indexable):
+    """When primary keys are present and Rect fails with 'not found',
+    falls back to ChangeParametersMultipleElement to create the objects."""
     from esapp.saw import PowerWorldPrerequisiteError
     mock_esa = indexable_instance.esa
 
-    # Create a DataFrame with ALL identifiers present (Gen has many secondary identifiers)
-    # We need to include all fields in grid.Gen.identifiers
-    all_identifiers = grid.Gen.identifiers
-    update_data = {field: [999, 1000] if field == "BusNum" else ["1", "1"] for field in all_identifiers}
-    update_data["GenMW"] = [100.0, 200.0]  # Add an editable field
-    update_df = pd.DataFrame(update_data)
+    # Create a DataFrame with all primary keys present
+    update_df = pd.DataFrame({
+        "BusNum": [999, 1000],
+        "GenID": ["1", "1"],
+        "GenMW": [100.0, 200.0],
+    })
 
     # Mock ChangeParametersMultipleElementRect to raise "not found" error
     mock_esa.ChangeParametersMultipleElementRect.side_effect = PowerWorldPrerequisiteError(
         "Object not found in case"
     )
 
-    with pytest.raises(PowerWorldPrerequisiteError, match="not found"):
-        indexable_instance[grid.Gen] = update_df
+    # The fallback ChangeParametersMultipleElement should be called instead of raising
+    indexable_instance[grid.Gen] = update_df
+
+    mock_esa.ChangeParametersMultipleElement.assert_called_once()
+    call_args = mock_esa.ChangeParametersMultipleElement.call_args
+    assert call_args[0][0] == "Gen"  # ObjectType
+    assert "BusNum" in call_args[0][1]  # field list includes keys
 
 
 def test_bulk_update_other_error(indexable_instance: Indexable):

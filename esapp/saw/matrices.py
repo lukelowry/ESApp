@@ -170,7 +170,7 @@ class MatrixMixin:
             os.unlink(g_matrix_path)
             os.unlink(id_file_path)
 
-    def get_jacobian(self, full: bool = False) -> Union[np.ndarray, csr_matrix]:
+    def get_jacobian(self, full: bool = False, form: str = 'R') -> Union[np.ndarray, csr_matrix]:
         """Get the power flow Jacobian matrix.
 
         This method calls the `SaveJacobian` script command to write the Jacobian
@@ -183,6 +183,9 @@ class MatrixMixin:
         full : bool, optional
             If True, returns a dense NumPy array. If False (default), returns a
             SciPy CSR sparse matrix.
+        form : str, optional
+            Jacobian coordinate form: 'R' for rectangular, 'P' for polar,
+            'DC' for B' matrix. Defaults to 'R'.
 
         Returns
         -------
@@ -198,12 +201,68 @@ class MatrixMixin:
         """
         jac_file_path, id_file_path = self._make_temp_matrix_files()
         try:
-            cmd = f'SaveJacobian("{jac_file_path}","{id_file_path}",M,R);'
+            cmd = f'SaveJacobian("{jac_file_path}","{id_file_path}",M,{form});'
             self.RunScriptCommand(cmd)
             with open(jac_file_path, "r") as f:
                 mat_str = f.read()
             sparse_matrix = self._parse_real_matrix(mat_str, "Jac")
             return sparse_matrix.toarray() if full else sparse_matrix
+        finally:
+            os.unlink(jac_file_path)
+            os.unlink(id_file_path)
+
+    def get_jacobian_with_ids(self, full: bool = False, form: str = 'R'):
+        """Get the power flow Jacobian matrix along with row/column ID mapping.
+
+        Returns both the Jacobian matrix and a list of identifiers describing
+        what each row/column represents (bus numbers and equation types).
+
+        Parameters
+        ----------
+        full : bool, optional
+            If True, returns a dense NumPy array. If False (default), returns a
+            SciPy CSR sparse matrix.
+        form : str, optional
+            Jacobian coordinate form: 'R' for rectangular, 'P' for polar,
+            'DC' for B' matrix. Defaults to 'R'.
+
+        Returns
+        -------
+        tuple
+            A tuple of (jacobian_matrix, row_ids) where:
+            - jacobian_matrix: The Jacobian as either dense array or sparse CSR matrix
+            - row_ids: List of strings describing each row/column
+        """
+        jac_file_path, id_file_path = self._make_temp_matrix_files()
+        try:
+            cmd = f'SaveJacobian("{jac_file_path}","{id_file_path}",M,{form});'
+            self.RunScriptCommand(cmd)
+
+            with open(jac_file_path, "r") as f:
+                mat_str = f.read()
+            sparse_matrix = self._parse_real_matrix(mat_str, "Jac")
+
+            with open(id_file_path, "r") as f:
+                id_content = f.read()
+
+            row_ids = []
+            lines = id_content.strip().split('\n')
+            for line in lines[1:]:
+                line = line.strip()
+                if not line:
+                    continue
+                parts = [p.strip() for p in line.split(',')]
+                if len(parts) >= 4:
+                    row_ids.append(parts[3])
+                elif len(parts) >= 3:
+                    row_ids.append(parts[2])
+                elif len(parts) >= 2:
+                    row_ids.append(parts[1])
+                else:
+                    row_ids.append(line)
+
+            matrix = sparse_matrix.toarray() if full else sparse_matrix
+            return matrix, row_ids
         finally:
             os.unlink(jac_file_path)
             os.unlink(id_file_path)

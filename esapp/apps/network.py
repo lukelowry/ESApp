@@ -36,7 +36,7 @@ import numpy as np
 from pandas import DataFrame, Series, concat
 from scipy.sparse import diags, coo_matrix, csc_matrix
 
-from ..components import Branch, Bus, DCTransmissionLine
+from ..components import Branch, Bus, DCTransmissionLine, Substation
 from ..indexable import Indexable
 
 __all__ = ['Network', 'BranchType']
@@ -310,3 +310,24 @@ class Network(Indexable):
         Y = AVG @ Ybus @ np.ones(Ybus.shape[0])
 
         return np.maximum(np.imag(np.sqrt(Z * Y)), min_delay)
+
+    def buscoords(self, astuple: bool = True):
+        """
+        Retrieve bus latitude and longitude from substation data.
+
+        Parameters
+        ----------
+        astuple : bool, default True
+            If True, return (Longitude, Latitude) Series tuple.
+            If False, return merged DataFrame.
+
+        Returns
+        -------
+        tuple of pd.Series or pd.DataFrame
+        """
+        A = self[Bus, "SubNum"]
+        S = self[Substation, ["SubNum", "Longitude", "Latitude"]]
+        LL = A.merge(S, on="SubNum")
+        if astuple:
+            return LL["Longitude"], LL["Latitude"]
+        return LL

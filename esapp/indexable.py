@@ -119,6 +119,24 @@ class Indexable:
         """
         Set grid data in PowerWorld using indexer notation.
 
+        Two write modes are supported:
+
+        **Case 1 — Bulk update** ``idx[GObject] = DataFrame``:
+            Sends every column in *value* to PowerWorld via
+            ``ChangeParametersMultipleElementRect``.  If the objects do
+            not yet exist (PowerWorld returns *"not found"*), the method
+            falls back to ``ChangeParametersMultipleElement`` which can
+            create new objects **provided the SAW instance was opened
+            with** ``CreateIfNotFound=True`` **and PowerWorld is in EDIT
+            mode** (see ``esa.EnterMode('EDIT')``).  If primary keys are
+            missing from the DataFrame, a ``ValueError`` is raised
+            immediately — secondary keys are *not* required.
+
+        **Case 2 — Broadcast update** ``idx[GObject, field(s)] = value``:
+            Reads existing objects' primary keys, appends *value* as new
+            column(s), and writes the result back.  This path only
+            *updates* existing objects; it never creates new ones.
+
         Parameters
         ----------
         args : Union[Type[GObject], Tuple[Type[GObject], Union[str, List[str]]]]
@@ -158,24 +176,50 @@ class Indexable:
         raise TypeError(f"Unsupported index for __setitem__: {args}")
 
     def _bulk_update_from_df(self, gtype: Type[GObject], df: DataFrame):
-        """Handles creating or overwriting objects from a complete DataFrame.
+        """Update (or create) objects from a DataFrame.
 
-        This corresponds to the use case: `wb.pw[ObjectType] = dataframe`.
+        Execution flow
+        --------------
+        1. Validate that every column is *settable* (key, secondary, or
+           editable).  Reject read-only fields early.
+        2. Call ``ChangeParametersMultipleElementRect`` — this is the fast
+           path that updates all rows in a single COM round-trip.
+        3. **If** the call raises ``PowerWorldPrerequisiteError`` with
+           *"not found"*:
+
+           a. Check whether the DataFrame contains all **primary keys**
+              (``gtype.keys``).  If any are missing, raise ``ValueError``
+              — we cannot identify/create objects without them.
+           b. Fall back to ``ChangeParametersMultipleElement`` which
+              iterates row-by-row.  When the SAW property
+              ``CreateIfNotFound`` is ``True`` **and** PowerWorld is in
+              **EDIT mode**, this variant creates objects that do not yet
+              exist.  *"not found"* messages from this call are silently
+              suppressed (they are expected for newly created rows).
+
+        4. Any *other* ``PowerWorldPrerequisiteError`` (not "not found")
+           is re-raised immediately.
+
+        Prerequisites for object creation
+        ----------------------------------
+        * ``SAW(path, CreateIfNotFound=True)``
+        * ``esa.EnterMode('EDIT')`` before the call
 
         Parameters
         ----------
         gtype : Type[GObject]
             The GObject subclass representing the type of objects to update.
         df : pandas.DataFrame
-            The DataFrame containing object data. Columns must match PowerWorld
-            field names, including primary keys.
+            The DataFrame containing object data.  Must include all
+            primary key columns (``gtype.keys``).
 
         Raises
         ------
         TypeError
-            If value is not a DataFrame.
+            If *df* is not a DataFrame.
         ValueError
-            If any column is not settable (keys or editable fields).
+            If any column is not settable, or if primary keys are missing
+            when object creation is required.
         """
         if not isinstance(df, DataFrame):
             raise TypeError("A DataFrame is required for bulk updates.")
@@ -190,15 +234,26 @@ class Indexable:
         try:
             self.esa.ChangeParametersMultipleElementRect(gtype.TYPE, df.columns.tolist(), df)
         except PowerWorldPrerequisiteError as e:
-            # If objects not found, check if missing identifiers could be the cause
             if "not found" in str(e).lower():
-                missing_identifiers = gtype.identifiers - set(df.columns)
-                if missing_identifiers:
+                missing_keys = set(gtype.keys) - set(df.columns)
+                if missing_keys:
                     raise ValueError(
-                        f"Missing required identifier field(s) for {gtype.TYPE}: {missing_identifiers}. "
-                        f"All identifiers (primary and secondary keys) must be included to create new objects."
+                        f"Missing required primary key field(s) for {gtype.TYPE}: {missing_keys}. "
+                        f"All primary keys must be included to create new objects."
                     ) from e
-            raise
+                # Primary keys present — fall back to
+                # ChangeParametersMultipleElement which creates objects
+                # that do not yet exist.  The "not found" message from
+                # this call is expected and suppressed.
+                cols = df.columns.tolist()
+                values = df.values.tolist()
+                try:
+                    self.esa.ChangeParametersMultipleElement(gtype.TYPE, cols, values)
+                except PowerWorldPrerequisiteError as create_err:
+                    if 'not found' not in str(create_err).lower():
+                        raise
+            else:
+                raise
 
     def _broadcast_update_to_fields(self, gtype: Type[GObject], fields: list[str], value):
         """Modifies specific fields for existing objects by broadcasting a value.

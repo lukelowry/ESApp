@@ -88,7 +88,7 @@ def saw_session():
     print(f"\n[Session Setup] Connecting to PowerWorld with case: {case_path}")
     saw = None
     try:
-        saw = SAW(case_path, early_bind=True)
+        saw = SAW(case_path, CreateIfNotFound=True, early_bind=True)
         yield saw
     finally:
         print("\n[Session Teardown] Closing case and exiting PowerWorld...")
