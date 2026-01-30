@@ -90,18 +90,6 @@ class TestGridWorkBenchFunctions:
         wb.edit_mode()
         wb.run_mode()
 
-    def test_file_operations(self, wb, temp_file):
-        """Tests load_aux, load_script."""
-        tmp_aux = temp_file(".aux")
-        with open(tmp_aux, 'w') as f:
-            f.write('DATA (Bus, [BusNum, BusName]) { 1 "Bus 1" }')
-        wb.load_aux(tmp_aux)
-        
-        tmp_script = temp_file(".aux")
-        with open(tmp_script, 'w') as f:
-            f.write('SCRIPT { LogAdd("Script Test"); }')
-        wb.load_script(tmp_script)
-
     # -------------------------------------------------------------------------
     # Data Retrieval
     # -------------------------------------------------------------------------
@@ -175,15 +163,6 @@ class TestGridWorkBenchFunctions:
             
         wb.scale_load(1.0)
         wb.scale_gen(1.0)
-        
-        # Create/Delete (Use dummy ID)
-        wb.create("Load", BusNum=1, LoadID="99", LoadMW=5.0)
-        wb.delete("Load", "LoadID = '99'")
-        
-        # Select/Unselect
-        wb.select("Bus", "BusNum < 10")
-        wb.unselect("Bus")
-
 
 
     # -------------------------------------------------------------------------
@@ -244,7 +223,6 @@ class TestGridWorkBenchFunctions:
         # Fault - wrap in try/except since clear_fault may fail if no fault exists
         try:
             wb.fault(1)
-            wb.clear_fault()
         except PowerWorldError:
             pass  # Fault operations may fail depending on case state
 
@@ -273,10 +251,6 @@ class TestGridWorkBenchFunctions:
         # YBus
         Y = wb.ybus()
         assert Y.shape[0] > 0
-
-    def test_reset(self, wb):
-        """Tests reset() alias for flatstart()."""
-        wb.reset()
 
     def test_print_log(self, wb):
         """Tests print_log() with all parameter combinations."""
@@ -328,22 +302,6 @@ class TestGridWorkBenchFunctions:
         assert Yt.shape[0] > 0
         assert Yf.shape == Yt.shape
 
-    def test_shunt_admittance(self, wb):
-        """Tests shunt_admittance()."""
-        Ysh = wb.shunt_admittance()
-        assert len(Ysh) > 0
-        assert np.iscomplexobj(Ysh)
-
-    def test_incidence_matrix(self, wb):
-        """Tests incidence_matrix()."""
-        A = wb.incidence_matrix()
-        assert A.shape[0] > 0
-        assert A.shape[1] > 0
-        # Each row should have exactly one +1 and one -1
-        for i in range(A.shape[0]):
-            assert np.sum(A[i] == 1) == 1
-            assert np.sum(A[i] == -1) == 1
-
     def test_jacobian(self, wb):
         """Tests jacobian()."""
         wb.pflow(getvolts=False)
@@ -352,14 +310,6 @@ class TestGridWorkBenchFunctions:
             assert J.shape[0] > 0
         except Exception:
             pytest.skip("Jacobian not available")
-
-    def test_gmatrix(self, wb):
-        """Tests gmatrix()."""
-        try:
-            G = wb.gmatrix()
-            assert G.shape[0] > 0
-        except Exception:
-            pytest.skip("GIC G-matrix not available")
 
     def test_buscoords_as_dataframe(self, wb):
         """Tests buscoords(astuple=False)."""
@@ -391,14 +341,7 @@ class TestGridWorkBenchFunctions:
             wb.gic_storm(max_field=1.0, direction=90.0, solve_pf=False)
         except Exception:
             pytest.skip("GIC storm not available")
-
-    def test_gic_clear(self, wb):
-        """Tests gic_clear()."""
-        try:
-            wb.gic_clear()
-        except Exception:
-            pytest.skip("GIC clear not available")
-
+            
     def test_gic_load_b3d(self, wb):
         """Tests gic_load_b3d()."""
         try:

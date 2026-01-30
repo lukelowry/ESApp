@@ -205,7 +205,7 @@ class TestGICGMatrix:
             pytest.skip(f"Could not generate GIC model: {e}")
 
         try:
-            G_powerworld = gic.gmatrix_from_powerworld(sparse=True)
+            G_powerworld = gic.gmatrix(sparse=True)
         except Exception as e:
             pytest.skip(f"Could not retrieve PowerWorld G-matrix: {e}")
 

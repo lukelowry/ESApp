@@ -32,13 +32,23 @@ _H2 = 2.8          # two-panel row height
 _W3 = 6.5          # three-panel row width
 _H3 = 2.5          # three-panel row height
 _WFULL = 6.5       # full page width
-_GEO_W = 5.0       # geographic map single-panel width
-_GEO_H = 4.0       # geographic map single-panel height
-_GEO_LG_W = 5.5    # geographic map with overlay width
-_GEO_LG_H = 4.5    # geographic map with overlay height
 
 # Font sizes for multi-panel (3+) plots to avoid title crowding
 _FS3 = dict(titlesize=10, labelsize=9, ticksize=8)
+_FS2 = dict(titlesize=11, labelsize=9, ticksize=8)
+
+# ---------------------------------------------------------------------------
+# Professional color palette
+# ---------------------------------------------------------------------------
+_C1 = '#4C72B0'     # primary blue
+_C2 = '#DD8452'     # secondary orange
+_C3 = '#55A868'     # tertiary green
+_C4 = '#C44E52'     # accent red
+_C5 = '#8172B3'     # purple
+_C6 = '#CCB974'     # yellow
+_C7 = '#64B5CD'     # cyan
+_CG = '#8C8C8C'     # gray
+_LIMIT = '#C44E52'  # limit/warning lines
 
 
 # ---------------------------------------------------------------------------
@@ -46,8 +56,10 @@ _FS3 = dict(titlesize=10, labelsize=9, ticksize=8)
 # ---------------------------------------------------------------------------
 
 def plot_barh_top(values, labels=None, n=20, title='', xlabel='', ylabel='',
-                  color='steelblue', figsize=(_WFULL, 3.5), ax=None):
+                  color=None, figsize=(_WFULL, 3.5), ax=None):
     """Horizontal bar chart of the top-*n* items sorted descending."""
+    if color is None:
+        color = _C1
     top = values[:n] if len(values) <= n else values.sort_values(ascending=False).head(n)
     if labels is None:
         labels = [f'{i+1}' for i in range(len(top))]
@@ -67,24 +79,31 @@ def plot_barh_top(values, labels=None, n=20, title='', xlabel='', ylabel='',
 
 
 def plot_dual_bar(values_a, values_b, label_a='A', label_b='B',
-                  xlabel='Index', ylabel='Value', title='', figsize=(_W2, _H2)):
+                  xlabel='Index', ylabel='Value', title='',
+                  figsize=(_W2, _H2), ax=None):
     """Grouped bar chart comparing two datasets side-by-side."""
-    fig, ax = plt.subplots(figsize=figsize)
+    show = ax is None
+    if ax is None:
+        fig, ax = plt.subplots(figsize=figsize)
     x = range(len(values_a))
     width = 0.35
     ax.bar([i - width / 2 for i in x], values_a, width,
-           label=label_a, color='steelblue', alpha=0.8)
+           label=label_a, color=_C1, alpha=0.85)
     ax.bar([i + width / 2 for i in x], values_b, width,
-           label=label_b, color='tomato', alpha=0.8)
+           label=label_b, color=_C2, alpha=0.85)
     format_plot(ax, title=title, xlabel=xlabel, ylabel=ylabel, plotarea='white')
-    ax.legend()
-    plt.tight_layout()
-    plt.show()
+    ax.legend(fontsize=8)
+    if show:
+        plt.tight_layout()
+        plt.show()
+    return ax
 
 
 def plot_hist(values, bins=20, title='', xlabel='', ylabel='Count',
-              color='steelblue', ax=None):
+              color=None, ax=None):
     """Simple histogram with white edge on bars."""
+    if color is None:
+        color = _C1
     show = ax is None
     if ax is None:
         fig, ax = plt.subplots(figsize=(_W1, _H1))
@@ -101,131 +120,149 @@ def plot_hist(values, bins=20, title='', xlabel='', ylabel='Count',
 # ---------------------------------------------------------------------------
 
 def plot_voltage_profile(vmag, vang=None, figsize=(_W2, _H2)):
-    """Scatter of bus voltage magnitudes (with optional angle stem plot)."""
-    ncols = 2 if vang is not None else 1
-    if ncols == 1:
-        figsize = (_W1, _H1)
-    fig, axes = plt.subplots(1, ncols, figsize=figsize)
-    if ncols == 1:
-        axes = [axes]
+    """Scatter of bus voltage magnitudes + angle stem plot (always 2-panel)."""
+    fig, axes = plt.subplots(1, 2, figsize=figsize)
 
-    axes[0].scatter(range(len(vmag)), vmag, c='steelblue', s=20, edgecolors='white')
-    axes[0].axhline(y=0.95, color='red', linestyle='--', alpha=0.7, label='0.95 pu limit')
-    axes[0].axhline(y=1.05, color='red', linestyle='--', alpha=0.7, label='1.05 pu limit')
-    axes[0].axhline(y=1.0, color='grey', linestyle='-', alpha=0.3)
-    format_plot(axes[0], title='Bus Voltage Profile',
-                xlabel='Bus Index', ylabel='Voltage Magnitude (pu)',
-                plotarea='white')
-    axes[0].legend(fontsize=8)
+    axes[0].scatter(range(len(vmag)), vmag, c=_C1, s=18, edgecolors='white',
+                    linewidth=0.4)
+    axes[0].axhline(y=0.95, color=_LIMIT, linestyle='--', alpha=0.7, label='0.95 pu')
+    axes[0].axhline(y=1.05, color=_LIMIT, linestyle='--', alpha=0.7, label='1.05 pu')
+    axes[0].axhline(y=1.0, color=_CG, linestyle='-', alpha=0.3)
+    format_plot(axes[0], title='Voltage Magnitude',
+                xlabel='Bus Index', ylabel='Voltage (pu)',
+                plotarea='white', **_FS2)
+    axes[0].legend(fontsize=7)
 
     if vang is not None:
-        axes[1].stem(range(len(vang)), vang, linefmt='steelblue', markerfmt='o', basefmt=' ')
-        format_plot(axes[1], title='Bus Voltage Angles',
-                    xlabel='Bus Index', ylabel='Voltage Angle (degrees)',
-                    plotarea='white')
+        axes[1].stem(range(len(vang)), vang, linefmt=_C1, markerfmt='o', basefmt=' ')
+        format_plot(axes[1], title='Voltage Angles',
+                    xlabel='Bus Index', ylabel='Angle (deg)',
+                    plotarea='white', **_FS2)
+    else:
+        axes[1].hist(vmag, bins=20, color=_C1, edgecolor='white')
+        format_plot(axes[1], title='Voltage Distribution',
+                    xlabel='Voltage (pu)', ylabel='Count',
+                    plotarea='white', **_FS2)
 
     plt.tight_layout()
     plt.show()
 
 
-def plot_branch_loading(branches_loaded, figsize=(5.5, 3.5)):
-    """Horizontal bar chart of most-loaded branches."""
-    fig, ax = plt.subplots(figsize=figsize)
+def plot_branch_loading(branches_loaded, figsize=(_W2, _H2)):
+    """Branch loading bar chart + loading histogram (2-panel)."""
+    fig, axes = plt.subplots(1, 2, figsize=figsize)
+
     labels = [f"{int(r['BusNum'])}-{int(r['BusNum:1'])}" for _, r in branches_loaded.iterrows()]
-    ax.barh(range(len(branches_loaded)), branches_loaded['LinePercent'].values,
-            color='steelblue')
-    ax.set_yticks(range(len(branches_loaded)))
-    ax.set_yticklabels(labels)
-    ax.invert_yaxis()
-    ax.axvline(x=100, color='red', linestyle='--', alpha=0.7, label='100% limit')
-    format_plot(ax, title='Top 15 Most Loaded Branches',
-                xlabel='Loading (%)', plotarea='white')
-    ax.legend(fontsize=8)
+    axes[0].barh(range(len(branches_loaded)), branches_loaded['LinePercent'].values,
+                 color=_C1)
+    axes[0].set_yticks(range(len(branches_loaded)))
+    axes[0].set_yticklabels(labels, fontsize=7)
+    axes[0].invert_yaxis()
+    axes[0].axvline(x=100, color=_LIMIT, linestyle='--', alpha=0.7, label='100%')
+    format_plot(axes[0], title='Most Loaded Branches',
+                xlabel='Loading (%)', plotarea='white', **_FS2)
+    axes[0].legend(fontsize=7)
+
+    axes[1].hist(branches_loaded['LinePercent'].values, bins=15,
+                 color=_C1, edgecolor='white')
+    axes[1].axvline(x=100, color=_LIMIT, linestyle='--', alpha=0.7)
+    format_plot(axes[1], title='Loading Distribution',
+                xlabel='Loading (%)', ylabel='Count',
+                plotarea='white', **_FS2)
+
     plt.tight_layout()
     plt.show()
 
 
 def plot_gen_dispatch_and_voltage(online_gens, bus_data, figsize=(_W2, _H2)):
-    """Generator MW bar chart + bus voltage scatter."""
+    """Generator MW bar chart + bus voltage scatter (2-panel)."""
     fig, axes = plt.subplots(1, 2, figsize=figsize)
 
     gen_mw = online_gens.sort_values('GenMW', ascending=True)
-    axes[0].barh(range(len(gen_mw)), gen_mw['GenMW'].values, color='steelblue')
+    axes[0].barh(range(len(gen_mw)), gen_mw['GenMW'].values, color=_C1)
     axes[0].set_yticks(range(len(gen_mw)))
-    axes[0].set_yticklabels([f"Bus {b}" for b in gen_mw['BusNum']])
-    format_plot(axes[0], title='Generator Active Power Dispatch',
-                xlabel='MW Output', plotarea='white')
+    axes[0].set_yticklabels([f"Bus {b}" for b in gen_mw['BusNum']], fontsize=7)
+    format_plot(axes[0], title='Generator Dispatch',
+                xlabel='MW Output', plotarea='white', **_FS2)
 
     axes[1].scatter(bus_data['BusNum'], bus_data['BusPUVolt'],
-                    c='steelblue', s=30, edgecolors='white')
-    axes[1].axhline(y=0.95, color='red', linestyle='--', alpha=0.5, label='0.95 pu')
-    axes[1].axhline(y=1.05, color='red', linestyle='--', alpha=0.5, label='1.05 pu')
+                    c=_C1, s=25, edgecolors='white', linewidth=0.4)
+    axes[1].axhline(y=0.95, color=_LIMIT, linestyle='--', alpha=0.5, label='0.95 pu')
+    axes[1].axhline(y=1.05, color=_LIMIT, linestyle='--', alpha=0.5, label='1.05 pu')
     format_plot(axes[1], title='Bus Voltage Profile',
-                xlabel='Bus Number', ylabel='Voltage (pu)', plotarea='white')
-    axes[1].legend(fontsize=8)
+                xlabel='Bus Number', ylabel='Voltage (pu)',
+                plotarea='white', **_FS2)
+    axes[1].legend(fontsize=7)
 
     plt.tight_layout()
     plt.show()
 
 
-def plot_gen_load_balance(total_gen, total_load, figsize=(4.5, 3)):
+def plot_gen_load_balance(total_gen, total_load, ax=None, figsize=(4.5, 3)):
     """Bar chart comparing total generation vs. total load."""
-    fig, ax = plt.subplots(figsize=figsize)
+    show = ax is None
+    if ax is None:
+        fig, ax = plt.subplots(figsize=figsize)
     bars = ax.bar(['Generation', 'Load'], [total_gen, total_load],
-                  color=['steelblue', 'tomato'])
-    format_plot(ax, title='System Generation vs Load Balance',
-                ylabel='MW', plotarea='white')
+                  color=[_C1, _C2])
+    format_plot(ax, title='Generation vs Load Balance',
+                ylabel='MW', plotarea='white', **_FS2)
     for bar, val in zip(bars, [total_gen, total_load]):
         ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 1,
-                f'{val:.1f}', ha='center', va='bottom', fontsize=9)
-    plt.tight_layout()
-    plt.show()
+                f'{val:.1f}', ha='center', va='bottom', fontsize=8)
+    if show:
+        plt.tight_layout()
+        plt.show()
+    return ax
 
 
 def plot_contingency_results(violations, figsize=(_W2, _H2)):
-    """Bar chart of violations per contingency + histogram."""
+    """Bar chart of violations per contingency + histogram (2-panel)."""
     if len(violations) == 0 or 'Contingency' not in violations.columns:
         return
     ctg_counts = violations['Contingency'].value_counts().head(15)
 
     fig, axes = plt.subplots(1, 2, figsize=figsize)
 
-    axes[0].barh(range(len(ctg_counts)), ctg_counts.values, color='steelblue')
+    axes[0].barh(range(len(ctg_counts)), ctg_counts.values, color=_C1)
     axes[0].set_yticks(range(len(ctg_counts)))
     axes[0].set_yticklabels(ctg_counts.index, fontsize=7)
     axes[0].invert_yaxis()
-    format_plot(axes[0], title='Top 15 Contingencies by Violation Count',
-                xlabel='Number of Violations', plotarea='white')
+    format_plot(axes[0], title='Top Contingencies',
+                xlabel='Number of Violations', plotarea='white', **_FS2)
 
     axes[1].hist(violations.groupby('Contingency').size(), bins=20,
-                 color='steelblue', edgecolor='white')
-    format_plot(axes[1], title='Distribution of Violations',
+                 color=_C1, edgecolor='white')
+    format_plot(axes[1], title='Violation Distribution',
                 xlabel='Violations per Contingency', ylabel='Count',
-                plotarea='white')
+                plotarea='white', **_FS2)
 
     plt.tight_layout()
     plt.show()
 
 
-def plot_pv_curve(mw_points, v_points, figsize=(_W1, _H1)):
+def plot_pv_curve(mw_points, v_points, ax=None, figsize=(_W1, _H1)):
     """PV curve with nose point marker."""
     if not mw_points:
         return
-    fig, ax = plt.subplots(figsize=figsize)
-    ax.plot(mw_points, v_points, 'o-', color='steelblue', markersize=3)
+    show = ax is None
+    if ax is None:
+        fig, ax = plt.subplots(figsize=figsize)
+    ax.plot(mw_points, v_points, 'o-', color=_C1, markersize=3)
 
     nose_idx = np.argmax(mw_points)
-    ax.plot(mw_points[nose_idx], v_points[nose_idx], 'r*', markersize=12,
-            label=f'Nose point: {mw_points[nose_idx]:.0f} MW')
+    ax.plot(mw_points[nose_idx], v_points[nose_idx], '*', color=_C4,
+            markersize=12, label=f'Nose: {mw_points[nose_idx]:.0f} MW')
 
-    ax.axhline(y=0.95, color='red', linestyle='--', alpha=0.5, label='0.95 pu limit')
-    format_plot(ax, title='PV Curve (Voltage Stability)',
-                xlabel='Interface Transfer (MW)',
-                ylabel='Critical Bus Voltage (pu)',
-                plotarea='white')
-    ax.legend(fontsize=8)
-    plt.tight_layout()
-    plt.show()
+    ax.axhline(y=0.95, color=_LIMIT, linestyle='--', alpha=0.5, label='0.95 pu')
+    format_plot(ax, title='PV Curve',
+                xlabel='Transfer (MW)', ylabel='Voltage (pu)',
+                plotarea='white', **_FS2)
+    ax.legend(fontsize=7)
+    if show:
+        plt.tight_layout()
+        plt.show()
+    return ax
 
 
 # ---------------------------------------------------------------------------
@@ -234,122 +271,143 @@ def plot_pv_curve(mw_points, v_points, figsize=(_W1, _H1)):
 
 def plot_spy_matrices(matrices, titles, figsize=None, markersize=3, colors=None):
     """Side-by-side spy() plots for one or more sparse matrices."""
-    n = len(matrices)
+    n = max(len(matrices), 2)
     if figsize is None:
         figsize = (min(_WFULL, 3.2 * n), _H2)
     if colors is None:
-        colors = ['steelblue'] * n
+        colors = [_C1, _C2, _C3, _C5, _C6, _C7][:len(matrices)]
     fig, axes = plt.subplots(1, n, figsize=figsize)
     if n == 1:
         axes = [axes]
-    fs = _FS3 if n >= 3 else {}
+    fs = _FS3 if n >= 3 else _FS2
     for ax, M, t, c in zip(axes, matrices, titles, colors):
         ax.spy(M, markersize=markersize, color=c)
         format_plot(ax, title=t, plotarea='white', grid=False, **fs)
+    for j in range(len(matrices), n):
+        axes[j].set_visible(False)
     plt.tight_layout()
     plt.show()
 
 
 def plot_ybus_analysis(Y, figsize=(_W2, _H2)):
-    """Y-Bus sparsity pattern + eigenvalue spectrum."""
+    """Y-Bus sparsity pattern + eigenvalue spectrum (2-panel)."""
     fig, axes = plt.subplots(1, 2, figsize=figsize)
 
-    axes[0].spy(Y, markersize=3, color='steelblue')
-    format_plot(axes[0], title=f'Y-Bus Sparsity Pattern\n{Y.shape}, nnz={Y.nnz}',
-                plotarea='white', grid=False)
+    axes[0].spy(Y, markersize=3, color=_C1)
+    format_plot(axes[0], title=f'Y-Bus Sparsity\n{Y.shape}, nnz={Y.nnz}',
+                plotarea='white', grid=False, **_FS2)
 
     eig_Y = np.linalg.eigvals(Y.toarray())
-    axes[1].scatter(eig_Y.real, eig_Y.imag, s=15, c='steelblue', edgecolors='white')
-    axes[1].axhline(y=0, color='grey', linewidth=0.5)
-    axes[1].axvline(x=0, color='grey', linewidth=0.5)
-    format_plot(axes[1], title='Y-Bus Eigenvalue Spectrum',
-                xlabel='Real', ylabel='Imaginary', plotarea='white')
+    axes[1].scatter(eig_Y.real, eig_Y.imag, s=15, c=_C1, edgecolors='white',
+                    linewidth=0.4)
+    axes[1].axhline(y=0, color=_CG, linewidth=0.5)
+    axes[1].axvline(x=0, color=_CG, linewidth=0.5)
+    format_plot(axes[1], title='Eigenvalue Spectrum',
+                xlabel='Real', ylabel='Imaginary',
+                plotarea='white', **_FS2)
 
     plt.tight_layout()
     plt.show()
 
 
 def plot_incidence_and_degree(A, figsize=(_W2, _H2)):
-    """Incidence matrix spy + bus degree bar chart."""
+    """Incidence matrix spy + bus degree bar chart (2-panel)."""
     fig, axes = plt.subplots(1, 2, figsize=figsize)
 
-    axes[0].spy(A, markersize=2, color='steelblue')
+    axes[0].spy(A, markersize=2, color=_C1)
     format_plot(axes[0], title=f'Incidence Matrix\n{A.shape}',
                 xlabel='Bus index', ylabel='Branch index',
-                plotarea='white', grid=False)
+                plotarea='white', grid=False, **_FS2)
 
     degrees = np.abs(A).T @ np.ones(A.shape[0])
-    axes[1].bar(range(len(degrees)), degrees, color='steelblue')
+    axes[1].bar(range(len(degrees)), degrees, color=_C1)
     format_plot(axes[1], title='Bus Degree Distribution',
-                xlabel='Bus index', ylabel='Degree', plotarea='white')
+                xlabel='Bus index', ylabel='Degree',
+                plotarea='white', **_FS2)
 
     plt.tight_layout()
     plt.show()
 
 
 def plot_incidence_and_laplacian(A, figsize=(_W2, _H2)):
-    """Incidence matrix spy + |A.T @ A| image."""
+    """Incidence matrix spy + |A^T A| image (2-panel)."""
     fig, axes = plt.subplots(1, 2, figsize=figsize)
 
-    axes[0].spy(A, markersize=2, color='steelblue')
+    axes[0].spy(A, markersize=2, color=_C1)
     format_plot(axes[0], title=f'Incidence Matrix\n{A.shape}',
                 xlabel='Bus index', ylabel='Branch index',
-                plotarea='white', grid=False)
+                plotarea='white', grid=False, **_FS2)
 
     L_unw = (A.T @ A).toarray()
     axes[1].imshow(np.abs(L_unw), cmap='Blues', aspect='auto')
-    format_plot(axes[1], title='|A.T @ A| (Unweighted Laplacian)',
+    format_plot(axes[1], title='|A\u1d40A| (Unweighted Laplacian)',
                 xlabel='Bus index', ylabel='Bus index',
-                plotarea='white', grid=False)
+                plotarea='white', grid=False, **_FS2)
 
+    plt.axis('equal')
     plt.tight_layout()
     plt.show()
 
 
 def plot_eigenspectrum(eigenvalue_sets, titles, figsize=None):
-    """Stem plots of one or more eigenvalue arrays."""
-    n = len(eigenvalue_sets)
+    """Stem plots of eigenvalue arrays (always >= 2 panels)."""
+    n = max(len(eigenvalue_sets), 2)
     if figsize is None:
         figsize = (min(_WFULL, 3.2 * n), _H2)
     fig, axes = plt.subplots(1, n, figsize=figsize)
     if n == 1:
         axes = [axes]
-    fs = _FS3 if n >= 3 else {}
+    fs = _FS3 if n >= 3 else _FS2
     for ax, vals, t in zip(axes, eigenvalue_sets, titles):
         ax.stem(vals, basefmt=' ')
         format_plot(ax, title=t, xlabel='Index', ylabel='Eigenvalue',
                     plotarea='white', **fs)
+    for j in range(len(eigenvalue_sets), n):
+        axes[j].set_visible(False)
     plt.tight_layout()
     plt.show()
 
 
-def plot_fiedler(fiedler, figsize=(5, 3)):
-    """Fiedler vector bar chart colored by sign."""
-    fig, ax = plt.subplots(figsize=figsize)
-    colors = ['steelblue' if v >= 0 else 'tomato' for v in fiedler]
-    ax.bar(range(len(fiedler)), fiedler, color=colors)
-    format_plot(ax, title='Fiedler Vector (Natural Network Partition)',
-                xlabel='Bus index', ylabel='Fiedler component', plotarea='white')
-    ax.axhline(y=0, color='black', linewidth=0.5)
+def plot_fiedler(fiedler, figsize=(_W2, _H2)):
+    """Fiedler vector bar chart colored by sign + partition histogram (2-panel)."""
+    fig, axes = plt.subplots(1, 2, figsize=figsize)
+
+    colors = [_C1 if v >= 0 else _C2 for v in fiedler]
+    axes[0].bar(range(len(fiedler)), fiedler, color=colors)
+    axes[0].axhline(y=0, color='black', linewidth=0.5)
+    format_plot(axes[0], title='Fiedler Vector (Network Partition)',
+                xlabel='Bus index', ylabel='Fiedler component',
+                plotarea='white', **_FS2)
+
+    axes[1].hist(fiedler, bins=15, color=_C1, edgecolor='white')
+    axes[1].axvline(x=0, color='black', linewidth=0.5)
+    n_pos = sum(1 for v in fiedler if v >= 0)
+    n_neg = len(fiedler) - n_pos
+    axes[1].set_title(f'Partition: {n_pos} vs {n_neg} buses', fontsize=11)
+    format_plot(axes[1], xlabel='Component value', ylabel='Count',
+                plotarea='white', **_FS2)
+
     plt.tight_layout()
     plt.show()
 
 
 def plot_histograms(datasets, titles, xlabels, colors=None, bins=25, figsize=None):
-    """Side-by-side histograms."""
-    n = len(datasets)
+    """Side-by-side histograms (always >= 2 panels)."""
+    n = max(len(datasets), 2)
     if figsize is None:
         figsize = (min(_WFULL, 3.2 * n), _H2)
     if colors is None:
-        colors = ['steelblue', 'tomato', 'seagreen', 'goldenrod'][:n]
+        colors = [_C1, _C2, _C3, _C6][:len(datasets)]
     fig, axes = plt.subplots(1, n, figsize=figsize)
     if n == 1:
         axes = [axes]
-    fs = _FS3 if n >= 3 else {}
+    fs = _FS3 if n >= 3 else _FS2
     for ax, data, t, xl, c in zip(axes, datasets, titles, xlabels, colors):
         ax.hist(data, bins=bins, color=c, edgecolor='white')
         format_plot(ax, title=t, xlabel=xl, ylabel='Count',
                     plotarea='white', **fs)
+    for j in range(len(datasets), n):
+        axes[j].set_visible(False)
     plt.tight_layout()
     plt.show()
 
@@ -358,21 +416,21 @@ def plot_histograms(datasets, titles, xlabels, colors=None, bins=25, figsize=Non
 # Direction sensitivity (GIC)
 # ---------------------------------------------------------------------------
 
-def plot_direction_sensitivity(directions, max_gics, title='Max GIC vs. Storm Direction',
-                               figsize=(_W2, 3)):
-    """Line plot + polar plot of GIC vs. storm direction."""
+def plot_direction_sensitivity(directions, max_gics, title='Max GIC vs Direction',
+                               figsize=(_W2, 2.8)):
+    """Line plot + polar plot of GIC vs. storm direction (2-panel)."""
     fig = plt.figure(figsize=figsize)
 
     ax1 = fig.add_subplot(121)
-    ax1.plot(directions, max_gics, 'o-', color='steelblue', markersize=3)
+    ax1.plot(directions, max_gics, 'o-', color=_C1, markersize=3)
     format_plot(ax1, title=title,
-                xlabel='Storm Direction (degrees from North)',
-                ylabel='Max |GIC| (Amps)', plotarea='white')
+                xlabel='Direction (deg from N)',
+                ylabel='Max |GIC| (A)', plotarea='white', **_FS2)
 
     ax2 = fig.add_subplot(122, projection='polar')
     theta = np.radians(directions)
-    ax2.plot(theta, max_gics, 'o-', color='tomato', markersize=3)
-    ax2.set_title('GIC Polar Response', pad=15, fontsize=10)
+    ax2.plot(theta, max_gics, 'o-', color=_C2, markersize=3)
+    ax2.set_title('Polar Response', pad=15, fontsize=10)
 
     plt.tight_layout()
     plt.show()
@@ -382,23 +440,26 @@ def plot_direction_sensitivity(directions, max_gics, title='Max GIC vs. Storm Di
     print(f"Worst-case max GIC: {max_gics.max():.2f} Amps")
 
 
-def plot_direction_profiles(directions, gic_profiles, labels, figsize=(_W2, 3)):
-    """Multi-transformer direction sensitivity: line + polar."""
+def plot_direction_profiles(directions, gic_profiles, labels, figsize=(_W2, 2.8)):
+    """Multi-transformer direction sensitivity: line + polar (2-panel)."""
     fig, axes = plt.subplots(1, 2, figsize=figsize)
 
+    pal = [_C1, _C2, _C3, _C4, _C5]
     for j, lbl in enumerate(labels):
-        axes[0].plot(directions, gic_profiles[:, j], label=lbl)
-    format_plot(axes[0], title='Top Transformer GIC vs. Storm Direction',
-                xlabel='Direction (deg from N)', ylabel='|GIC| (Amps)',
-                plotarea='white')
+        axes[0].plot(directions, gic_profiles[:, j], label=lbl,
+                     color=pal[j % len(pal)])
+    format_plot(axes[0], title='Transformer GIC vs Direction',
+                xlabel='Direction (deg from N)', ylabel='|GIC| (A)',
+                plotarea='white', **_FS2)
     axes[0].legend(fontsize=7)
 
     ax_polar = fig.add_axes(axes[1].get_position(), projection='polar')
     axes[1].set_visible(False)
     theta = np.radians(directions)
     for j, lbl in enumerate(labels):
-        ax_polar.plot(theta, gic_profiles[:, j], label=lbl)
-    ax_polar.set_title('Polar GIC Response', pad=15, fontsize=10)
+        ax_polar.plot(theta, gic_profiles[:, j], label=lbl,
+                      color=pal[j % len(pal)])
+    ax_polar.set_title('Polar Response', pad=15, fontsize=10)
     ax_polar.legend(loc='upper right', bbox_to_anchor=(1.3, 1.0), fontsize=7)
 
     plt.tight_layout()
@@ -409,68 +470,54 @@ def plot_direction_profiles(directions, gic_profiles, labels, figsize=(_W2, 3)):
 # GIC matrix / sensitivity
 # ---------------------------------------------------------------------------
 
-def plot_gic_distribution(gic_abs, n=20, figsize=(_W2, _H2)):
-    """Bar chart of top-*n* transformer GICs + histogram."""
+def plot_gic_distribution(gic_abs, n=15, figsize=(_W2, _H2)):
+    """Histogram + top-N bar chart for GIC magnitudes (2-panel)."""
     fig, axes = plt.subplots(1, 2, figsize=figsize)
 
-    top = gic_abs.sort_values(ascending=False).head(n)
-    axes[0].barh(range(len(top)), top.values, color='steelblue')
-    axes[0].set_yticks(range(len(top)))
-    axes[0].set_yticklabels([f'XF {i + 1}' for i in range(len(top))], fontsize=7)
-    axes[0].invert_yaxis()
-    format_plot(axes[0], title=f'Top {n} Transformer GICs',
-                xlabel='|GIC| (Amps)', plotarea='white')
-
-    axes[1].hist(gic_abs, bins=20, color='steelblue', edgecolor='white')
-    format_plot(axes[1], title='GIC Magnitude Distribution',
-                xlabel='|GIC| (Amps)', ylabel='Count', plotarea='white')
-
-    plt.tight_layout()
-    plt.show()
-
-
-def plot_gic_bar_hist(gic_abs, n=15, figsize=(_W2, _H2)):
-    """Histogram + top-N bar chart for GIC magnitudes."""
-    fig, axes = plt.subplots(1, 2, figsize=figsize)
-
-    axes[0].hist(gic_abs, bins=20, color='steelblue', edgecolor='white')
-    format_plot(axes[0], title='Distribution of Transformer GIC Magnitudes',
-                xlabel='|GIC| (Amps)', ylabel='Count', plotarea='white')
+    axes[0].hist(gic_abs, bins=20, color=_C1, edgecolor='white')
+    format_plot(axes[0], title='GIC Distribution',
+                xlabel='|GIC| (A)', ylabel='Count',
+                plotarea='white', **_FS2)
 
     top = gic_abs.sort_values(ascending=False).head(n)
-    axes[1].barh(range(len(top)), top.values, color='steelblue')
+    axes[1].barh(range(len(top)), top.values, color=_C1)
     axes[1].set_yticks(range(len(top)))
     axes[1].set_yticklabels([f'XF {i + 1}' for i in range(len(top))], fontsize=7)
     axes[1].invert_yaxis()
     format_plot(axes[1], title=f'Top {n} Transformer GICs',
-                xlabel='|GIC| (Amps)', ylabel='Transformer', plotarea='white')
+                xlabel='|GIC| (A)', ylabel='Transformer',
+                plotarea='white', **_FS2)
 
     plt.tight_layout()
     plt.show()
 
 
+# Keep backward compatibility alias
+plot_gic_bar_hist = plot_gic_distribution
+
+
 def plot_gmatrix_comparison(G_model, G_pw, figsize=(_W3, _H3)):
-    """Compare model G-matrix vs PowerWorld G-matrix with difference."""
+    """Compare model G-matrix vs PowerWorld G-matrix with difference (3-panel)."""
     fig, axes = plt.subplots(1, 3, figsize=figsize)
 
     im0 = axes[0].imshow(np.abs(G_model), cmap='Blues', aspect='auto')
     fig.colorbar(im0, ax=axes[0], shrink=0.7)
-    format_plot(axes[0], title='|G| from model()', plotarea='white',
+    format_plot(axes[0], title='|G| Model', plotarea='white',
                 grid=False, **_FS3)
 
     im1 = axes[1].imshow(np.abs(G_pw), cmap='Blues', aspect='auto')
     fig.colorbar(im1, ax=axes[1], shrink=0.7)
-    format_plot(axes[1], title='|G| from PowerWorld', plotarea='white',
+    format_plot(axes[1], title='|G| PowerWorld', plotarea='white',
                 grid=False, **_FS3)
 
     if G_model.shape == G_pw.shape:
         diff = np.abs(G_model - G_pw)
         im2 = axes[2].imshow(diff, cmap='Reds', aspect='auto')
         fig.colorbar(im2, ax=axes[2], shrink=0.7)
-        format_plot(axes[2], title=f'|Difference|\nmax={diff.max():.2e}',
+        format_plot(axes[2], title=f'|Diff| max={diff.max():.2e}',
                     plotarea='white', grid=False, **_FS3)
     else:
-        axes[2].text(0.5, 0.5, 'Different shapes\n(different node sets)',
+        axes[2].text(0.5, 0.5, 'Shape mismatch',
                      ha='center', va='center', transform=axes[2].transAxes,
                      fontsize=9)
         format_plot(axes[2], title='Difference', plotarea='white',
@@ -481,37 +528,43 @@ def plot_gmatrix_comparison(G_model, G_pw, figsize=(_W3, _H3)):
 
 
 def plot_jacobian_sensitivity(J_dense, figsize=(_W2, _H2)):
-    """dI/dE Jacobian heatmap + row-wise sensitivity bar chart."""
+    """dI/dE Jacobian heatmap + row-wise sensitivity bar chart (2-panel)."""
     fig, axes = plt.subplots(1, 2, figsize=figsize)
 
     im0 = axes[0].imshow(np.abs(J_dense), cmap='Blues', aspect='auto')
     fig.colorbar(im0, ax=axes[0], shrink=0.7)
     format_plot(axes[0], title='|dI/dE| Jacobian',
                 xlabel='Branch index', ylabel='Transformer index',
-                plotarea='white', grid=False)
+                plotarea='white', grid=False, **_FS2)
 
     row_sens = np.sum(np.abs(J_dense), axis=1)
-    axes[1].barh(range(len(row_sens)), row_sens, color='steelblue')
+    axes[1].barh(range(len(row_sens)), row_sens, color=_C1)
     axes[1].invert_yaxis()
-    format_plot(axes[1], title='Transformer Sensitivity to E-Field',
+    format_plot(axes[1], title='Transformer E-Field Sensitivity',
                 xlabel='Total sensitivity', ylabel='Transformer index',
-                plotarea='white')
+                plotarea='white', **_FS2)
 
     plt.tight_layout()
     plt.show()
 
 
-def plot_branch_impact(col_sens, top_n=5, figsize=(_WFULL, 2.8)):
-    """Bar chart of branch voltage impact with top branches highlighted."""
-    fig, ax = plt.subplots(figsize=figsize)
-    ax.bar(range(len(col_sens)), col_sens, color='steelblue', width=1.0)
-    format_plot(ax, title='Branch Voltage Impact on Total GIC',
-                xlabel='Branch index', ylabel='Aggregate |dI/dE|',
-                plotarea='white')
+def plot_branch_impact(col_sens, top_n=5, figsize=(_W2, _H2)):
+    """Branch impact bar chart + top-N detail (2-panel)."""
+    fig, axes = plt.subplots(1, 2, figsize=figsize)
 
     top_branches = np.argsort(col_sens)[::-1][:top_n]
-    for b in top_branches:
-        ax.bar(b, col_sens[b], color='tomato', width=1.0)
+    colors = [_C2 if i in top_branches else _C1 for i in range(len(col_sens))]
+    axes[0].bar(range(len(col_sens)), col_sens, color=colors, width=1.0)
+    format_plot(axes[0], title='Branch Impact on GIC',
+                xlabel='Branch index', ylabel='Aggregate |dI/dE|',
+                plotarea='white', **_FS2)
+
+    axes[1].barh(range(top_n), col_sens[top_branches], color=_C2)
+    axes[1].set_yticks(range(top_n))
+    axes[1].set_yticklabels([f'Branch {b}' for b in top_branches], fontsize=7)
+    axes[1].invert_yaxis()
+    format_plot(axes[1], title=f'Top {top_n} Branches',
+                xlabel='|dI/dE|', plotarea='white', **_FS2)
 
     plt.tight_layout()
     plt.show()
@@ -524,61 +577,66 @@ def plot_branch_impact(col_sens, top_n=5, figsize=(_WFULL, 2.8)):
 # ---------------------------------------------------------------------------
 
 def plot_geo_grid_buses(LON, LAT, lon, lat, shape, xlim, ylim,
-                        figsize=(_GEO_W, _GEO_H)):
+                        figsize=(_W2, 2.8), ax=None, fig=None):
     """Grid points + bus locations on a geographic border."""
-    fig, ax = plt.subplots(figsize=figsize)
-    ax.scatter(LON.ravel(), LAT.ravel(), s=1, c='lightblue', alpha=0.5,
+    show = ax is None
+    if ax is None:
+        fig, ax = plt.subplots(figsize=figsize)
+    ax.scatter(LON.ravel(), LAT.ravel(), s=1, c=_C7, alpha=0.5,
                label='Grid points')
-    ax.scatter(lon, lat, s=15, c='red', zorder=5, label='Bus locations')
+    ax.scatter(lon, lat, s=12, c=_C4, zorder=5, label='Bus locations')
     border(ax, shape)
     ax.set_xlim(xlim[0] - 0.1, xlim[1] + 0.1)
     ax.set_ylim(ylim[0] - 0.1, ylim[1] + 0.1)
-    format_plot(ax, title='Geographic Grid with Bus Locations',
-                xlabel=r'Longitude ($^\circ$E)', ylabel=r'Latitude ($^\circ$N)',
-                plotarea='white', grid=False)
-    ax.legend(fontsize=8)
+    format_plot(ax, title='Grid & Bus Locations',
+                xlabel=r'Lon ($^\circ$E)', ylabel=r'Lat ($^\circ$N)',
+                plotarea='white', grid=False, **_FS2)
+    ax.legend(fontsize=7, loc='lower right')
     ax.set_aspect('equal')
-    plt.tight_layout()
-    plt.show()
+    if show:
+        plt.tight_layout()
+        plt.show()
+    return ax
 
 
 def plot_efield_comparison(LON, LAT, fields, shape, figsize=None):
-    """Side-by-side magnitude heatmaps for multiple E-field patterns.
+    """Side-by-side magnitude heatmaps for E-field patterns (>= 2-panel).
 
     Parameters
     ----------
     fields : list of (name, Ex, Ey) tuples
     """
-    n = len(fields)
+    n = max(len(fields), 2)
     if figsize is None:
         figsize = (_WFULL, _H3)
     fig, axes = plt.subplots(1, n, figsize=figsize)
     if n == 1:
         axes = [axes]
-    fs = _FS3 if n >= 3 else {}
+    fs = _FS3 if n >= 3 else _FS2
     for ax, (name, Ex, Ey) in zip(axes, fields):
         magnitude = np.sqrt(Ex ** 2 + Ey ** 2)
         im = ax.pcolormesh(LON, LAT, magnitude, cmap='hot_r', shading='auto')
         border(ax, shape)
-        xlim = (LON.min(), LON.max())
-        ylim = (LAT.min(), LAT.max())
-        ax.set_xlim(*xlim)
-        ax.set_ylim(*ylim)
+        ax.set_xlim(LON.min(), LON.max())
+        ax.set_ylim(LAT.min(), LAT.max())
         fig.colorbar(im, ax=ax, label='|E| (V/km)', shrink=0.7)
         format_plot(ax, title=f'{name} |E|',
-                    xlabel=r'Longitude ($^\circ$E)',
-                    ylabel=r'Latitude ($^\circ$N)',
+                    xlabel=r'Lon ($^\circ$E)',
+                    ylabel=r'Lat ($^\circ$N)',
                     plotarea='white', grid=False, **fs)
         ax.set_aspect('equal')
-    plt.suptitle('Electric Field Magnitude Comparison', fontsize=12)
+    for j in range(len(fields), n):
+        axes[j].set_visible(False)
     plt.tight_layout()
     plt.show()
 
 
 def plot_efield_vectors(LON, LAT, Ex, Ey, shape, step=3,
-                        figsize=(_GEO_W, _GEO_H)):
+                        figsize=(_W2, 2.8), ax=None, fig=None):
     """Heatmap of E-field magnitude + vector field overlay."""
-    fig, ax = plt.subplots(figsize=figsize)
+    show = ax is None
+    if ax is None:
+        fig, ax = plt.subplots(figsize=figsize)
     magnitude = np.sqrt(Ex ** 2 + Ey ** 2)
     im = ax.pcolormesh(LON, LAT, magnitude, cmap='YlOrRd', shading='auto', alpha=0.6)
     border(ax, shape)
@@ -588,69 +646,82 @@ def plot_efield_vectors(LON, LAT, Ex, Ey, shape, step=3,
     sm = plot_vecfield(ax, LON[::step, ::step], LAT[::step, ::step],
                        Ex[::step, ::step], Ey[::step, ::step],
                        scale=40, width=0.003)
-    fig.colorbar(im, ax=ax, label='|E| (V/km)', shrink=0.7)
-    format_plot(ax, title='Spatially Varying E-Field',
-                xlabel=r'Longitude ($^\circ$E)',
-                ylabel=r'Latitude ($^\circ$N)', grid=False)
+    if fig is not None:
+        fig.colorbar(im, ax=ax, label='|E| (V/km)', shrink=0.7)
+    format_plot(ax, title='E-Field Vectors',
+                xlabel=r'Lon ($^\circ$E)',
+                ylabel=r'Lat ($^\circ$N)', grid=False, **_FS2)
     ax.set_aspect('equal')
-    plt.tight_layout()
-    plt.show()
+    if show:
+        plt.tight_layout()
+        plt.show()
+    return ax
 
 
 def plot_network_efield(LON, LAT, magnitude, lines, lon, lat, Ex, Ey,
-                        shape, step=4, figsize=(_GEO_LG_W, _GEO_LG_H)):
-    """Full network overlay: heatmap + transmission lines + buses + E-field vectors."""
-    fig, ax = plt.subplots(figsize=figsize)
+                        shape, step=4, figsize=(_W2, 2.8), ax=None, fig=None):
+    """Full network overlay: heatmap + lines + buses + E-field vectors."""
+    show = ax is None
+    if ax is None:
+        fig, ax = plt.subplots(figsize=figsize)
 
     im = ax.pcolormesh(LON, LAT, magnitude, cmap='YlOrRd', shading='auto', alpha=0.4)
     border(ax, shape)
-    plot_lines(ax, lines, ms=6, lw=0.8)
-    ax.scatter(lon, lat, s=20, c='navy', zorder=6, label='Buses',
-               edgecolors='white', linewidth=0.5)
+    plot_lines(ax, lines, ms=4, lw=0.6)
+    ax.scatter(lon, lat, s=12, c='navy', zorder=6, label='Buses',
+               edgecolors='white', linewidth=0.4)
     ax.quiver(LON[::step, ::step], LAT[::step, ::step],
               Ex[::step, ::step], Ey[::step, ::step],
               color='darkred', alpha=0.7, scale=30, width=0.002, zorder=7)
     ax.set_xlim(LON.min(), LON.max())
     ax.set_ylim(LAT.min(), LAT.max())
 
-    fig.colorbar(im, ax=ax, label='|E| (V/km)', shrink=0.7)
-    format_plot(ax, title='E-Field with Transmission Network Overlay',
-                xlabel=r'Longitude ($^\circ$E)',
-                ylabel=r'Latitude ($^\circ$N)',
-                plotarea='white', grid=False)
-    ax.legend(loc='lower right', fontsize=8)
+    if fig is not None:
+        fig.colorbar(im, ax=ax, label='|E| (V/km)', shrink=0.7)
+    format_plot(ax, title='Network + E-Field',
+                xlabel=r'Lon ($^\circ$E)',
+                ylabel=r'Lat ($^\circ$N)',
+                plotarea='white', grid=False, **_FS2)
+    ax.legend(loc='lower right', fontsize=7)
     ax.set_aspect('equal')
-    plt.tight_layout()
-    plt.show()
+    if show:
+        plt.tight_layout()
+        plt.show()
+    return ax
 
 
 def plot_gic_geo_map(lines, xf_geo, gic_mag, shape, xlim, ylim,
-                     figsize=(_GEO_LG_W, _GEO_LG_H)):
+                     figsize=(_W2, 2.8), ax=None, fig=None):
     """GIC magnitudes on a geographic map with transmission network."""
-    fig, ax = plt.subplots(figsize=figsize)
+    show = ax is None
+    if ax is None:
+        fig, ax = plt.subplots(figsize=figsize)
     border(ax, shape)
-    plot_lines(ax, lines, ms=4, lw=0.5)
+    plot_lines(ax, lines, ms=3, lw=0.4)
 
-    sizes = 15 + 150 * gic_mag / gic_mag.max()
+    sizes = 10 + 120 * gic_mag / gic_mag.max()
     sc = ax.scatter(xf_geo['Longitude'], xf_geo['Latitude'],
                     s=sizes, c=gic_mag, cmap='Reds', zorder=8,
-                    edgecolors='black', linewidth=0.5)
-    fig.colorbar(sc, ax=ax, label='|GIC| (Amps)', shrink=0.7)
+                    edgecolors='black', linewidth=0.4)
+    if fig is not None:
+        fig.colorbar(sc, ax=ax, label='|GIC| (A)', shrink=0.7)
 
     ax.set_xlim(*xlim)
     ax.set_ylim(*ylim)
-    format_plot(ax, title='Transformer GIC Magnitudes on Geographic Map',
-                xlabel=r'Longitude ($^\circ$E)',
-                ylabel=r'Latitude ($^\circ$N)',
-                plotarea='white', grid=False)
+    format_plot(ax, title='Transformer GIC Map',
+                xlabel=r'Lon ($^\circ$E)',
+                ylabel=r'Lat ($^\circ$N)',
+                plotarea='white', grid=False, **_FS2)
     ax.set_aspect('equal')
-    plt.tight_layout()
-    plt.show()
+    if show:
+        plt.tight_layout()
+        plt.show()
+    return ax
 
 
 def plot_b3d_roundtrip(LON, LAT, ex_orig, ex_loaded, shape, ny, nx,
                        figsize=(_W2, _H2)):
-    """Side-by-side original vs loaded Ex from B3D."""
+    """Side-by-side original vs loaded Ex from B3D (2-panel)."""
     fig, axes = plt.subplots(1, 2, figsize=figsize)
 
     ex_2d_orig = ex_orig[0].reshape(ny, nx, order='F')
@@ -665,9 +736,9 @@ def plot_b3d_roundtrip(LON, LAT, ex_orig, ex_loaded, shape, ny, nx,
         ax.set_ylim(LAT.min(), LAT.max())
         fig.colorbar(im, ax=ax, label='Ex (V/km)')
         format_plot(ax, title=title,
-                    xlabel=r'Longitude ($^\circ$E)',
-                    ylabel=r'Latitude ($^\circ$N)',
-                    plotarea='white', grid=False)
+                    xlabel=r'Lon ($^\circ$E)',
+                    ylabel=r'Lat ($^\circ$N)',
+                    plotarea='white', grid=False, **_FS2)
         ax.set_aspect('equal')
 
     plt.tight_layout()
@@ -685,14 +756,14 @@ def plot_b3d_components(LON, LAT, Ex, Ey, shape, suptitle='',
         [magnitude, Ex, Ey],
         ['hot_r', 'RdBu_r', 'RdBu_r'],
         ['|E| (V/km)', 'Ex (V/km)', 'Ey (V/km)'],
-        ['E-Field Magnitude', 'Ex (Eastward)', 'Ey (Northward)'],
+        ['|E| Magnitude', 'Ex (Eastward)', 'Ey (Northward)'],
     ):
         im = ax.pcolormesh(LON, LAT, data, cmap=cmap, shading='auto')
         border(ax, shape)
         fig.colorbar(im, ax=ax, label=label, shrink=0.7)
         format_plot(ax, title=title,
-                    xlabel=r'Longitude ($^\circ$E)',
-                    ylabel=r'Latitude ($^\circ$N)',
+                    xlabel=r'Lon ($^\circ$E)',
+                    ylabel=r'Lat ($^\circ$N)',
                     plotarea='white', grid=False, **_FS3)
         ax.set_aspect('equal')
 
@@ -707,19 +778,26 @@ def plot_b3d_components(LON, LAT, Ex, Ey, shape, suptitle='',
 # ---------------------------------------------------------------------------
 
 def plot_comparative_dynamics(ctg_names, all_results, figsize=None):
-    """Stacked subplots of generator power for each contingency."""
+    """Stacked subplots of generator power for each contingency (multi-row)."""
+    n = len(ctg_names)
+    ncols = min(n, 2)
+    nrows = (n + ncols - 1) // ncols
     if figsize is None:
-        figsize = (_WFULL, 2.8 * len(ctg_names))
-    fig, axes = plt.subplots(len(ctg_names), 1, figsize=figsize, sharex=True)
-    if len(ctg_names) == 1:
-        axes = [axes]
-    for ax, name in zip(axes, ctg_names):
+        figsize = (_WFULL, 2.6 * nrows)
+    fig, axes = plt.subplots(nrows, ncols, figsize=figsize, sharex=True)
+    axes_flat = np.array(axes).ravel() if n > 1 else [axes]
+    fs = _FS3 if ncols >= 3 else _FS2
+    for ax, name in zip(axes_flat, ctg_names):
         results = all_results[name]
         p_cols = [c for c in results.columns if 'P' in str(c) or 'MW' in str(c)]
         if p_cols:
             results[p_cols].plot(ax=ax, legend=True)
-        format_plot(ax, title=f'{name}: Generator Power',
-                    xlabel='Time (s)', ylabel='P (MW)', plotarea='white')
+            ax.legend(fontsize=6)
+        format_plot(ax, title=f'{name}',
+                    xlabel='Time (s)', ylabel='P (MW)',
+                    plotarea='white', **fs)
+    for j in range(n, len(axes_flat)):
+        axes_flat[j].set_visible(False)
     plt.tight_layout()
     plt.show()
 
@@ -740,28 +818,28 @@ def plot_grid_regions(X, Y, grid, figsize=(_W3, _H3)):
     xf = X.ravel(order='C')
     yf = Y.ravel(order='C')
 
-    axes[0].scatter(xf, yf, s=5, c='steelblue')
+    axes[0].scatter(xf, yf, s=5, c=_C1)
     axes[0].set_aspect('equal')
     format_plot(axes[0], title='All Grid Points', xlabel='x', ylabel='y',
                 grid=False, plotarea='white', **_FS3)
 
     axes[1].scatter(xf[grid.interior], yf[grid.interior],
-                    s=5, c='steelblue', label='Interior')
+                    s=5, c=_C1, label='Interior')
     axes[1].scatter(xf[grid.boundary], yf[grid.boundary],
-                    s=8, c='tomato', label='Boundary')
+                    s=8, c=_C2, label='Boundary')
     axes[1].set_aspect('equal')
     format_plot(axes[1], title='Boundary vs Interior', xlabel='x', ylabel='y',
                 grid=False, plotarea='white', **_FS3)
     axes[1].legend(markerscale=2, fontsize=7)
 
     axes[2].scatter(xf[grid.left], yf[grid.left],
-                    s=8, c='red', label='Left')
+                    s=8, c=_C4, label='Left')
     axes[2].scatter(xf[grid.right], yf[grid.right],
-                    s=8, c='blue', label='Right')
+                    s=8, c=_C1, label='Right')
     axes[2].scatter(xf[grid.top], yf[grid.top],
-                    s=8, c='green', label='Top')
+                    s=8, c=_C3, label='Top')
     axes[2].scatter(xf[grid.bottom], yf[grid.bottom],
-                    s=8, c='orange', label='Bottom')
+                    s=8, c=_C2, label='Bottom')
     axes[2].set_aspect('equal')
     format_plot(axes[2], title='Edge Selectors', xlabel='x', ylabel='y',
                 grid=False, plotarea='white', **_FS3)
@@ -772,11 +850,7 @@ def plot_grid_regions(X, Y, grid, figsize=(_W3, _H3)):
 
 
 def plot_incidence_directed(grid, figsize=(_W2, 3.8)):
-    """Visualize the oriented incidence matrix as directed edges on a small grid.
-
-    Draws each node as a labeled dot and each edge as an arrow from source (-1)
-    to target (+1), colored by type (horizontal vs vertical). Alongside, shows
-    the dense incidence matrix with source/target annotations.
+    """Oriented incidence matrix as directed edges + matrix heatmap (2-panel).
 
     Parameters
     ----------
@@ -791,20 +865,16 @@ def plot_incidence_directed(grid, figsize=(_W2, 3.8)):
     fig, axes = plt.subplots(1, 2, figsize=figsize,
                              gridspec_kw={'width_ratios': [1.3, 1]})
 
-    # --- Left panel: directed graph ---
     ax = axes[0]
-
-    # Draw nodes with dark edge outline
     for xi in range(nx):
         for yi in range(ny):
             idx = grid.flat_index(xi, yi)
-            ax.plot(xi, yi, 'o', color='steelblue', markersize=14,
+            ax.plot(xi, yi, 'o', color=_C1, markersize=14,
                     markeredgecolor='#2c3e50', markeredgewidth=1.0, zorder=5)
             ax.text(xi, yi, str(idx), ha='center', va='center',
                     fontsize=7, fontweight='bold', color='white', zorder=6)
 
-    # Draw directed edges as arrows with edge-index labels
-    shrink = 0.22  # gap from node center
+    shrink = 0.22
     for e in range(grid.n_edges):
         src = np.where(A[e] == -1)[0][0]
         tgt = np.where(A[e] == +1)[0][0]
@@ -812,27 +882,22 @@ def plot_incidence_directed(grid, figsize=(_W2, 3.8)):
         tx, ty = grid.grid_coords(tgt)
         dx_a, dy_a = tx - sx, ty - sy
         length = np.hypot(dx_a, dy_a)
-        # Shrink arrow to leave room around node circles
         sx_s = sx + shrink * dx_a / length
         sy_s = sy + shrink * dy_a / length
         dx_s = dx_a * (1 - 2 * shrink)
         dy_s = dy_a * (1 - 2 * shrink)
-        color = '#e74c3c' if e < grid.n_edges_x else '#27ae60'
+        color = _C4 if e < grid.n_edges_x else _C3
         ax.annotate('', xy=(sx_s + dx_s, sy_s + dy_s), xytext=(sx_s, sy_s),
                     arrowprops=dict(arrowstyle='->', color=color, lw=1.8,
                                    mutation_scale=14))
-        # Edge index label at midpoint, offset perpendicular to the edge
-        mx = (sx + tx) / 2
-        my = (sy + ty) / 2
-        # Offset: perpendicular direction, small shift
+        mx, my = (sx + tx) / 2, (sy + ty) / 2
         perp_x, perp_y = -dy_a / length, dx_a / length
-        off = 0.15
-        ax.text(mx + off * perp_x, my + off * perp_y, f'e{e}',
+        ax.text(mx + 0.15 * perp_x, my + 0.15 * perp_y, f'e{e}',
                 ha='center', va='center', fontsize=5.5, color=color,
                 fontstyle='italic', alpha=0.85)
 
-    ax.legend([Line2D([0], [0], color='#e74c3c', lw=2),
-               Line2D([0], [0], color='#27ae60', lw=2)],
+    ax.legend([Line2D([0], [0], color=_C4, lw=2),
+               Line2D([0], [0], color=_C3, lw=2)],
               [f'Horizontal (0..{grid.n_edges_x - 1})',
                f'Vertical ({grid.n_edges_x}..{grid.n_edges - 1})'],
               loc='upper left', fontsize=7, framealpha=0.9)
@@ -840,16 +905,14 @@ def plot_incidence_directed(grid, figsize=(_W2, 3.8)):
     ax.set_xlim(-0.6, nx - 0.4)
     ax.set_ylim(-0.6, ny - 0.4)
     ax.set_aspect('equal')
-    format_plot(ax, title=f'Oriented Edges of {nx}\u00d7{ny} Grid',
-                xlabel='x', ylabel='y', plotarea='#f8f9fa', grid=False)
+    format_plot(ax, title=f'Oriented Edges ({nx}\u00d7{ny})',
+                xlabel='x', ylabel='y', plotarea='#f8f9fa', grid=False, **_FS2)
     ax.grid(True, alpha=0.15, linestyle='--')
 
-    # --- Right panel: incidence matrix heatmap ---
     ax2 = axes[1]
-    im = ax2.imshow(A, cmap='RdBu_r', vmin=-1.5, vmax=1.5, aspect='auto',
-                    interpolation='nearest')
+    ax2.imshow(A, cmap='RdBu_r', vmin=-1.5, vmax=1.5, aspect='auto',
+               interpolation='nearest')
 
-    # Annotate nonzeros with contrasting text
     for e in range(A.shape[0]):
         for n in range(A.shape[1]):
             if A[e, n] != 0:
@@ -858,57 +921,57 @@ def plot_incidence_directed(grid, figsize=(_W2, 3.8)):
                          fontsize=5, fontweight='bold',
                          color='white' if abs(A[e, n]) > 0.5 else 'black')
 
-    # Horizontal divider between H and V edge blocks
     if grid.n_edges_x > 0 and grid.n_edges_y > 0:
-        ax2.axhline(y=grid.n_edges_x - 0.5, color='#2c3e50', linewidth=1.2,
-                    linestyle='-')
+        ax2.axhline(y=grid.n_edges_x - 0.5, color='#2c3e50', linewidth=1.2)
 
-    # Edge type bracket labels
     if grid.n_edges_x > 0:
-        mid_h = (grid.n_edges_x - 1) / 2
-        ax2.text(-1.2, mid_h, 'H', ha='center', va='center', fontsize=8,
-                 fontweight='bold', color='#e74c3c')
+        ax2.text(-1.2, (grid.n_edges_x - 1) / 2, 'H', ha='center', va='center',
+                 fontsize=8, fontweight='bold', color=_C4)
     if grid.n_edges_y > 0:
-        mid_v = grid.n_edges_x + (grid.n_edges_y - 1) / 2
-        ax2.text(-1.2, mid_v, 'V', ha='center', va='center', fontsize=8,
-                 fontweight='bold', color='#27ae60')
+        ax2.text(-1.2, grid.n_edges_x + (grid.n_edges_y - 1) / 2, 'V',
+                 ha='center', va='center', fontsize=8, fontweight='bold', color=_C3)
 
-    format_plot(ax2, title=f'Incidence Matrix A  ({grid.n_edges}\u00d7{grid.size})',
-                xlabel='Node index', ylabel='Edge index',
-                plotarea='white', grid=False)
+    format_plot(ax2, title=f'Incidence A ({grid.n_edges}\u00d7{grid.size})',
+                xlabel='Node', ylabel='Edge',
+                plotarea='white', grid=False, **_FS2)
     plt.tight_layout()
     plt.show()
 
 
 def plot_scalar_field(X, Y, f, title='', clabel='f(x,y)', cmap='RdBu_r',
-                      figsize=(_W1, _H1)):
-    """Single pcolormesh of a scalar field with colorbar."""
-    fig, ax = plt.subplots(figsize=figsize)
+                      figsize=(_W1, _H1), ax=None, fig=None):
+    """Pcolormesh of a scalar field with colorbar."""
+    show = ax is None
+    if ax is None:
+        fig, ax = plt.subplots(figsize=figsize)
     im = ax.pcolormesh(X, Y, f, cmap=cmap, shading='auto')
-    fig.colorbar(im, ax=ax, label=clabel)
+    if fig is not None:
+        fig.colorbar(im, ax=ax, label=clabel)
     ax.set_aspect('equal')
     format_plot(ax, title=title, xlabel='x', ylabel='y', grid=False,
-                plotarea='white')
-    plt.tight_layout()
-    plt.show()
+                plotarea='white', **_FS2)
+    if show:
+        plt.tight_layout()
+        plt.show()
+    return ax
 
 
 def plot_field_panels(X, Y, fields, titles, cmap='RdBu_r', figsize=None,
                       suptitle=None, equal_aspect=True):
-    """Row of pcolormesh panels, one per field.
+    """Row of pcolormesh panels (always >= 2 panels).
 
     Parameters
     ----------
     fields : list of 2-D arrays
     titles : list of str
     """
-    n = len(fields)
+    n = max(len(fields), 2)
     if figsize is None:
         figsize = (min(_WFULL, 3.2 * n + 0.5), 3)
     fig, axes = plt.subplots(1, n, figsize=figsize)
     if n == 1:
         axes = [axes]
-    fs = _FS3 if n >= 3 else {}
+    fs = _FS3 if n >= 3 else _FS2
     for ax, data, t in zip(axes, fields, titles):
         im = ax.pcolormesh(X, Y, data, cmap=cmap, shading='auto')
         fig.colorbar(im, ax=ax)
@@ -916,6 +979,8 @@ def plot_field_panels(X, Y, fields, titles, cmap='RdBu_r', figsize=None,
             ax.set_aspect('equal')
         format_plot(ax, title=t, xlabel='x', ylabel='y', grid=False,
                     plotarea='white', **fs)
+    for j in range(len(fields), n):
+        axes[j].set_visible(False)
     if suptitle:
         plt.suptitle(suptitle, fontsize=12)
     plt.tight_layout()
@@ -923,32 +988,37 @@ def plot_field_panels(X, Y, fields, titles, cmap='RdBu_r', figsize=None,
 
 
 def plot_gradient_vecfield(X, Y, f, grad_x, grad_y, step=3,
-                           figsize=(_W1, _H1)):
+                           figsize=(_W1, _H1), ax=None, fig=None):
     """Scalar field background + gradient vector field overlay."""
+    show = ax is None
+    if ax is None:
+        fig, ax = plt.subplots(figsize=figsize)
     Xs = X[::step, ::step]
     Ys = Y[::step, ::step]
     Us = grad_x[::step, ::step]
     Vs = grad_y[::step, ::step]
 
-    fig, ax = plt.subplots(figsize=figsize)
     ax.pcolormesh(X, Y, f, cmap='Greys', shading='auto', alpha=0.3)
     sm = plot_vecfield(ax, Xs, Ys, Us, Vs, scale=150, width=0.003)
-    fig.colorbar(sm, ax=ax, label='Angle (rad)')
+    if fig is not None:
+        fig.colorbar(sm, ax=ax, label='Angle (rad)')
     ax.set_aspect('equal')
     format_plot(ax, title='Gradient Vector Field', xlabel='x', ylabel='y',
-                grid=False, plotarea='white')
-    plt.tight_layout()
-    plt.show()
+                grid=False, plotarea='white', **_FS2)
+    if show:
+        plt.tight_layout()
+        plt.show()
+    return ax
 
 
 def plot_div_curl(X, Y, u_field, v_field, div_uv, curl_uv, step=3,
                   figsize=(_W3, _H3)):
-    """Quiver plot of vector field + divergence + curl pcolormesh."""
+    """Vector field + divergence + curl pcolormesh (3-panel)."""
     fig, axes = plt.subplots(1, 3, figsize=figsize)
 
     axes[0].quiver(X[::step, ::step], Y[::step, ::step],
                    u_field[::step, ::step], v_field[::step, ::step],
-                   color='steelblue')
+                   color=_C1)
     axes[0].set_aspect('equal')
     format_plot(axes[0], title='Vector Field (u, v)', xlabel='x', ylabel='y',
                 grid=False, plotarea='white', **_FS3)
@@ -956,13 +1026,13 @@ def plot_div_curl(X, Y, u_field, v_field, div_uv, curl_uv, step=3,
     im1 = axes[1].pcolormesh(X, Y, div_uv, cmap='RdBu_r', shading='auto')
     fig.colorbar(im1, ax=axes[1])
     axes[1].set_aspect('equal')
-    format_plot(axes[1], title='Divergence (expansion = 1.0)', xlabel='x',
+    format_plot(axes[1], title='Divergence', xlabel='x',
                 ylabel='y', grid=False, plotarea='white', **_FS3)
 
     im2 = axes[2].pcolormesh(X, Y, curl_uv, cmap='RdBu_r', shading='auto')
     fig.colorbar(im2, ax=axes[2])
     axes[2].set_aspect('equal')
-    format_plot(axes[2], title='Curl (rotation = 1.0)', xlabel='x',
+    format_plot(axes[2], title='Curl', xlabel='x',
                 ylabel='y', grid=False, plotarea='white', **_FS3)
 
     plt.tight_layout()
@@ -971,24 +1041,24 @@ def plot_div_curl(X, Y, u_field, v_field, div_uv, curl_uv, step=3,
 
 def plot_hodge_rotation(X, Y, f, grad_x, grad_y, rot_x, rot_y, step=3,
                         figsize=(_W2, _H2)):
-    """Side-by-side quiver plots: gradient vs Hodge-rotated gradient."""
+    """Gradient vs Hodge-rotated gradient quiver plots (2-panel)."""
     fig, axes = plt.subplots(1, 2, figsize=figsize)
 
     axes[0].pcolormesh(X, Y, f, cmap='Greys', shading='auto', alpha=0.3)
     axes[0].quiver(X[::step, ::step], Y[::step, ::step],
                    grad_x[::step, ::step], grad_y[::step, ::step],
-                   color='steelblue')
+                   color=_C1)
     axes[0].set_aspect('equal')
     format_plot(axes[0], title='Gradient Field', xlabel='x', ylabel='y',
-                grid=False, plotarea='white')
+                grid=False, plotarea='white', **_FS2)
 
     axes[1].pcolormesh(X, Y, f, cmap='Greys', shading='auto', alpha=0.3)
     axes[1].quiver(X[::step, ::step], Y[::step, ::step],
                    rot_x[::step, ::step], rot_y[::step, ::step],
-                   color='tomato')
+                   color=_C2)
     axes[1].set_aspect('equal')
     format_plot(axes[1], title='Hodge Star (90\u00b0 Rotation)', xlabel='x',
-                ylabel='y', grid=False, plotarea='white')
+                ylabel='y', grid=False, plotarea='white', **_FS2)
 
     plt.tight_layout()
     plt.show()
@@ -1065,32 +1135,33 @@ def plot_graph_operators(matrices, titles, cmaps=None, vranges=None,
 
 
 def plot_normlap_spectrum(L_norm, evals, figsize=(_W2, _H2)):
-    """Normalized Laplacian image + eigenvalue stem plot."""
+    """Normalized Laplacian image + eigenvalue stem plot (2-panel)."""
     fig, axes = plt.subplots(1, 2, figsize=figsize)
 
     axes[0].imshow(L_norm, cmap='RdBu_r')
     format_plot(axes[0], title='Normalized Cycle Laplacian',
-                plotarea='white', grid=False)
+                plotarea='white', grid=False, **_FS2)
 
     axes[1].stem(evals, basefmt=' ')
-    axes[1].axhline(y=2, color='r', linestyle='--', alpha=0.5, label='eig=2 bound')
+    axes[1].axhline(y=2, color=_LIMIT, linestyle='--', alpha=0.5, label='eig=2')
     format_plot(axes[1], title='Eigenvalue Spectrum',
-                xlabel='Index', ylabel='Eigenvalue', plotarea='white')
-    axes[1].legend(fontsize=8)
+                xlabel='Index', ylabel='Eigenvalue',
+                plotarea='white', **_FS2)
+    axes[1].legend(fontsize=7)
 
     plt.tight_layout()
     plt.show()
 
 
 def plot_hermitify(M, H, figsize=(_W2, _H2)):
-    """Side-by-side |M| vs |H| images."""
+    """Side-by-side |M| vs |H| images (2-panel)."""
     fig, axes = plt.subplots(1, 2, figsize=figsize)
     axes[0].imshow(np.abs(M), cmap='viridis')
     format_plot(axes[0], title='|M| (complex symmetric)',
-                plotarea='white', grid=False)
+                plotarea='white', grid=False, **_FS2)
     axes[1].imshow(np.abs(H), cmap='viridis')
     format_plot(axes[1], title='|H| (Hermitian)',
-                plotarea='white', grid=False)
+                plotarea='white', grid=False, **_FS2)
     plt.tight_layout()
     plt.show()
 
@@ -1153,78 +1224,93 @@ def plot_borders(shapes, figsize=(_W2, _H2)):
 
 
 def plot_network_map(lines, lon, lat, shape, pad=0.5,
-                     figsize=(_GEO_W, _GEO_H)):
+                     figsize=(_W2, 2.8), ax=None, fig=None):
     """Transmission network on geographic background."""
-    fig, ax = plt.subplots(figsize=figsize)
+    show = ax is None
+    if ax is None:
+        fig, ax = plt.subplots(figsize=figsize)
     border(ax, shape)
-    plot_lines(ax, lines, ms=12, lw=1.0)
+    plot_lines(ax, lines, ms=8, lw=0.8)
     ax.set_xlim(lon.min() - pad, lon.max() + pad)
     ax.set_ylim(lat.min() - pad, lat.max() + pad)
     format_plot(ax, title='Transmission Network',
-                xlabel=r'Longitude ($^\circ$E)',
-                ylabel=r'Latitude ($^\circ$N)',
-                plotarea='white', grid=False)
+                xlabel=r'Lon ($^\circ$E)',
+                ylabel=r'Lat ($^\circ$N)',
+                plotarea='white', grid=False, **_FS2)
     ax.set_aspect('equal')
-    plt.tight_layout()
-    plt.show()
+    if show:
+        plt.tight_layout()
+        plt.show()
+    return ax
 
 
 def plot_bus_voltages_map(lines, lon, lat, vmag, shape, pad=0.5,
-                          figsize=(_GEO_W, _GEO_H)):
+                          figsize=(_W2, 2.8), ax=None, fig=None):
     """Bus voltages colored on geographic map with network overlay."""
-    fig, ax = plt.subplots(figsize=figsize)
+    show = ax is None
+    if ax is None:
+        fig, ax = plt.subplots(figsize=figsize)
     border(ax, shape)
-    plot_lines(ax, lines, ms=4, lw=0.8)
+    plot_lines(ax, lines, ms=3, lw=0.6)
 
-    sc = ax.scatter(lon, lat, s=40, c=vmag, cmap='RdYlGn', vmin=0.95, vmax=1.05,
-                    zorder=6, edgecolors='black', linewidth=0.5)
-    fig.colorbar(sc, ax=ax, label='Voltage (pu)', shrink=0.7)
+    sc = ax.scatter(lon, lat, s=30, c=vmag, cmap='RdYlGn', vmin=0.95, vmax=1.05,
+                    zorder=6, edgecolors='black', linewidth=0.4)
+    if fig is not None:
+        fig.colorbar(sc, ax=ax, label='V (pu)', shrink=0.7)
 
     ax.set_xlim(lon.min() - pad, lon.max() + pad)
     ax.set_ylim(lat.min() - pad, lat.max() + pad)
-    format_plot(ax, title='Bus Voltages on Geographic Map',
-                xlabel=r'Longitude ($^\circ$E)',
-                ylabel=r'Latitude ($^\circ$N)',
-                plotarea='white', grid=False)
+    format_plot(ax, title='Bus Voltages',
+                xlabel=r'Lon ($^\circ$E)',
+                ylabel=r'Lat ($^\circ$N)',
+                plotarea='white', grid=False, **_FS2)
     ax.set_aspect('equal')
-    plt.tight_layout()
-    plt.show()
+    if show:
+        plt.tight_layout()
+        plt.show()
+    return ax
 
 
 def plot_vecfield_map(LON, LAT, Ex, Ey, lines, shape,
-                      figsize=(_GEO_W, _GEO_H)):
+                      figsize=(_W2, 2.8), ax=None, fig=None):
     """Vector field over network with geographic border."""
-    fig, ax = plt.subplots(figsize=figsize)
+    show = ax is None
+    if ax is None:
+        fig, ax = plt.subplots(figsize=figsize)
     border(ax, shape)
-    plot_lines(ax, lines, ms=3, lw=0.5)
+    plot_lines(ax, lines, ms=3, lw=0.4)
 
     sm = plot_vecfield(ax, LON, LAT, Ex, Ey, scale=30, width=0.003)
-    fig.colorbar(sm, ax=ax, label='Angle (rad)', shrink=0.7)
+    if fig is not None:
+        fig.colorbar(sm, ax=ax, label='Angle (rad)', shrink=0.7)
 
     ax.set_xlim(LON.min(), LON.max())
     ax.set_ylim(LAT.min(), LAT.max())
-    format_plot(ax, title='Synthetic Vector Field over Network',
-                xlabel=r'Longitude ($^\circ$E)',
-                ylabel=r'Latitude ($^\circ$N)',
-                grid=False)
+    format_plot(ax, title='Vector Field over Network',
+                xlabel=r'Lon ($^\circ$E)',
+                ylabel=r'Lat ($^\circ$N)',
+                grid=False, **_FS2)
     ax.set_aspect('equal')
-    plt.tight_layout()
-    plt.show()
+    if show:
+        plt.tight_layout()
+        plt.show()
+    return ax
 
 
 def plot_format_showcase(x_data, figsize=(_W3, _H3)):
-    """Showcase of format_plot styling options."""
+    """Showcase of format_plot styling options (3-panel)."""
     fig, axes = plt.subplots(1, 3, figsize=figsize)
 
-    axes[0].plot(x_data, np.sin(x_data), 'o-', markersize=3)
+    axes[0].plot(x_data, np.sin(x_data), 'o-', markersize=3, color=_C1)
     format_plot(axes[0], title='Default Style', xlabel='x', ylabel='sin(x)',
                 **_FS3)
 
-    axes[1].plot(x_data, np.cos(x_data), 'o-', markersize=3, color='steelblue')
+    axes[1].plot(x_data, np.cos(x_data), 'o-', markersize=3, color=_C2)
     format_plot(axes[1], title='Colored Background', xlabel='x', ylabel='cos(x)',
                 plotarea='#f0f0f0', **_FS3)
 
-    axes[2].plot(x_data, np.sin(x_data) * np.exp(-x_data / 5), 'o-', markersize=3)
+    axes[2].plot(x_data, np.sin(x_data) * np.exp(-x_data / 5), 'o-',
+                 markersize=3, color=_C3)
     format_plot(axes[2], title='Custom Ticks', xlabel='x', ylabel='y',
                 xlim=(0, 10), ylim=(-1, 1), xticksep=2.5, yticksep=0.5, **_FS3)
 

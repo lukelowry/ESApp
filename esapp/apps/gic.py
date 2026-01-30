@@ -240,7 +240,7 @@ class GIC(Indexable):
 
     # --- G-Matrix Retrieval ---
 
-    def gmatrix_from_powerworld(self, sparse: bool = True) -> Union[csr_matrix, np.ndarray]:
+    def gmatrix(self, sparse: bool = True) -> Union[csr_matrix, np.ndarray]:
         """
         Retrieve the G-matrix directly from PowerWorld.
 

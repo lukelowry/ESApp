@@ -136,16 +136,6 @@ class GridWorkBench(Indexable):
         """
         self.esa.ResetToFlatStart()
 
-    def reset(self) -> None:
-        """
-        Alias for flatstart(). Resets the case to a flat start (1.0 pu voltage, 0.0 angle).
-
-        Examples
-        --------
-        >>> wb.reset()
-        """
-        self.flatstart()
-
     def save(self, filename: Optional[str] = None) -> None:
         """
         Saves the case to the specified filename, or overwrites current if None.
@@ -291,36 +281,6 @@ class GridWorkBench(Indexable):
         self.esa.EnterMode("RUN")
 
     # --- File Operations ---
-
-    def load_aux(self, filename: str):
-        """
-        Loads an auxiliary file.
-
-        Parameters
-        ----------
-        filename : str
-            The path to the .aux file.
-
-        Examples
-        --------
-        >>> wb.load_aux("data.aux")
-        """
-        self.esa.LoadAux(filename)
-    
-    def load_script(self, filename: str):
-        """
-        Loads and runs a script file.
-
-        Parameters
-        ----------
-        filename : str
-            The path to the script file.
-
-        Examples
-        --------
-        >>> wb.load_script("run.pws")
-        """
-        self.esa.LoadScript(filename)
 
     def generations(self):
         """
@@ -574,89 +534,6 @@ class GridWorkBench(Indexable):
         """
         self.esa.Scale("GEN", "FACTOR", [factor], "SYSTEM")
 
-    def create(self, obj_type, **kwargs):
-        """
-        Creates an object with specified parameters.
-        Example: adapter.create('Load', BusNum=1, LoadID='1', LoadMW=10)
-
-        Parameters
-        ----------
-        obj_type : str
-            The PowerWorld object type.
-        **kwargs
-            Field names and values.
-
-        Examples
-        --------
-        >>> wb.create("Load", BusNum=1, LoadID="1", LoadMW=10)
-        """
-        fields = list(kwargs.keys())
-        values = list(kwargs.values())
-        self.esa.CreateData(obj_type, fields, values)
-
-    def delete(self, obj_type, filter_name=""):
-        """
-        Deletes objects of a given type, optionally matching a filter.
-
-        Parameters
-        ----------
-        obj_type : str
-            The PowerWorld object type.
-        filter_name : str, optional
-            The filter to apply.
-
-        Examples
-        --------
-        >>> wb.delete("Gen", filter_name="AreaNum = 1")
-        """
-        self.esa.Delete(obj_type, filter_name)
-
-    def select(self, obj_type, filter_name=""):
-        """
-        Sets the Selected field to YES for objects matching the filter.
-
-        Parameters
-        ----------
-        obj_type : str
-            The PowerWorld object type.
-        filter_name : str, optional
-            The filter to apply.
-
-        Examples
-        --------
-        >>> wb.select("Bus", filter_name="BusPUVolt < 0.95")
-        """
-        self.esa.SelectAll(obj_type, filter_name)
-
-    def unselect(self, obj_type, filter_name=""):
-        """
-        Sets the Selected field to NO for objects matching the filter.
-
-        Parameters
-        ----------
-        obj_type : str
-            The PowerWorld object type.
-        filter_name : str, optional
-            The filter to apply.
-
-        Examples
-        --------
-        >>> wb.unselect("Bus")
-        """
-        self.esa.UnSelectAll(obj_type, filter_name)
-
-
-
-    def radial_paths(self):
-        """
-        Identifies radial paths in the network.
-
-        Examples
-        --------
-        >>> wb.radial_paths()
-        """
-        self.esa.FindRadialBusPaths()
-
     def path_distance(self, start_element_str):
         """
         Calculates distance from a starting element to all buses.
@@ -888,16 +765,6 @@ class GridWorkBench(Indexable):
         >>> wb.fault(bus_num=5, fault_type="SLG")
         """
         return self.esa.RunFault(create_object_string("Bus", bus_num), fault_type, r, x)
-    
-    def clear_fault(self):
-        """
-        Clears the currently applied fault.
-
-        Examples
-        --------
-        >>> wb.clear_fault()
-        """
-        self.esa.FaultClear()
 
     def shortest_path(self, start_bus, end_bus):
         """
@@ -1025,58 +892,6 @@ class GridWorkBench(Indexable):
         Yt = csr_matrix((np.hstack([Ytf.reshape(-1), Ytt.reshape(-1)]), (i, np.hstack([f, t]))), (nl, nb))
         return Yf, Yt
 
-    def shunt_admittance(self):
-        """
-        Calculate the shunt admittance vector, Ysh.
-
-        This vector represents the equivalent admittance to ground for each bus,
-        derived from fixed bus shunts.
-
-        Returns
-        -------
-        np.ndarray
-            A complex-valued NumPy array representing the shunt admittance for each bus.
-
-        Examples
-        --------
-        >>> Ysh = wb.shunt_admittance()
-        """
-        base_df = self[Sim_Solution_Options, ["SBase"]]
-        base = float(base_df["SBase"].iloc[0])
-        bus_df = self[Bus, ["BusNum", "BusSS", "BusSSMW"]]
-        bus_df = bus_df.fillna(0)
-        return (bus_df["BusSSMW"].to_numpy() + 1j * bus_df["BusSS"].to_numpy()) / base
-
-    def incidence_matrix(self):
-        """
-        Calculate the bus-branch incidence matrix.
-
-        The incidence matrix (A) describes the topology of the network.
-        For a system with N buses and L branches, it is an L x N matrix
-        where A[i, j] = 1 if branch i starts at bus j, -1 if branch i
-        ends at bus j, and 0 otherwise.
-
-        Returns
-        -------
-        np.ndarray
-            A NumPy array representing the incidence matrix.
-
-        Examples
-        --------
-        >>> A = wb.incidence_matrix()
-        """
-        branch_df = self[Branch, ["BusNum", "BusNum:1", "LineCircuit"]]
-        bus_df = self[Bus, ["BusNum"]]
-
-        # Build bus number to index mapping
-        bus_to_idx = {bus: idx for idx, bus in enumerate(bus_df["BusNum"])}
-
-        incidence = np.zeros([len(branch_df), len(bus_df)], dtype=int)
-        for i, row in branch_df.iterrows():
-            incidence[i, bus_to_idx[row["BusNum"]]] = 1
-            incidence[i, bus_to_idx[row["BusNum:1"]]] = -1
-        return incidence
-
     def jacobian(self, dense=False):
         """
         Get the power flow Jacobian matrix.
@@ -1101,28 +916,6 @@ class GridWorkBench(Indexable):
         """
         return self.esa.get_jacobian(dense)
 
-    def gmatrix(self, dense=False):
-        """
-        Get the GIC conductance matrix (G).
-
-        The G-matrix relates GIC currents to earth potentials.
-
-        Parameters
-        ----------
-        dense : bool, optional
-            If True, returns a dense NumPy array. If False (default), returns a
-            SciPy CSR sparse matrix.
-
-        Returns
-        -------
-        Union[np.ndarray, csr_matrix]
-            The G-matrix.
-
-        Examples
-        --------
-        >>> G = wb.gmatrix()
-        """
-        return self.esa.get_gmatrix(dense)
 
     # --- Location Functions ---
 
@@ -1292,16 +1085,6 @@ class GridWorkBench(Indexable):
         """
         yn = "YES" if solve_pf else "NO"
         self.esa.RunScriptCommand(f"GICCalculate({max_field}, {direction}, {yn})")
-
-    def gic_clear(self):
-        """
-        Clear manual GIC calculations from PowerWorld.
-
-        Examples
-        --------
-        >>> wb.gic_clear()
-        """
-        self.esa.RunScriptCommand("GICClear;")
 
     def gic_load_b3d(self, file_type: str, filename: str, setup_on_load=True):
         """
