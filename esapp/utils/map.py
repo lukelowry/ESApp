@@ -15,6 +15,7 @@ from numpy.typing import NDArray
 
 from matplotlib.axes import Axes
 from matplotlib.cm import ScalarMappable
+from matplotlib.collections import LineCollection, PatchCollection
 from matplotlib.colors import Normalize, ListedColormap, rgb_to_hsv, hsv_to_rgb
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
@@ -35,48 +36,66 @@ _SHAPES_DIR = Path(__file__).resolve().parent / 'shapes'
 
 def format_plot(
     ax: Axes,
-    title: str = 'Chart Title',
-    xlabel: str = 'X Axis Label',
-    ylabel: str = 'Y Axis Label',
+    title: str | None = None,
+    xlabel: str | None = None,
+    ylabel: str | None = None,
     xlim: tuple[float, float] | None = None,
     ylim: tuple[float, float] | None = None,
     grid: bool = True,
-    plotarea: str = 'linen',
+    plotarea: str = 'white',
     spine_color: str = 'black',
     xticksep: float | None = None,
     yticksep: float | None = None,
+    titlesize: float = 12,
+    labelsize: float = 10,
+    ticksize: float = 9,
+    spine_width: float = 0.8,
 ) -> None:
     """
-    Format a matplotlib axes with standard styling.
+    Apply journal-standard formatting to a matplotlib axes.
 
     Parameters
     ----------
     ax : matplotlib.axes.Axes
         The axes to format.
-    title : str, default 'Chart Title'
+    title : str, optional
         Plot title.
-    xlabel, ylabel : str
+    xlabel, ylabel : str, optional
         Axis labels.
     xlim, ylim : tuple of float, optional
         Axis limits as (min, max).
     grid : bool, default True
         Whether to show grid lines.
-    plotarea : str, default 'linen'
+    plotarea : str, default 'white'
         Background face color.
     spine_color : str, default 'black'
         Color for axis spines and ticks.
     xticksep, yticksep : float, optional
         Tick separation for x and y axes.
+    titlesize : float, default 12
+        Font size for the title.
+    labelsize : float, default 10
+        Font size for axis labels.
+    ticksize : float, default 9
+        Font size for tick labels.
+    spine_width : float, default 0.8
+        Line width for axis spines.
     """
     ax.set_facecolor(plotarea)
-    ax.grid(grid)
 
     if grid:
+        ax.grid(True, color='#cccccc', linewidth=0.5, linestyle='-')
         ax.set_axisbelow(True)
+    else:
+        ax.grid(False)
 
-    ax.tick_params(color=spine_color, labelcolor=spine_color)
+    ax.tick_params(
+        axis='both', color=spine_color, labelcolor=spine_color,
+        labelsize=ticksize,
+    )
     for spine in ax.spines.values():
         spine.set_edgecolor(spine_color)
+        spine.set_linewidth(spine_width)
 
     if xlim:
         ax.set_xlim(xlim)
@@ -87,9 +106,12 @@ def format_plot(
         if yticksep:
             ax.set_yticks(np.arange(*ylim, yticksep))
 
-    ax.set_title(title)
-    ax.set_ylabel(ylabel)
-    ax.set_xlabel(xlabel)
+    if title is not None:
+        ax.set_title(title, fontsize=titlesize)
+    if xlabel is not None:
+        ax.set_xlabel(xlabel, fontsize=labelsize)
+    if ylabel is not None:
+        ax.set_ylabel(ylabel, fontsize=labelsize)
 
 
 def darker_hsv_colormap(scale_factor: float = 0.5) -> ListedColormap:
@@ -133,9 +155,15 @@ def border(ax: Axes, shape: str = 'Texas') -> None:
     shapeobj.plot(ax=ax, edgecolor='black', facecolor='none')
 
 
-def plot_lines(ax: Axes, lines: DataFrame, ms: float = 50, lw: float = 1) -> None:
+def plot_lines(
+    ax: Axes,
+    lines: DataFrame,
+    ms: float = 50,
+    lw: float = 1,
+    color: str = 'k',
+) -> None:
     """
-    Draw transmission lines geographically.
+    Draw transmission lines geographically using a single LineCollection.
 
     Parameters
     ----------
@@ -147,13 +175,22 @@ def plot_lines(ax: Axes, lines: DataFrame, ms: float = 50, lw: float = 1) -> Non
         Marker size for bus endpoints.
     lw : float, default 1
         Line width for transmission lines.
+    color : str, default 'k'
+        Color for lines and endpoint markers.
     """
     cX = lines[['Longitude', 'Longitude:1']].to_numpy()
     cY = lines[['Latitude', 'Latitude:1']].to_numpy()
 
-    for i in range(cX.shape[0]):
-        ax.plot(cX[i], cY[i], zorder=4, c='k', linewidth=lw)
-        ax.scatter(cX[i], cY[i], c='k', zorder=2, s=ms)
+    segments = np.stack([
+        np.column_stack([cX[:, 0], cY[:, 0]]),
+        np.column_stack([cX[:, 1], cY[:, 1]]),
+    ], axis=1)
+
+    ax.add_collection(
+        LineCollection(segments, colors=color, linewidths=lw, zorder=4)
+    )
+    ax.scatter(cX.ravel(), cY.ravel(), c=color, s=ms, zorder=2)
+    ax.autoscale_view()
 
 
 def plot_mesh(
@@ -187,27 +224,29 @@ def plot_mesh(
 
     X, Y, W = gt.tile_info
 
-    for x in X:
-        ax.plot([x, x], [Y.min(), Y.max()], c=color, zorder=1)
-    for y in Y:
-        ax.plot([X.min(), X.max()], [y, y], c=color, zorder=1)
+    segs = [[(x, Y.min()), (x, Y.max())] for x in X]
+    segs += [[(X.min(), y), (X.max(), y)] for y in Y]
+    ax.add_collection(
+        LineCollection(segs, colors=color, linewidths=0.5, zorder=1)
+    )
 
     tile_ids = gt.tile_ids
     refpnt = np.array([[X.min(), Y.min()]]).T
     tiles_unique = np.unique(tile_ids[:, ~np.isnan(tile_ids[0])], axis=1)
     tile_pos = tiles_unique * W + refpnt
 
-    for tile in tile_pos.T:
-        ax.add_patch(Rectangle((tile[0], tile[1]), W, W, facecolor=tcolor, alpha=talpha))
-
-    format_plot(ax, xlabel=r'Longitude ($^\circ$E)', ylabel=r'Latitude ($^\circ$N)',
-                title='Geographic Line Plot', plotarea='white', grid=False)
+    patches = [Rectangle((t[0], t[1]), W, W) for t in tile_pos.T]
+    pc = PatchCollection(patches, facecolor=tcolor, alpha=talpha,
+                         edgecolor='none')
+    ax.add_collection(pc)
+    ax.autoscale_view()
 
 
 def plot_tiles(
     ax: Axes,
     gt,
     colors: NDArray | None = None,
+    alpha: float = 0.3,
 ) -> None:
     """
     Plot colored tiles on a tesselation grid.
@@ -220,16 +259,22 @@ def plot_tiles(
         GIC tool object with ``tile_info``.
     colors : np.ndarray, optional
         2D array of tile colors. If None, uses red.
+    alpha : float, default 0.3
+        Tile transparency.
     """
     X, Y, W = gt.tile_info
 
-    for i in np.arange(len(X) - 1):
-        for j in np.arange(len(Y) - 1):
-            fc = colors[j, i] if colors is not None else 'red'
-            ax.add_patch(Rectangle((X[i] * W, Y[j] * W), W, W, facecolor=fc, alpha=0.3))
+    patches = []
+    facecolors = []
+    for i in range(len(X) - 1):
+        for j in range(len(Y) - 1):
+            patches.append(Rectangle((X[i] * W, Y[j] * W), W, W))
+            facecolors.append(colors[j, i] if colors is not None else 'red')
 
-    format_plot(ax, xlabel=r'Longitude ($^\circ$E)', ylabel=r'Latitude ($^\circ$N)',
-                title='Tile Plot', plotarea='white', grid=False)
+    pc = PatchCollection(patches, alpha=alpha, edgecolor='none')
+    pc.set_facecolor(facecolors)
+    ax.add_collection(pc)
+    ax.autoscale_view()
 
 
 def plot_vecfield(
@@ -242,7 +287,6 @@ def plot_vecfield(
     pivot: str = 'mid',
     scale: float = 70,
     width: float = 0.001,
-    title: str = '',
 ) -> ScalarMappable:
     """
     Plot a vector field colored by angle.
@@ -263,8 +307,6 @@ def plot_vecfield(
         Quiver arrow scaling.
     width : float, default 0.001
         Quiver arrow width.
-    title : str, default ''
-        Plot title.
 
     Returns
     -------
@@ -278,9 +320,7 @@ def plot_vecfield(
     colors = np.arctan2(U, V)
     colors[np.isnan(colors)] = 0
 
-    ax.quiver(X, Y, U, V, colors, norm=norm, pivot=pivot, scale=scale, width=width, cmap=cmap)
-
-    format_plot(ax, xlabel=r'Longitude ($^\circ$E)', ylabel=r'Latitude ($^\circ$N)',
-                title=title, plotarea='white', grid=False)
+    ax.quiver(X, Y, U, V, colors, norm=norm, pivot=pivot, scale=scale,
+              width=width, cmap=cmap)
 
     return ScalarMappable(norm, cmap)

@@ -41,7 +41,6 @@ __all__ = [
     'Mesh',
     'extract_unique_edges',
     'Grid2D',
-    'GridSelector',
 ]
 
 
@@ -291,11 +290,15 @@ class Mesh:
 
 class Grid2D:
     """
-    Finite difference operator generator for regular 2D grids.
+    Graph-based discrete operator generator for regular 2D grids.
 
-    Generates sparse matrix operators for gradient, divergence, curl,
-    and Laplacian on a rectangular grid with Fortran-style (column-major)
-    indexing.
+    Constructs an oriented incidence matrix for the 2D grid graph and
+    derives all discrete operators (gradient, divergence, curl, Laplacian)
+    from it. The Laplacian is computed as L = A^T diag(w) A where A is
+    the incidence matrix and w are edge weights.
+
+    Also provides boolean masks for boundary and interior region selection,
+    useful for applying boundary conditions in finite difference schemes.
 
     Parameters
     ----------
@@ -310,28 +313,103 @@ class Grid2D:
         Number of grid points in y direction.
     size : int
         Total number of grid points (nx * ny).
+    n_edges_x : int
+        Number of horizontal edges: (nx - 1) * ny.
+    n_edges_y : int
+        Number of vertical edges: nx * (ny - 1).
+    n_edges : int
+        Total number of edges.
 
     Examples
     --------
     >>> grid = Grid2D((10, 10))
-    >>> Dx, Dy = grid.gradient()
-    >>> L = grid.laplacian()
-    >>> div = grid.divergence()
+    >>> A = grid.incidence()          # Oriented incidence matrix
+    >>> L = grid.laplacian()          # L = A^T A (unit weights)
+    >>> Dx, Dy = grid.gradient()      # Extracted from A
+    >>> u[grid.boundary] = 0          # Apply Dirichlet BC
 
     Notes
     -----
     Grid points are indexed in Fortran order (column-major), so point
     (x, y) maps to flat index y * nx + x. This matches numpy's 'F' order.
+
+    Edges are ordered with all horizontal edges first, then vertical edges.
+    Each edge is oriented from the lower-index node to the higher-index node
+    (left-to-right for horizontal, bottom-to-top for vertical).
     """
 
     def __init__(self, shape: tuple[int, int]) -> None:
         self.nx, self.ny = shape
         self.size = self.nx * self.ny
+        self.n_edges_x = (self.nx - 1) * self.ny
+        self.n_edges_y = self.nx * (self.ny - 1)
+        self.n_edges = self.n_edges_x + self.n_edges_y
+
+        # Build and cache the incidence matrix and region masks
+        self._A = self._build_incidence()
+        self._build_masks()
 
     @property
     def shape(self) -> tuple[int, int]:
         """Grid dimensions (nx, ny)."""
         return (self.nx, self.ny)
+
+    # -----------------------------------------------------------------
+    # Region masks (formerly GridSelector)
+    # -----------------------------------------------------------------
+
+    def _build_masks(self) -> None:
+        """Compute boolean masks for boundary and interior regions."""
+        idx = np.arange(self.size)
+        x = idx % self.nx
+        y = idx // self.nx
+
+        self._left = (x == 0)
+        self._right = (x == self.nx - 1)
+        self._bottom = (y == 0)
+        self._top = (y == self.ny - 1)
+        self._corners = (self._left | self._right) & (self._bottom | self._top)
+        self._boundary = self._left | self._right | self._bottom | self._top
+        self._interior = ~self._boundary
+
+    @property
+    def left(self) -> NDArray[np.bool_]:
+        """Boolean mask for left boundary (x = 0)."""
+        return self._left
+
+    @property
+    def right(self) -> NDArray[np.bool_]:
+        """Boolean mask for right boundary (x = nx-1)."""
+        return self._right
+
+    @property
+    def bottom(self) -> NDArray[np.bool_]:
+        """Boolean mask for bottom boundary (y = 0)."""
+        return self._bottom
+
+    @property
+    def top(self) -> NDArray[np.bool_]:
+        """Boolean mask for top boundary (y = ny-1)."""
+        return self._top
+
+    @property
+    def corners(self) -> NDArray[np.bool_]:
+        """Boolean mask for corner points."""
+        return self._corners
+
+    @property
+    def boundary(self) -> NDArray[np.bool_]:
+        """Boolean mask for all boundary points."""
+        return self._boundary
+
+    @property
+    def interior(self) -> NDArray[np.bool_]:
+        """Boolean mask for interior (non-boundary) points."""
+        return self._interior
+
+    # -----------------------------------------------------------------
+    # Indexing
+    # -----------------------------------------------------------------
 
     def flat_index(self, x: int, y: int) -> int:
         """
@@ -380,112 +458,124 @@ class Grid2D:
             for x in range(self.nx):
                 yield x, y, self.flat_index(x, y)
 
-    def _build_gradient_x(self, scheme: str = 'forward') -> csr_matrix:
-        """Build x-direction gradient operator using vectorized construction."""
+    # -----------------------------------------------------------------
+    # Incidence matrix (core data structure)
+    # -----------------------------------------------------------------
+
+    def _build_incidence(self) -> csr_matrix:
+        """
+        Build the oriented incidence matrix of the 2D grid graph.
+
+        The matrix A has shape (n_edges, n_nodes). Each row has exactly
+        two nonzeros: -1 at the source node and +1 at the target node.
+        Horizontal edges are listed first, then vertical edges.
+
+        Returns
+        -------
+        scipy.sparse.csr_matrix
+            Incidence matrix A of shape (n_edges, n_nodes).
+        """
         n = self.size
-        idx = np.arange(n)
-        x = idx % self.nx
+        nx, ny = self.nx, self.ny
 
-        if scheme == 'forward':
-            mask = x < self.nx - 1
-            src = idx[mask]
-            rows = np.repeat(src, 2)
-            cols = np.column_stack([src, src + 1]).ravel()
-            data = np.tile([-1.0, 1.0], len(src))
-        elif scheme == 'backward':
-            mask = x > 0
-            src = idx[mask]
-            rows = np.repeat(src, 2)
-            cols = np.column_stack([src - 1, src]).ravel()
-            data = np.tile([-1.0, 1.0], len(src))
-        elif scheme == 'central':
-            mask = (x > 0) & (x < self.nx - 1)
-            src = idx[mask]
-            rows = np.repeat(src, 2)
-            cols = np.column_stack([src - 1, src + 1]).ravel()
-            data = np.tile([-0.5, 0.5], len(src))
+        # --- Horizontal edges: (x, y) → (x+1, y) ---
+        # For each row y, there are (nx-1) horizontal edges
+        ex = self.n_edges_x
+        if ex > 0:
+            # Source nodes for horizontal edges
+            all_nodes = np.arange(n).reshape(ny, nx)
+            src_x = all_nodes[:, :-1].ravel()   # left endpoints
+            tgt_x = all_nodes[:, 1:].ravel()     # right endpoints
+            edge_idx_x = np.arange(ex)
         else:
-            raise ValueError(f"Unknown scheme: {scheme}")
+            src_x = np.array([], dtype=int)
+            tgt_x = np.array([], dtype=int)
+            edge_idx_x = np.array([], dtype=int)
 
-        return csr_matrix((data, (rows, cols)), shape=(n, n))
-
-    def _build_gradient_y(self, scheme: str = 'forward') -> csr_matrix:
-        """Build y-direction gradient operator using vectorized construction."""
-        n = self.size
-        step = self.nx
-        idx = np.arange(n)
-        y = idx // self.nx
-
-        if scheme == 'forward':
-            mask = y < self.ny - 1
-            src = idx[mask]
-            rows = np.repeat(src, 2)
-            cols = np.column_stack([src, src + step]).ravel()
-            data = np.tile([-1.0, 1.0], len(src))
-        elif scheme == 'backward':
-            mask = y > 0
-            src = idx[mask]
-            rows = np.repeat(src, 2)
-            cols = np.column_stack([src - step, src]).ravel()
-            data = np.tile([-1.0, 1.0], len(src))
-        elif scheme == 'central':
-            mask = (y > 0) & (y < self.ny - 1)
-            src = idx[mask]
-            rows = np.repeat(src, 2)
-            cols = np.column_stack([src - step, src + step]).ravel()
-            data = np.tile([-0.5, 0.5], len(src))
+        # --- Vertical edges: (x, y) → (x, y+1) ---
+        ey = self.n_edges_y
+        if ey > 0:
+            all_nodes = np.arange(n).reshape(ny, nx)
+            src_y = all_nodes[:-1, :].ravel()    # bottom endpoints
+            tgt_y = all_nodes[1:, :].ravel()      # top endpoints
+            edge_idx_y = np.arange(ex, ex + ey)
         else:
-            raise ValueError(f"Unknown scheme: {scheme}")
+            src_y = np.array([], dtype=int)
+            tgt_y = np.array([], dtype=int)
+            edge_idx_y = np.array([], dtype=int)
 
-        return csr_matrix((data, (rows, cols)), shape=(n, n))
+        # Assemble COO data
+        rows = np.concatenate([edge_idx_x, edge_idx_x, edge_idx_y, edge_idx_y])
+        cols = np.concatenate([src_x, tgt_x, src_y, tgt_y])
+        data = np.concatenate([
+            -np.ones(ex), np.ones(ex),
+            -np.ones(ey), np.ones(ey),
+        ])
 
-    def gradient(self, scheme: str = 'forward') -> tuple[csr_matrix, csr_matrix]:
+        return csr_matrix((data, (rows, cols)), shape=(self.n_edges, n))
+
+    def incidence(self) -> csr_matrix:
+        """
+        Return the oriented incidence matrix of the 2D grid graph.
+
+        The matrix A has shape (n_edges, n_nodes). Rows 0..n_edges_x-1
+        correspond to horizontal edges, and rows n_edges_x..n_edges-1
+        correspond to vertical edges. Each row has -1 at the source
+        node and +1 at the target node.
+
+        Returns
+        -------
+        scipy.sparse.csr_matrix
+            Incidence matrix A.
+        """
+        return self._A
+
+    # -----------------------------------------------------------------
+    # Discrete operators derived from the incidence matrix
+    # -----------------------------------------------------------------
+
+    def gradient(self) -> tuple[csr_matrix, csr_matrix]:
         """
         Build gradient operators for a scalar field.
 
-        Parameters
-        ----------
-        scheme : {'forward', 'backward', 'central'}
-            Finite difference scheme to use.
+        The gradient operators Dx, Dy are extracted directly from the
+        incidence matrix A: Dx consists of the horizontal-edge rows,
+        and Dy consists of the vertical-edge rows.
 
         Returns
         -------
         Dx : scipy.sparse.csr_matrix
-            X-direction gradient operator.
+            X-direction gradient, shape (n_edges_x, n_nodes).
         Dy : scipy.sparse.csr_matrix
-            Y-direction gradient operator.
+            Y-direction gradient, shape (n_edges_y, n_nodes).
 
         Notes
         -----
-        For a scalar field u, the gradient is (Dx @ u, Dy @ u).
-
-        Forward differences use: du/dx ≈ u[i+1] - u[i]
-        Backward differences use: du/dx ≈ u[i] - u[i-1]
-        Central differences use: du/dx ≈ (u[i+1] - u[i-1]) / 2
+        For a scalar field u (length n_nodes), the gradient components
+        are Dx @ u and Dy @ u.
         """
-        return self._build_gradient_x(scheme), self._build_gradient_y(scheme)
+        Dx = self._A[:self.n_edges_x, :]
+        Dy = self._A[self.n_edges_x:, :]
+        return Dx, Dy
 
     def divergence(self) -> csr_matrix:
         """
         Build divergence operator for a vector field.
 
+        The divergence is the negative adjoint of the gradient:
+        div = -A^T, applied to an edge-based vector field.
+
         Returns
         -------
         scipy.sparse.csr_matrix
-            Divergence operator of shape (n, 2n).
+            Divergence operator of shape (n_nodes, n_edges).
 
         Notes
         -----
-        For a vector field (u, v) stored as a stacked vector [u; v],
-        the divergence is: div(u, v) = du/dx + dv/dy
-
-        Uses centered differences (backward - forward).
+        For an edge-based vector field f (length n_edges),
+        the divergence is -A^T @ f.
         """
-        Dxf, Dyf = self.gradient('forward')
-        Dxb, Dyb = self.gradient('backward')
-        Dx = Dxb - Dxf
-        Dy = Dyb - Dyf
-        return sp.hstack([Dx, Dy], format='csr')
+        return -self._A.T.tocsr()
 
     def curl(self) -> csr_matrix:
         """
@@ -494,41 +584,80 @@ class Grid2D:
         Returns
         -------
         scipy.sparse.csr_matrix
-            Curl operator of shape (n, 2n).
+            Curl operator of shape (n_faces, n_edges), where n_faces
+            is the number of grid cells (nx-1) * (ny-1).
 
         Notes
         -----
-        For a 2D vector field (u, v), the curl gives the scalar:
-        curl(u, v) = dv/dx - du/dy
+        The discrete curl maps an edge field to a face field. For each
+        rectangular cell, the curl sums the edge values around the cell
+        boundary (with orientation signs).
 
-        Uses centered differences (backward - forward).
+        For a grid cell with corners (x,y), (x+1,y), (x+1,y+1), (x,y+1):
+        curl = bottom + right - top - left
         """
-        Dxf, Dyf = self.gradient('forward')
-        Dxb, Dyb = self.gradient('backward')
-        Dx = Dxb - Dxf
-        Dy = Dyb - Dyf
-        return sp.hstack([Dy, -Dx], format='csr')
+        nx, ny = self.nx, self.ny
+        n_faces = (nx - 1) * (ny - 1)
+        if n_faces == 0:
+            return csr_matrix((0, self.n_edges))
 
-    def laplacian(self) -> csr_matrix:
+        # Edge indices within the incidence matrix
+        # Horizontal edges: row y, column x → index y*(nx-1) + x
+        # Vertical edges:   row y, column x → n_edges_x + y*nx + x
+        face_idx = np.arange(n_faces)
+        fx = face_idx % (nx - 1)
+        fy = face_idx // (nx - 1)
+
+        bottom = fy * (nx - 1) + fx                          # horizontal, row y
+        top = (fy + 1) * (nx - 1) + fx                       # horizontal, row y+1
+        left = self.n_edges_x + fy * nx + fx                 # vertical, col x
+        right = self.n_edges_x + fy * nx + (fx + 1)          # vertical, col x+1
+
+        rows = np.tile(face_idx, 4)
+        cols = np.concatenate([bottom, right, top, left])
+        data = np.concatenate([
+            np.ones(n_faces),      # bottom: +1
+            np.ones(n_faces),      # right:  +1
+            -np.ones(n_faces),     # top:    -1
+            -np.ones(n_faces),     # left:   -1
+        ])
+
+        return csr_matrix((data, (rows, cols)), shape=(n_faces, self.n_edges))
+
+    def laplacian(self, weights: NDArray[np.floating] | None = None) -> csr_matrix:
         """
         Build the discrete Laplacian operator.
+
+        Computed as L = A^T diag(w) A where A is the incidence matrix
+        and w are per-edge weights.
+
+        Parameters
+        ----------
+        weights : np.ndarray, optional
+            Per-edge weight vector of length n_edges. If None, unit
+            weights are used (standard combinatorial Laplacian).
 
         Returns
         -------
         scipy.sparse.csr_matrix
-            Laplacian operator of shape (n, n).
+            Laplacian operator of shape (n_nodes, n_nodes).
 
         Notes
         -----
-        Computed as L = Dx.T @ Dx + Dy.T @ Dy using forward differences,
-        which gives the standard 5-point stencil for interior points.
+        With unit weights, this produces the standard 5-point stencil
+        for interior nodes: L[i,i] = degree(i), L[i,j] = -1 for
+        adjacent nodes j.
         """
-        Dx, Dy = self.gradient('forward')
-        return Dx.T @ Dx + Dy.T @ Dy
+        A = self._A
+        if weights is None:
+            return (A.T @ A).tocsr()
+        else:
+            W = sp.diags(weights)
+            return (A.T @ W @ A).tocsr()
 
     def hodge_star(self) -> csr_matrix:
         """
-        Build the 2D Hodge star operator.
+        Build the 2D Hodge star operator on node-based vector fields.
 
         The Hodge star rotates vectors by 90 degrees, equivalent to
         multiplication by the imaginary unit in the complex plane.
@@ -540,64 +669,13 @@ class Grid2D:
 
         Notes
         -----
-        For a vector field [u; v], returns [-v; u].
+        For a node-based vector field [u; v] of length 2n,
+        returns [-v; u].
         """
         n = self.size
         I = sp.eye(n, format='csr')
         Z = csr_matrix((n, n))
         return sp.bmat([[Z, -I], [I, Z]], format='csr')
-
-
-class GridSelector:
-    """
-    Boolean masks for selecting regions of a structured grid.
-
-    Provides masks for boundary and interior point selection,
-    useful for applying boundary conditions in finite difference schemes.
-
-    Parameters
-    ----------
-    grid : Grid2D
-        The grid to create selectors for.
-
-    Attributes
-    ----------
-    left : np.ndarray
-        Boolean mask for left boundary (x = 0).
-    right : np.ndarray
-        Boolean mask for right boundary (x = nx-1).
-    bottom : np.ndarray
-        Boolean mask for bottom boundary (y = 0).
-    top : np.ndarray
-        Boolean mask for top boundary (y = ny-1).
-    corners : np.ndarray
-        Boolean mask for corner points.
-    boundary : np.ndarray
-        Boolean mask for all boundary points.
-    interior : np.ndarray
-        Boolean mask for interior (non-boundary) points.
-
-    Examples
-    --------
-    >>> grid = Grid2D((10, 10))
-    >>> sel = GridSelector(grid)
-    >>> u[sel.boundary] = 0  # Apply Dirichlet BC
-    >>> interior_values = u[sel.interior]
-    """
-
-    def __init__(self, grid: Grid2D) -> None:
-        idx = np.arange(grid.size)
-        x = idx % grid.nx
-        y = idx // grid.nx
-
-        self.left = (x == 0)
-        self.right = (x == grid.nx - 1)
-        self.bottom = (y == 0)
-        self.top = (y == grid.ny - 1)
-
-        self.corners = (self.left | self.right) & (self.bottom | self.top)
-        self.boundary = self.left | self.right | self.bottom | self.top
-        self.interior = ~self.boundary
 
 
 # =============================================================================

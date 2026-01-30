@@ -21,7 +21,6 @@ from .mesh import (
     Mesh,
     extract_unique_edges,
     Grid2D,
-    GridSelector,
 )
 
 from .misc import (
@@ -55,7 +54,6 @@ __all__ = [
     'Mesh',
     'extract_unique_edges',
     'Grid2D',
-    'GridSelector',
     # misc
     'InjectionVector',
     'timing',
