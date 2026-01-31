@@ -1,8 +1,10 @@
 """
 Unit tests for the Indexable class data access (wb[GObject, "field"] syntax).
 
-Tests __getitem__ and __setitem__ for reading/writing PowerWorld data,
-including broadcast, bulk update, keyless objects, and error handling.
+These are **unit tests** that do NOT require PowerWorld Simulator. All
+PowerWorld COM interactions are mocked. They test __getitem__ and __setitem__
+for reading/writing PowerWorld data, including broadcast, bulk update,
+keyless objects, and error handling.
 
 USAGE:
     pytest tests/test_indexing.py -v
@@ -325,7 +327,8 @@ def test_open_relative_path():
     from os import path as ospath
     with patch('esapp.indexable.SAW') as mock_saw_class, \
          patch('esapp.indexable.path.isabs', return_value=False), \
-         patch('esapp.indexable.path.abspath', return_value='/abs/path/case.pwb'):
+         patch('esapp.indexable.path.abspath', return_value='/abs/path/case.pwb'), \
+         patch('esapp.indexable.path.exists', return_value=True):
 
         mock_esa = Mock()
         mock_saw_class.return_value = mock_esa
@@ -342,7 +345,8 @@ def test_open_relative_path():
 def test_open_absolute_path():
     """open() preserves absolute path."""
     with patch('esapp.indexable.SAW') as mock_saw_class, \
-         patch('esapp.indexable.path.isabs', return_value=True):
+         patch('esapp.indexable.path.isabs', return_value=True), \
+         patch('esapp.indexable.path.exists', return_value=True):
 
         mock_esa = Mock()
         mock_saw_class.return_value = mock_esa

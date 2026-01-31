@@ -808,7 +808,20 @@ class SAWBase(object):
                 raise TypeError("When OpenCase is called for the first time, a FileName is required.")
         else:
             self.pwb_file_path = FileName
-        return self._call_simauto("OpenCase", self.pwb_file_path)
+        try:
+            return self._call_simauto("OpenCase", self.pwb_file_path)
+        except PowerWorldError as e:
+            hints = [f"Failed to open case: '{self.pwb_file_path}'"]
+            if not os.path.exists(self.pwb_file_path):
+                hints.append(f"File does not exist at the specified path.")
+            else:
+                hints.append("The file exists but PowerWorld could not open it.")
+                hints.append("Possible causes:")
+                hints.append("  - PowerWorld Simulator is not licensed or the license has expired")
+                hints.append("  - The file is corrupted or in an unsupported format")
+                hints.append("  - The file is locked by another process")
+            hints.append(f"Original error: {e.raw_message}")
+            raise PowerWorldError("\n".join(hints)) from e
 
     def OpenCaseType(self, FileName: str, FileType: str, Options: Union[list, str, None] = None) -> None:
         """Opens a case file of a specific type (e.g., PTI, GE) with options.
@@ -835,7 +848,20 @@ class SAWBase(object):
             options = Options
         else:
             options = ""
-        return self._call_simauto("OpenCaseType", self.pwb_file_path, FileType, options)
+        try:
+            return self._call_simauto("OpenCaseType", self.pwb_file_path, FileType, options)
+        except PowerWorldError as e:
+            hints = [f"Failed to open case: '{self.pwb_file_path}' (format: {FileType})"]
+            if not os.path.exists(self.pwb_file_path):
+                hints.append(f"File does not exist at the specified path.")
+            else:
+                hints.append("The file exists but PowerWorld could not open it.")
+                hints.append("Possible causes:")
+                hints.append("  - PowerWorld Simulator is not licensed or the license has expired")
+                hints.append(f"  - The file format '{FileType}' does not match the actual file contents")
+                hints.append("  - The file is corrupted or locked by another process")
+            hints.append(f"Original error: {e.raw_message}")
+            raise PowerWorldError("\n".join(hints)) from e
 
     def ProcessAuxFile(self, FileName):
         """Executes a PowerWorld auxiliary (.aux) file.

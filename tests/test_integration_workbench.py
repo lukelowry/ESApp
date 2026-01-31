@@ -1,12 +1,16 @@
 """
-Integration tests for GridWorkBench functionality with live PowerWorld data.
+Integration tests for the GridWorkBench facade.
 
-Tests workbench-level facade methods. Domain-specific tests for Statics,
-Network, GIC, and Dynamics are in test_integration_analysis.py.
+These are **integration tests** that require a live connection to PowerWorld
+Simulator via the SimAuto COM interface. They test the top-level
+GridWorkBench facade: case I/O, simulation control, component retrieval,
+data modification, and delegation to sub-modules. Domain-specific analysis
+tests (statics, GIC, dynamics) are in test_integration_analysis.py.
 
-DEPENDENCIES:
-- PowerWorld Simulator installed and SimAuto registered
-- Valid PowerWorld case file configured in tests/config_test.py
+REQUIREMENTS:
+    - PowerWorld Simulator installed with SimAuto COM registered
+    - A valid PowerWorld case file path set in ``tests/config_test.py``
+      (variable ``SAW_TEST_CASE``) or via the ``SAW_TEST_CASE`` env variable
 
 USAGE:
     pytest tests/test_integration_workbench.py -v
@@ -114,19 +118,6 @@ class TestGridWorkBenchFunctions:
             wb.open_branch(l['BusNum'], l['BusNum:1'], l['LineCircuit'])
             wb.close_branch(l['BusNum'], l['BusNum:1'], l['LineCircuit'])
 
-        gens = wb.generations()
-        if not gens.empty:
-            g_keys = wb[Gen, ["BusNum", "GenID"]].iloc[0]
-            wb.set_gen(g_keys['BusNum'], g_keys['GenID'], mw=10.0, status="Closed")
-
-        loads = wb.loads()
-        if not loads.empty:
-            l_keys = wb[Load, ["BusNum", "LoadID"]].iloc[0]
-            wb.set_load(l_keys['BusNum'], l_keys['LoadID'], mw=5.0, status="Closed")
-
-        wb.scale_load(1.0)
-        wb.scale_gen(1.0)
-
     # -------------------------------------------------------------------------
     # Analysis & Difference Flows
     # -------------------------------------------------------------------------
@@ -141,9 +132,6 @@ class TestGridWorkBenchFunctions:
         assert not mp.empty
         assert not mq.empty
 
-        isl = wb.islands()
-        assert isl is not None
-
         wb.set_as_base_case()
         wb.diff_mode("DIFFERENCE")
         wb.diff_mode("PRESENT")
@@ -151,36 +139,6 @@ class TestGridWorkBenchFunctions:
     # -------------------------------------------------------------------------
     # Sensitivity, Faults
     # -------------------------------------------------------------------------
-
-    def test_sensitivity_faults(self, wb):
-        """Tests ptdf, lodf, fault, shortest_path."""
-        areas = wb.areas()
-        if len(areas) >= 2:
-            s = create_object_string("Area", areas.iloc[0]["AreaNum"])
-            b = create_object_string("Area", areas.iloc[1]["AreaNum"])
-            wb.ptdf(s, b)
-
-        lines = wb.lines()
-        if not lines.empty:
-            l = lines.iloc[0]
-            br = create_object_string("Branch", l["BusNum"], l["BusNum:1"], l["LineCircuit"])
-            wb.lodf(br)
-
-        try:
-            wb.fault(1)
-        except PowerWorldError:
-            pass
-
-        buses = wb[Bus]
-        if len(buses) >= 2:
-            wb.shortest_path(buses.iloc[0]['BusNum'], buses.iloc[1]['BusNum'])
-
-    def test_advanced_analysis(self, wb):
-        """Tests OPF, YBus."""
-        wb.solve_opf()
-
-        Y = wb.ybus()
-        assert Y.shape[0] > 0
 
     def test_print_log(self, wb):
         """Tests print_log() with all parameter combinations."""
@@ -231,11 +189,8 @@ class TestGridWorkBenchFunctions:
     def test_jacobian(self, wb):
         """Tests jacobian() delegation."""
         wb.pflow(getvolts=False)
-        try:
-            J = wb.jacobian()
-            assert J.shape[0] > 0
-        except Exception:
-            pytest.skip("Jacobian not available")
+        J = wb.jacobian()
+        assert J.shape[0] > 0
 
     def test_buscoords_as_dataframe(self, wb):
         """Tests buscoords(astuple=False) delegation."""

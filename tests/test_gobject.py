@@ -1,7 +1,12 @@
 """
 Unit tests for the GObject base class and FieldPriority flag.
 
-Tests the schema construction, field access, and string representation.
+These are **unit tests** that do NOT require PowerWorld Simulator. They test
+GObject schema construction, field access, string representation, and
+bitwise FieldPriority flag operations.
+
+USAGE:
+    pytest tests/test_gobject.py -v
 """
 import pytest
 

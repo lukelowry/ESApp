@@ -1,0 +1,121 @@
+"""
+GIC sensitivity analysis for non-uniform electric fields.
+
+Provides standalone functions for computing:
+- Interface flow sensitivity to transformer GIC currents (dBound/dI)
+- E-field to GIC Jacobian (dI/dE)
+
+These functions operate on matrices produced by ``GridWorkBench.gic.model()``
+and require a live ``GridWorkBench`` instance for bus category data.
+
+Example
+-------
+>>> from esapp import GridWorkBench
+>>> from esapp.utils import GIC, jac_decomp
+>>> from examples.nonuniform.sens import dBounddI, dIdE
+>>>
+>>> wb = GridWorkBench("case.pwb")
+>>> wb.gic.model()
+>>> H = wb.gic.H
+>>> J = wb.jacobian(dense=True)
+>>> V = wb.voltage(complex=False)[0].to_numpy()
+>>> eta = ...  # injection vector
+>>> PX = wb.gic.Px
+>>> sens = dBounddI(wb, eta, PX, J, V)
+"""
+
+import numpy as np
+from scipy.sparse import hstack
+from scipy.sparse.linalg import inv as sinv
+
+from esapp.components import Bus
+from esapp.utils.gic import jac_decomp
+
+__all__ = ['dBounddI', 'dIdE', 'signdiag']
+
+
+def signdiag(x):
+    """
+    Create diagonal matrix of signs.
+
+    Parameters
+    ----------
+    x : np.ndarray
+        Input vector.
+
+    Returns
+    -------
+    np.ndarray
+        Diagonal matrix with sign(x) on diagonal.
+    """
+    return np.diagflat(np.sign(x))
+
+
+def dBounddI(wb, eta, PX, J, V):
+    """
+    Compute interface sensitivity with respect to transformer GIC currents.
+
+    Parameters
+    ----------
+    wb : GridWorkBench
+        Live workbench instance (used to retrieve bus categories).
+    eta : np.ndarray
+        Injection vector (n x 1).
+    PX : np.ndarray or sparse matrix
+        Transformer to loaded-bus mapping (n x m).
+    J : np.ndarray
+        Full AC power flow Jacobian at boundary.
+    V : np.ndarray
+        Bus voltage magnitudes (n x 1).
+
+    Returns
+    -------
+    np.ndarray
+        Sensitivity vector (1 x n).
+    """
+    buscat = wb[Bus, ['BusCat']]['BusCat']
+    slk = buscat == 'Slack'
+    pv = buscat == 'PV'
+    pq = ~(slk | pv)
+
+    dPdT, dPdV, dQdT, dQdV = jac_decomp(J)
+
+    A = hstack([dPdT[:, ~slk], dPdV[:, pq]])
+    B = hstack([dQdT[pq][:, ~slk], dQdV[pq][:, pq]])
+
+    Vdiag = np.diagflat(V[pq])
+
+    return (1 / (eta.T @ eta)) @ eta.T @ A @ B.T @ sinv((B @ B.T).tocsc()) @ Vdiag @ PX[pq]
+
+
+def dIdE(H, E=None, i=None):
+    """
+    Compute Jacobian between mesh E-field and absolute transformer GICs.
+
+    Parameters
+    ----------
+    H : np.ndarray or sparse matrix
+        H-matrix (e.g., from ``wb.gic.H`` after calling ``model()``).
+    E : np.ndarray, optional
+        Electric field vector. If provided and i is None, computes i = H @ E.
+    i : np.ndarray, optional
+        Signed neutral transformer currents. Required if E is not provided.
+
+    Returns
+    -------
+    np.ndarray
+        Jacobian matrix (rows: transformers, cols: E-field components).
+
+    Raises
+    ------
+    ValueError
+        If neither E nor i is provided.
+    """
+    if E is not None:
+        if i is None:
+            i = H @ E
+    elif i is None:
+        raise ValueError("Either E or i must be provided")
+
+    F = signdiag(i)
+    return F @ H

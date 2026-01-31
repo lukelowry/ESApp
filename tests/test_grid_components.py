@@ -1,8 +1,9 @@
 """
-Unit tests for GObject metaclass and FieldPriority.
+Unit tests for GObject metaclass and auto-generated component classes.
 
-Tests field collection, key/editable/settable classification, and validates
-all auto-generated component classes from grid.py.
+These are **unit tests** that do NOT require PowerWorld Simulator. They test
+field collection, key/editable/settable classification, and validate that all
+auto-generated component classes from grid.py are well-formed.
 
 USAGE:
     pytest tests/test_grid_components.py -v

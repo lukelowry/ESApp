@@ -41,10 +41,21 @@ class Indexable:
         This method validates the case path, initializes the SimAuto COM object,
         and attempts to initialize transient stability to ensure initial values
         are available for dynamic models.
+
+        Raises
+        ------
+        FileNotFoundError
+            If the case file does not exist on disk.
         """
         # Validate Path Name
         if not path.isabs(self.fname):
             self.fname = path.abspath(self.fname)
+
+        if not path.exists(self.fname):
+            raise FileNotFoundError(
+                f"Case file not found: '{self.fname}'\n"
+                f"Please verify the file path is correct and the file exists."
+            )
 
         # ESA Object & Transient Sim
         self.esa = SAW(self.fname, CreateIfNotFound=True, early_bind=True)

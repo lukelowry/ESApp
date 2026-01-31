@@ -1,8 +1,9 @@
 """
 Unit tests for pure Python helper functions in the SAW module.
 
-These tests do NOT require PowerWorld - they test pure Python functions
-that handle data transformation, formatting, and file parsing.
+These are **unit tests** that do NOT require PowerWorld Simulator. They test
+data transformation (df_to_aux), path conversion, argument packing, format
+string edge cases, and CSV result parsing.
 
 USAGE:
     pytest tests/test_helpers_unit.py -v

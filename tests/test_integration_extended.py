@@ -1,30 +1,27 @@
 """
-Integration tests for Scheduled Actions, Weather, Oneline, Modify, OPF, and ATC
-extended functionality against a live PowerWorld case.
+Integration tests for extended SAW functionality.
 
-WHAT THIS TESTS:
-- Scheduled Actions (all boolean parameter paths)
-- Weather commands (all boolean parameter paths)
-- Oneline diagram commands (extended coverage)
-- Modify operations (extended coverage)
-- OPF solver operations (extended coverage)
-- ATC analysis operations (extended coverage)
-- General / Case Actions (extended coverage)
-- Transient extended (additional uncovered methods)
-- Sensitivity / Topology (additional uncovered methods)
-- Powerflow (additional uncovered methods)
+These are **integration tests** that require a live connection to PowerWorld
+Simulator via the SimAuto COM interface. They provide extended coverage for
+SAW operations not covered by the other dedicated integration test files:
+scheduled actions, weather, modify, OPF, ATC, transient, sensitivity,
+topology, and power flow gap-filling.
 
 ORDERING STRATEGY:
     - Orders 500-599: Read-only queries, exports to temp files (non-destructive)
     - Orders 600-699: Analysis commands (ATC, OPF) that don't permanently alter the case
     - Orders 700-799: Transient operations (mostly exports, model queries)
     - Orders 800-899: State-modifying operations wrapped with StoreState/RestoreState
-    - Orders 900-949: Case Actions (descriptions, scaling — uses identity values)
+    - Orders 900-949: Case Actions (descriptions, scaling -- uses identity values)
     - Orders 950-999: Final cleanup (state always restored after modifications)
 
-DEPENDENCIES:
-- PowerWorld Simulator installed and SimAuto registered
-- Valid PowerWorld case file configured in tests/config_test.py
+REQUIREMENTS:
+    - PowerWorld Simulator installed with SimAuto COM registered
+    - A valid PowerWorld case file path set in ``tests/config_test.py``
+      (variable ``SAW_TEST_CASE``) or via the ``SAW_TEST_CASE`` env variable
+
+USAGE:
+    pytest tests/test_integration_extended.py -v
 """
 
 import os
@@ -69,18 +66,18 @@ def save_restore_state(saw_session):
 class TestScheduledActions:
     """Tests for Scheduled Actions mixin — all parameter paths."""
 
-    @pytest.mark.order(500)
+    @pytest.mark.order(50000)
     def test_scheduled_set_reference(self, saw_instance):
         saw_instance.ScheduledActionsSetReference()
 
-    @pytest.mark.order(501)
+    @pytest.mark.order(50100)
     def test_scheduled_apply_at(self, saw_instance):
         try:
             saw_instance.ApplyScheduledActionsAt("01/01/2025 10:00")
         except PowerWorldPrerequisiteError:
             pytest.skip("No scheduled actions defined")
 
-    @pytest.mark.order(502)
+    @pytest.mark.order(50200)
     def test_scheduled_apply_at_with_end_time(self, saw_instance):
         try:
             saw_instance.ApplyScheduledActionsAt(
@@ -89,7 +86,7 @@ class TestScheduledActions:
         except PowerWorldPrerequisiteError:
             pytest.skip("No scheduled actions defined")
 
-    @pytest.mark.order(503)
+    @pytest.mark.order(50300)
     def test_scheduled_apply_at_with_filter(self, saw_instance):
         try:
             saw_instance.ApplyScheduledActionsAt(
@@ -98,7 +95,7 @@ class TestScheduledActions:
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("No scheduled actions or filter not found")
 
-    @pytest.mark.order(504)
+    @pytest.mark.order(50400)
     def test_scheduled_apply_at_revert(self, saw_instance):
         try:
             saw_instance.ApplyScheduledActionsAt(
@@ -107,14 +104,14 @@ class TestScheduledActions:
         except PowerWorldPrerequisiteError:
             pytest.skip("No scheduled actions defined")
 
-    @pytest.mark.order(505)
+    @pytest.mark.order(50500)
     def test_scheduled_revert_at(self, saw_instance):
         try:
             saw_instance.RevertScheduledActionsAt("01/01/2025 10:00")
         except PowerWorldPrerequisiteError:
             pytest.skip("No scheduled actions defined")
 
-    @pytest.mark.order(506)
+    @pytest.mark.order(50600)
     def test_scheduled_revert_at_with_filter(self, saw_instance):
         try:
             saw_instance.RevertScheduledActionsAt(
@@ -123,28 +120,28 @@ class TestScheduledActions:
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("No scheduled actions or filter not found")
 
-    @pytest.mark.order(507)
+    @pytest.mark.order(50700)
     def test_scheduled_identify_breakers(self, saw_instance):
         try:
             saw_instance.IdentifyBreakersForScheduledActions(identify_from_normal=True)
         except PowerWorldPrerequisiteError:
             pytest.skip("No scheduled actions defined")
 
-    @pytest.mark.order(508)
+    @pytest.mark.order(50800)
     def test_scheduled_identify_breakers_false(self, saw_instance):
         try:
             saw_instance.IdentifyBreakersForScheduledActions(identify_from_normal=False)
         except PowerWorldPrerequisiteError:
             pytest.skip("No scheduled actions defined")
 
-    @pytest.mark.order(509)
+    @pytest.mark.order(50900)
     def test_scheduled_set_view(self, saw_instance):
         try:
             saw_instance.SetScheduleView("01/01/2025 10:00")
         except PowerWorldPrerequisiteError:
             pytest.skip("Schedule view not available")
 
-    @pytest.mark.order(510)
+    @pytest.mark.order(51000)
     def test_scheduled_set_view_with_options(self, saw_instance):
         try:
             saw_instance.SetScheduleView(
@@ -156,7 +153,7 @@ class TestScheduledActions:
         except PowerWorldPrerequisiteError:
             pytest.skip("Schedule view not available")
 
-    @pytest.mark.order(511)
+    @pytest.mark.order(51100)
     def test_scheduled_set_window(self, saw_instance):
         try:
             saw_instance.SetScheduleWindow(
@@ -166,7 +163,7 @@ class TestScheduledActions:
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("Schedule window not available")
 
-    @pytest.mark.order(512)
+    @pytest.mark.order(51200)
     def test_scheduled_set_window_with_resolution(self, saw_instance):
         try:
             saw_instance.SetScheduleWindow(
@@ -186,28 +183,28 @@ class TestScheduledActions:
 class TestWeather:
     """Tests for Weather mixin — all boolean parameter paths."""
 
-    @pytest.mark.order(520)
+    @pytest.mark.order(52000)
     def test_weather_limits_gen_update(self, saw_instance):
         try:
             saw_instance.WeatherLimitsGenUpdate(update_max=True, update_min=True)
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("Weather data not available")
 
-    @pytest.mark.order(521)
+    @pytest.mark.order(52100)
     def test_weather_limits_gen_update_false(self, saw_instance):
         try:
             saw_instance.WeatherLimitsGenUpdate(update_max=False, update_min=False)
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("Weather data not available")
 
-    @pytest.mark.order(522)
+    @pytest.mark.order(52200)
     def test_weather_temperature_limits_branch(self, saw_instance):
         try:
             saw_instance.TemperatureLimitsBranchUpdate()
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("Temperature limits not available")
 
-    @pytest.mark.order(523)
+    @pytest.mark.order(52300)
     def test_weather_temperature_limits_branch_custom(self, saw_instance):
         try:
             saw_instance.TemperatureLimitsBranchUpdate(
@@ -218,56 +215,56 @@ class TestWeather:
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("Temperature limits not available")
 
-    @pytest.mark.order(524)
+    @pytest.mark.order(52400)
     def test_weather_pfw_set_inputs(self, saw_instance):
         try:
             saw_instance.WeatherPFWModelsSetInputs()
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("PFW weather models not available")
 
-    @pytest.mark.order(525)
+    @pytest.mark.order(52500)
     def test_weather_pfw_set_inputs_and_apply(self, saw_instance):
         try:
             saw_instance.WeatherPFWModelsSetInputsAndApply(solve_pf=True)
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("PFW weather models not available")
 
-    @pytest.mark.order(526)
+    @pytest.mark.order(52600)
     def test_weather_pfw_set_inputs_and_apply_no_solve(self, saw_instance):
         try:
             saw_instance.WeatherPFWModelsSetInputsAndApply(solve_pf=False)
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("PFW weather models not available")
 
-    @pytest.mark.order(527)
+    @pytest.mark.order(52700)
     def test_weather_pfw_restore_design(self, saw_instance):
         try:
             saw_instance.WeatherPFWModelsRestoreDesignValues()
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("PFW weather models not available")
 
-    @pytest.mark.order(528)
+    @pytest.mark.order(52800)
     def test_weather_pww_load_datetime(self, saw_instance):
         try:
             saw_instance.WeatherPWWLoadForDateTimeUTC("2025-01-01T10:00:00")
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("PWW weather data not available")
 
-    @pytest.mark.order(529)
+    @pytest.mark.order(52900)
     def test_weather_pww_set_directory(self, saw_instance, temp_dir):
         try:
             saw_instance.WeatherPWWSetDirectory(str(temp_dir), include_subdirs=True)
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("PWW directory set not available")
 
-    @pytest.mark.order(530)
+    @pytest.mark.order(53000)
     def test_weather_pww_set_directory_no_subdirs(self, saw_instance, temp_dir):
         try:
             saw_instance.WeatherPWWSetDirectory(str(temp_dir), include_subdirs=False)
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("PWW directory set not available")
 
-    @pytest.mark.order(531)
+    @pytest.mark.order(53100)
     def test_weather_pww_file_all_meas_valid(self, saw_instance, temp_file):
         tmp = temp_file(".pww")
         try:
@@ -275,7 +272,7 @@ class TestWeather:
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("PWW validation not available")
 
-    @pytest.mark.order(532)
+    @pytest.mark.order(53200)
     def test_weather_pww_file_combine(self, saw_instance, temp_file):
         src1 = temp_file(".pww")
         src2 = temp_file(".pww")
@@ -285,7 +282,7 @@ class TestWeather:
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("PWW combine not available")
 
-    @pytest.mark.order(533)
+    @pytest.mark.order(53300)
     def test_weather_pww_file_geo_reduce(self, saw_instance, temp_file):
         src = temp_file(".pww")
         dst = temp_file(".pww")
@@ -307,89 +304,89 @@ class TestModifyExtended:
     All modifications are reverted after the class completes.
     """
 
-    @pytest.mark.order(800)
+    @pytest.mark.order(80000)
     def test_modify_auto_insert_tieline(self, saw_instance):
         try:
             saw_instance.AutoInsertTieLineTransactions()
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("Tie line transactions not available")
 
-    @pytest.mark.order(801)
+    @pytest.mark.order(80100)
     def test_modify_branch_mva_limit_reorder(self, saw_instance):
         try:
             saw_instance.BranchMVALimitReorder()
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("Branch MVA limit reorder not available")
 
-    @pytest.mark.order(802)
+    @pytest.mark.order(80200)
     def test_modify_branch_mva_limit_reorder_with_filter(self, saw_instance):
         try:
             saw_instance.BranchMVALimitReorder(filter_name="ALL")
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("Branch MVA limit reorder not available")
 
-    @pytest.mark.order(803)
+    @pytest.mark.order(80300)
     def test_modify_calculate_rxbg(self, saw_instance):
         try:
             saw_instance.CalculateRXBGFromLengthConfigCondType()
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("TransLineCalc not available")
 
-    @pytest.mark.order(804)
+    @pytest.mark.order(80400)
     def test_modify_calculate_rxbg_selected(self, saw_instance):
         try:
             saw_instance.CalculateRXBGFromLengthConfigCondType(filter_name="SELECTED")
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("TransLineCalc not available")
 
-    @pytest.mark.order(805)
+    @pytest.mark.order(80500)
     def test_modify_clear_small_islands(self, saw_instance):
         saw_instance.ClearSmallIslands()
 
-    @pytest.mark.order(806)
+    @pytest.mark.order(80600)
     def test_modify_init_gen_mvar_limits(self, saw_instance):
         saw_instance.InitializeGenMvarLimits()
 
-    @pytest.mark.order(807)
+    @pytest.mark.order(80700)
     def test_modify_injection_groups_auto_insert(self, saw_instance):
         try:
             saw_instance.InjectionGroupsAutoInsert()
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("Injection group auto-insert not available")
 
-    @pytest.mark.order(808)
+    @pytest.mark.order(80800)
     def test_modify_injection_group_create(self, saw_instance):
         try:
             saw_instance.InjectionGroupCreate("TestIG", "Gen", 1.0, "ALL", append=True)
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("Injection group create not available")
 
-    @pytest.mark.order(809)
+    @pytest.mark.order(80900)
     def test_modify_injection_group_create_no_append(self, saw_instance):
         try:
             saw_instance.InjectionGroupCreate("TestIG2", "Gen", 1.0, "ALL", append=False)
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("Injection group create not available")
 
-    @pytest.mark.order(810)
+    @pytest.mark.order(81000)
     def test_modify_interfaces_auto_insert(self, saw_instance):
         try:
             saw_instance.InterfacesAutoInsert("AREA", delete_existing=True, use_filters=False)
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("Interface auto-insert not available")
 
-    @pytest.mark.order(811)
+    @pytest.mark.order(81100)
     def test_modify_interfaces_auto_insert_with_filters(self, saw_instance):
         try:
             saw_instance.InterfacesAutoInsert("AREA", delete_existing=False, use_filters=True, prefix="TEST_")
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("Interface auto-insert not available")
 
-    @pytest.mark.order(812)
+    @pytest.mark.order(81200)
     def test_modify_set_participation_factors(self, saw_instance):
         saw_instance.SetParticipationFactors("CONSTANT", 1.0, "SYSTEM")
 
-    @pytest.mark.order(813)
+    @pytest.mark.order(81300)
     def test_modify_set_scheduled_voltage(self, saw_instance):
         buses = saw_instance.GetParametersMultipleElement("Bus", ["BusNum"])
         if buses is None or buses.empty:
@@ -400,14 +397,14 @@ class TestModifyExtended:
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("SetScheduledVoltage not available")
 
-    @pytest.mark.order(814)
+    @pytest.mark.order(81400)
     def test_modify_set_interface_limit_sum(self, saw_instance):
         try:
             saw_instance.SetInterfaceLimitToMonitoredElementLimitSum("ALL")
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("Interface limit sum not available")
 
-    @pytest.mark.order(815)
+    @pytest.mark.order(81500)
     def test_modify_rotate_bus_angles(self, saw_instance):
         buses = saw_instance.GetParametersMultipleElement("Bus", ["BusNum"])
         if buses is None or buses.empty:
@@ -418,21 +415,21 @@ class TestModifyExtended:
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("Rotate bus angles not available")
 
-    @pytest.mark.order(816)
+    @pytest.mark.order(81600)
     def test_modify_set_gen_pmax(self, saw_instance):
         try:
             saw_instance.SetGenPMaxFromReactiveCapabilityCurve()
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("Reactive capability curve not available")
 
-    @pytest.mark.order(817)
+    @pytest.mark.order(81700)
     def test_modify_remove_3w_xformer(self, saw_instance):
         try:
             saw_instance.Remove3WXformerContainer()
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("3W transformer removal not available")
 
-    @pytest.mark.order(818)
+    @pytest.mark.order(81800)
     def test_modify_rename_injection_group(self, saw_instance):
         try:
             saw_instance.InjectionGroupCreate("RenameTestIG", "Gen", 1.0, "ALL")
@@ -440,35 +437,35 @@ class TestModifyExtended:
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("Injection group rename not available")
 
-    @pytest.mark.order(819)
+    @pytest.mark.order(81900)
     def test_modify_reassign_ids(self, saw_instance):
         try:
             saw_instance.ReassignIDs("Load", "BusName", filter_name="", use_right=False)
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("ReassignIDs not available")
 
-    @pytest.mark.order(820)
+    @pytest.mark.order(82000)
     def test_modify_reassign_ids_right(self, saw_instance):
         try:
             saw_instance.ReassignIDs("Load", "BusName", filter_name="ALL", use_right=True)
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("ReassignIDs not available")
 
-    @pytest.mark.order(821)
+    @pytest.mark.order(82100)
     def test_modify_merge_line_terminals(self, saw_instance):
         try:
             saw_instance.MergeLineTerminals("SELECTED")
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("MergeLineTerminals not available")
 
-    @pytest.mark.order(822)
+    @pytest.mark.order(82200)
     def test_modify_merge_ms_line_sections(self, saw_instance):
         try:
             saw_instance.MergeMSLineSections("SELECTED")
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("MergeMSLineSections not available")
 
-    @pytest.mark.order(823)
+    @pytest.mark.order(82300)
     def test_modify_directions_auto_insert(self, saw_instance):
         areas = saw_instance.GetParametersMultipleElement("Area", ["AreaNum"])
         if areas is None or len(areas) < 2:
@@ -477,7 +474,7 @@ class TestModifyExtended:
         b = create_object_string("Area", areas.iloc[1]["AreaNum"])
         saw_instance.DirectionsAutoInsert(s, b, delete_existing=True, use_area_zone_filters=False)
 
-    @pytest.mark.order(824)
+    @pytest.mark.order(82400)
     def test_modify_directions_auto_insert_with_filters(self, saw_instance):
         areas = saw_instance.GetParametersMultipleElement("Area", ["AreaNum"])
         if areas is None or len(areas) < 2:
@@ -489,14 +486,14 @@ class TestModifyExtended:
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("Directions with filters not available")
 
-    @pytest.mark.order(825)
+    @pytest.mark.order(82500)
     def test_modify_directions_auto_insert_ref_opposite(self, saw_instance):
         try:
             saw_instance.DirectionsAutoInsertReference("Bus", "Slack", delete_existing=True, opposite_direction=True)
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("Directions reference insert not available")
 
-    @pytest.mark.order(826)
+    @pytest.mark.order(82600)
     def test_modify_change_system_mva_base(self, saw_instance):
         saw_instance.ChangeSystemMVABase(100.0)
 
@@ -508,21 +505,21 @@ class TestModifyExtended:
 class TestOPFExtended:
     """Extended tests for OPF solver operations."""
 
-    @pytest.mark.order(600)
+    @pytest.mark.order(60000)
     def test_opf_initialize_primal_lp(self, saw_instance):
         try:
             saw_instance.InitializePrimalLP()
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("OPF initialization not available")
 
-    @pytest.mark.order(601)
+    @pytest.mark.order(60100)
     def test_opf_solve_primal_lp(self, saw_instance):
         try:
             saw_instance.SolvePrimalLP()
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("Primal LP OPF not available")
 
-    @pytest.mark.order(602)
+    @pytest.mark.order(60200)
     def test_opf_solve_primal_lp_with_aux(self, saw_instance, temp_file):
         tmp_aux = temp_file(".aux")
         try:
@@ -532,28 +529,28 @@ class TestOPFExtended:
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("Primal LP OPF with aux not available")
 
-    @pytest.mark.order(603)
+    @pytest.mark.order(60300)
     def test_opf_solve_single_outer_loop(self, saw_instance):
         try:
             saw_instance.SolveSinglePrimalLPOuterLoop()
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("Single primal LP outer loop not available")
 
-    @pytest.mark.order(604)
+    @pytest.mark.order(60400)
     def test_opf_solve_full_scopf(self, saw_instance):
         try:
             saw_instance.SolveFullSCOPF(bc_method="OPF")
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("Full SCOPF not available")
 
-    @pytest.mark.order(605)
+    @pytest.mark.order(60500)
     def test_opf_solve_full_scopf_powerflow(self, saw_instance):
         try:
             saw_instance.SolveFullSCOPF(bc_method="POWERFLOW")
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("Full SCOPF with POWERFLOW not available")
 
-    @pytest.mark.order(606)
+    @pytest.mark.order(60600)
     def test_opf_write_results(self, saw_instance, temp_file):
         tmp_aux = temp_file(".aux")
         try:
@@ -570,19 +567,19 @@ class TestOPFExtended:
 class TestATCExtended:
     """Extended tests for ATC analysis operations."""
 
-    @pytest.mark.order(610)
+    @pytest.mark.order(61000)
     def test_atc_set_reference(self, saw_instance):
         saw_instance.ATCSetAsReference()
 
-    @pytest.mark.order(611)
+    @pytest.mark.order(61100)
     def test_atc_restore_initial(self, saw_instance):
         saw_instance.ATCRestoreInitialState()
 
-    @pytest.mark.order(612)
+    @pytest.mark.order(61200)
     def test_atc_delete_all_results(self, saw_instance):
         saw_instance.ATCDeleteAllResults()
 
-    @pytest.mark.order(613)
+    @pytest.mark.order(61300)
     def test_atc_determine_distributed(self, saw_instance):
         areas = saw_instance.GetParametersMultipleElement("Area", ["AreaNum"])
         if areas is None or len(areas) < 2:
@@ -594,7 +591,7 @@ class TestATCExtended:
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("Distributed ATC not available")
 
-    @pytest.mark.order(614)
+    @pytest.mark.order(61400)
     def test_atc_determine_multiple_scenarios(self, saw_instance):
         areas = saw_instance.GetParametersMultipleElement("Area", ["AreaNum"])
         if areas is None or len(areas) < 2:
@@ -606,7 +603,7 @@ class TestATCExtended:
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("ATC multiple scenarios not available")
 
-    @pytest.mark.order(615)
+    @pytest.mark.order(61500)
     def test_atc_determine_multiple_directions_distributed(self, saw_instance):
         areas = saw_instance.GetParametersMultipleElement("Area", ["AreaNum"])
         if areas is None or len(areas) < 2:
@@ -619,56 +616,56 @@ class TestATCExtended:
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("ATC multiple directions distributed not available")
 
-    @pytest.mark.order(616)
+    @pytest.mark.order(61600)
     def test_atc_create_contingent_interfaces(self, saw_instance):
         try:
             saw_instance.ATCCreateContingentInterfaces()
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("ATC contingent interfaces not available")
 
-    @pytest.mark.order(617)
+    @pytest.mark.order(61700)
     def test_atc_create_contingent_interfaces_with_filter(self, saw_instance):
         try:
             saw_instance.ATCCreateContingentInterfaces(filter_name="ALL")
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("ATC contingent interfaces not available")
 
-    @pytest.mark.order(618)
+    @pytest.mark.order(61800)
     def test_atc_determine_for(self, saw_instance):
         try:
             saw_instance.ATCDetermineATCFor(0, 0, 0)
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("ATCDetermineATCFor not available")
 
-    @pytest.mark.order(619)
+    @pytest.mark.order(61900)
     def test_atc_determine_for_apply(self, saw_instance):
         try:
             saw_instance.ATCDetermineATCFor(0, 0, 0, apply_transfer=True)
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("ATCDetermineATCFor with apply not available")
 
-    @pytest.mark.order(620)
+    @pytest.mark.order(62000)
     def test_atc_determine_multiple_directions_for(self, saw_instance):
         try:
             saw_instance.ATCDetermineMultipleDirectionsATCFor(0, 0, 0)
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("ATCDetermineMultipleDirectionsATCFor not available")
 
-    @pytest.mark.order(621)
+    @pytest.mark.order(62100)
     def test_atc_increase_transfer(self, saw_instance):
         try:
             saw_instance.ATCIncreaseTransferBy(0.0)
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("ATCIncreaseTransferBy not available")
 
-    @pytest.mark.order(622)
+    @pytest.mark.order(62200)
     def test_atc_take_me_to_scenario(self, saw_instance):
         try:
             saw_instance.ATCTakeMeToScenario(0, 0, 0)
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("ATCTakeMeToScenario not available")
 
-    @pytest.mark.order(623)
+    @pytest.mark.order(62300)
     def test_atc_data_write_options(self, saw_instance, temp_file):
         tmp_aux = temp_file(".aux")
         try:
@@ -676,7 +673,7 @@ class TestATCExtended:
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("ATC write options not available")
 
-    @pytest.mark.order(624)
+    @pytest.mark.order(62400)
     def test_atc_write_all_options_deprecated(self, saw_instance, temp_file):
         tmp_aux = temp_file(".aux")
         try:
@@ -684,7 +681,7 @@ class TestATCExtended:
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("ATCWriteAllOptions not available")
 
-    @pytest.mark.order(625)
+    @pytest.mark.order(62500)
     def test_atc_write_results_and_options(self, saw_instance, temp_file):
         tmp_aux = temp_file(".aux")
         try:
@@ -692,7 +689,7 @@ class TestATCExtended:
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("ATC write results not available")
 
-    @pytest.mark.order(626)
+    @pytest.mark.order(62600)
     def test_atc_write_scenario_log(self, saw_instance, temp_file):
         tmp_txt = temp_file(".txt")
         try:
@@ -700,7 +697,7 @@ class TestATCExtended:
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("ATC scenario log not available")
 
-    @pytest.mark.order(627)
+    @pytest.mark.order(62700)
     def test_atc_write_scenario_log_with_filter(self, saw_instance, temp_file):
         tmp_txt = temp_file(".txt")
         try:
@@ -708,7 +705,7 @@ class TestATCExtended:
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("ATC scenario log not available")
 
-    @pytest.mark.order(628)
+    @pytest.mark.order(62800)
     def test_atc_write_scenario_minmax(self, saw_instance, temp_file):
         tmp_csv = temp_file(".csv")
         try:
@@ -716,7 +713,7 @@ class TestATCExtended:
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("ATC scenario min/max not available")
 
-    @pytest.mark.order(629)
+    @pytest.mark.order(62900)
     def test_atc_write_scenario_minmax_with_fields(self, saw_instance, temp_file):
         tmp_csv = temp_file(".csv")
         try:
@@ -729,7 +726,7 @@ class TestATCExtended:
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("ATC scenario min/max not available")
 
-    @pytest.mark.order(630)
+    @pytest.mark.order(63000)
     def test_atc_write_to_text(self, saw_instance, temp_file):
         tmp_txt = temp_file(".txt")
         try:
@@ -737,7 +734,7 @@ class TestATCExtended:
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("ATC write to text not available")
 
-    @pytest.mark.order(631)
+    @pytest.mark.order(63100)
     def test_atc_write_to_text_csv_fields(self, saw_instance, temp_file):
         tmp_csv = temp_file(".csv")
         try:
@@ -745,14 +742,14 @@ class TestATCExtended:
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("ATC write to text CSV not available")
 
-    @pytest.mark.order(632)
+    @pytest.mark.order(63200)
     def test_atc_delete_scenario_change(self, saw_instance):
         try:
             saw_instance.ATCDeleteScenarioChangeIndexRange("RL", ["0"])
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("ATC delete scenario change not available")
 
-    @pytest.mark.order(633)
+    @pytest.mark.order(63300)
     def test_atc_get_results_default_fields(self, saw_instance):
         saw_instance._object_fields["transferlimiter"] = pd.DataFrame({
             "internal_field_name": ["LimitingContingency", "MaxFlow", "LimitingElement",
@@ -775,7 +772,7 @@ class TestATCExtended:
 class TestTransientExtended2:
     """Additional transient tests to hit uncovered parameter paths."""
 
-    @pytest.mark.order(640)
+    @pytest.mark.order(64000)
     def test_transient_transfer_state(self, saw_instance):
         try:
             saw_instance.TSInitialize()
@@ -783,26 +780,26 @@ class TestTransientExtended2:
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("Transient transfer state not available")
 
-    @pytest.mark.order(641)
+    @pytest.mark.order(64100)
     def test_transient_transfer_state_no_mismatch(self, saw_instance):
         try:
             saw_instance.TSTransferStateToPowerFlow(calculate_mismatch=False)
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("Transient transfer state not available")
 
-    @pytest.mark.order(642)
+    @pytest.mark.order(64200)
     def test_transient_store_response(self, saw_instance):
         saw_instance.TSStoreResponse("Gen", True)
         saw_instance.TSStoreResponse("Gen", False)
 
-    @pytest.mark.order(643)
+    @pytest.mark.order(64300)
     def test_transient_clear_results_ram(self, saw_instance):
         try:
             saw_instance.TSClearResultsFromRAM()
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(644)
+    @pytest.mark.order(64400)
     def test_transient_clear_results_specific_ctg(self, saw_instance):
         try:
             saw_instance.TSClearResultsFromRAM(
@@ -816,18 +813,18 @@ class TestTransientExtended2:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(645)
+    @pytest.mark.order(64500)
     def test_transient_clear_results_and_disable(self, saw_instance):
         saw_instance.TSClearResultsFromRAMAndDisableStorage()
 
-    @pytest.mark.order(646)
+    @pytest.mark.order(64600)
     def test_transient_clear_all_models(self, saw_instance):
         try:
             saw_instance.TSClearAllModels()
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("TSClearAllModels not available")
 
-    @pytest.mark.order(647)
+    @pytest.mark.order(64700)
     def test_transient_smib_eigenvalues(self, saw_instance):
         try:
             saw_instance.TSInitialize()
@@ -835,14 +832,14 @@ class TestTransientExtended2:
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("SMIB eigenvalues not available")
 
-    @pytest.mark.order(648)
+    @pytest.mark.order(64800)
     def test_transient_clear_models_for_objects(self, saw_instance):
         try:
             saw_instance.TSClearModelsforObjects("Gen")
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("TSClearModelsforObjects not available")
 
-    @pytest.mark.order(649)
+    @pytest.mark.order(64900)
     def test_transient_disable_machine_model(self, saw_instance):
         try:
             saw_instance.TSInitialize()
@@ -850,7 +847,7 @@ class TestTransientExtended2:
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("TSDisableMachineModelNonZeroDerivative not available")
 
-    @pytest.mark.order(650)
+    @pytest.mark.order(65000)
     def test_transient_auto_insert_dist_relay(self, saw_instance):
         try:
             saw_instance.TSAutoInsertDistRelay(
@@ -860,21 +857,21 @@ class TestTransientExtended2:
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("TSAutoInsertDistRelay not available")
 
-    @pytest.mark.order(651)
+    @pytest.mark.order(65100)
     def test_transient_auto_insert_zpott(self, saw_instance):
         try:
             saw_instance.TSAutoInsertZPOTT(reach=1.0, filter_name="ALL")
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("TSAutoInsertZPOTT not available")
 
-    @pytest.mark.order(652)
+    @pytest.mark.order(65200)
     def test_transient_run_result_analyzer(self, saw_instance):
         try:
             saw_instance.TSRunResultAnalyzer()
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("TSRunResultAnalyzer not available")
 
-    @pytest.mark.order(653)
+    @pytest.mark.order(65300)
     def test_transient_run_until_specified_time(self, saw_instance):
         try:
             saw_instance.TSInitialize()
@@ -882,7 +879,7 @@ class TestTransientExtended2:
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("TSRunUntilSpecifiedTime not available")
 
-    @pytest.mark.order(654)
+    @pytest.mark.order(65400)
     def test_transient_save_formats(self, saw_instance, temp_file):
         for fmt, method in [
             (".dyr", saw_instance.TSSavePTI),
@@ -895,7 +892,7 @@ class TestTransientExtended2:
             except (PowerWorldPrerequisiteError, PowerWorldError):
                 continue
 
-    @pytest.mark.order(655)
+    @pytest.mark.order(65500)
     def test_transient_save_formats_diff(self, saw_instance, temp_file):
         for fmt, method in [
             (".dyr", saw_instance.TSSavePTI),
@@ -908,7 +905,7 @@ class TestTransientExtended2:
             except (PowerWorldPrerequisiteError, PowerWorldError):
                 continue
 
-    @pytest.mark.order(656)
+    @pytest.mark.order(65600)
     def test_transient_write_models_diff(self, saw_instance, temp_file):
         tmp = temp_file(".aux")
         try:
@@ -916,7 +913,7 @@ class TestTransientExtended2:
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("TSWriteModels diff not available")
 
-    @pytest.mark.order(657)
+    @pytest.mark.order(65700)
     def test_transient_write_options_custom(self, saw_instance, temp_file):
         tmp = temp_file(".aux")
         try:
@@ -934,7 +931,7 @@ class TestTransientExtended2:
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("TSWriteOptions custom not available")
 
-    @pytest.mark.order(658)
+    @pytest.mark.order(65800)
     def test_transient_save_two_bus_equiv(self, saw_instance, temp_file):
         buses = saw_instance.GetParametersMultipleElement("Bus", ["BusNum"])
         if buses is None or buses.empty:
@@ -946,14 +943,14 @@ class TestTransientExtended2:
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("TSSaveTwoBusEquivalent not available")
 
-    @pytest.mark.order(659)
+    @pytest.mark.order(65900)
     def test_transient_join_active_ctgs(self, saw_instance):
         try:
             saw_instance.TSJoinActiveCTGs(0.1, delete_existing=True, join_with_self=False)
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("TSJoinActiveCTGs not available")
 
-    @pytest.mark.order(660)
+    @pytest.mark.order(66000)
     def test_transient_set_selected_for_refs(self, saw_instance):
         try:
             saw_instance.TSSetSelectedForTransientReferences(
@@ -962,7 +959,7 @@ class TestTransientExtended2:
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("TSSetSelectedForTransientReferences not available")
 
-    @pytest.mark.order(661)
+    @pytest.mark.order(66100)
     def test_transient_save_dynamic_models_append(self, saw_instance, temp_file):
         tmp = temp_file(".aux")
         try:
@@ -970,14 +967,14 @@ class TestTransientExtended2:
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("TSSaveDynamicModels append not available")
 
-    @pytest.mark.order(662)
+    @pytest.mark.order(66200)
     def test_transient_plot_series_add(self, saw_instance):
         try:
             saw_instance.TSPlotSeriesAdd("TestPlot", 1, 1, "Gen", "GenMW")
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("TSPlotSeriesAdd not available")
 
-    @pytest.mark.order(663)
+    @pytest.mark.order(66300)
     def test_transient_get_vcurve_data(self, saw_instance, temp_file):
         tmp = temp_file(".csv")
         try:
@@ -993,28 +990,28 @@ class TestTransientExtended2:
 class TestGeneralExtended:
     """Extended tests for General mixin — uncovered parameter paths."""
 
-    @pytest.mark.order(670)
+    @pytest.mark.order(67000)
     def test_general_log_clear(self, saw_instance):
         saw_instance.LogClear()
 
-    @pytest.mark.order(671)
+    @pytest.mark.order(67100)
     def test_general_log_show(self, saw_instance):
         saw_instance.LogShow(show=True)
         saw_instance.LogShow(show=False)
 
-    @pytest.mark.order(672)
+    @pytest.mark.order(67200)
     def test_general_log_add_datetime(self, saw_instance):
         saw_instance.LogAddDateTime("TestLabel", include_date=True, include_time=True, include_milliseconds=False)
 
-    @pytest.mark.order(673)
+    @pytest.mark.order(67300)
     def test_general_log_add_datetime_all(self, saw_instance):
         saw_instance.LogAddDateTime("TestLabel2", include_date=True, include_time=True, include_milliseconds=True)
 
-    @pytest.mark.order(674)
+    @pytest.mark.order(67400)
     def test_general_log_add_datetime_minimal(self, saw_instance):
         saw_instance.LogAddDateTime("TestLabel3", include_date=False, include_time=False, include_milliseconds=False)
 
-    @pytest.mark.order(675)
+    @pytest.mark.order(67500)
     def test_general_log_save_append(self, saw_instance, temp_file):
         tmp = temp_file(".txt")
         saw_instance.LogAdd("Test1")
@@ -1023,21 +1020,21 @@ class TestGeneralExtended:
         saw_instance.LogSave(tmp, append=True)
         assert os.path.exists(tmp)
 
-    @pytest.mark.order(676)
+    @pytest.mark.order(67600)
     def test_general_set_current_directory(self, saw_instance, temp_dir):
         saw_instance.SetCurrentDirectory(str(temp_dir))
 
-    @pytest.mark.order(677)
+    @pytest.mark.order(67700)
     def test_general_set_current_directory_create(self, saw_instance, temp_dir):
         new_dir = os.path.join(str(temp_dir), "test_subdir")
         saw_instance.SetCurrentDirectory(new_dir, create_if_not_found=True)
 
-    @pytest.mark.order(678)
+    @pytest.mark.order(67800)
     def test_general_enter_mode(self, saw_instance):
         saw_instance.EnterMode("EDIT")
         saw_instance.EnterMode("RUN")
 
-    @pytest.mark.order(679)
+    @pytest.mark.order(67900)
     def test_general_import_data(self, saw_instance, temp_file):
         tmp_csv = temp_file(".csv")
         with open(tmp_csv, "w") as f:
@@ -1047,7 +1044,7 @@ class TestGeneralExtended:
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("ImportData not available")
 
-    @pytest.mark.order(680)
+    @pytest.mark.order(68000)
     def test_general_load_csv(self, saw_instance, temp_file):
         tmp_csv = temp_file(".csv")
         with open(tmp_csv, "w") as f:
@@ -1057,7 +1054,7 @@ class TestGeneralExtended:
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("LoadCSV not available")
 
-    @pytest.mark.order(681)
+    @pytest.mark.order(68100)
     def test_general_save_data_with_extra(self, saw_instance, temp_file):
         tmp_csv = temp_file(".csv")
         try:
@@ -1069,7 +1066,7 @@ class TestGeneralExtended:
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("SaveDataWithExtra not available")
 
-    @pytest.mark.order(682)
+    @pytest.mark.order(68200)
     def test_general_save_data_no_sort(self, saw_instance, temp_file):
         tmp_aux = temp_file(".aux")
         saw_instance.SaveData(
@@ -1078,7 +1075,7 @@ class TestGeneralExtended:
         )
         assert os.path.exists(tmp_aux)
 
-    @pytest.mark.order(683)
+    @pytest.mark.order(68300)
     def test_general_save_data_transposed(self, saw_instance, temp_file):
         tmp_csv = temp_file(".csv")
         try:
@@ -1089,7 +1086,7 @@ class TestGeneralExtended:
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("SaveData transposed not available")
 
-    @pytest.mark.order(684)
+    @pytest.mark.order(68400)
     def test_general_load_aux_create(self, saw_instance, temp_file):
         tmp_aux = temp_file(".aux")
         with open(tmp_aux, "w") as f:
@@ -1101,21 +1098,21 @@ class TestGeneralExtended:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(685)
+    @pytest.mark.order(68500)
     def test_general_load_aux_directory(self, saw_instance, temp_dir):
         try:
             saw_instance.LoadAuxDirectory(str(temp_dir), filter_string="*.aux")
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("LoadAuxDirectory not available")
 
-    @pytest.mark.order(686)
+    @pytest.mark.order(68600)
     def test_general_load_aux_directory_no_filter(self, saw_instance, temp_dir):
         try:
             saw_instance.LoadAuxDirectory(str(temp_dir))
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("LoadAuxDirectory not available")
 
-    @pytest.mark.order(687)
+    @pytest.mark.order(68700)
     def test_general_load_data(self, saw_instance, temp_file):
         tmp_aux = temp_file(".aux")
         with open(tmp_aux, "w") as f:
@@ -1125,14 +1122,14 @@ class TestGeneralExtended:
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("LoadData not available")
 
-    @pytest.mark.order(688)
+    @pytest.mark.order(68800)
     def test_general_stop_aux_file(self, saw_instance):
         try:
             saw_instance.StopAuxFile()
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("StopAuxFile not available")
 
-    @pytest.mark.order(689)
+    @pytest.mark.order(68900)
     def test_general_select_all_no_filter(self, saw_instance):
         saw_instance.SelectAll("Bus")
         saw_instance.UnSelectAll("Bus")
@@ -1145,13 +1142,13 @@ class TestGeneralExtended:
 class TestCaseActionsExtended:
     """Extended tests for Case Actions — uncovered parameter paths."""
 
-    @pytest.mark.order(900)
+    @pytest.mark.order(90000)
     def test_case_description_append(self, saw_instance):
         saw_instance.CaseDescriptionSet("Line 1")
         saw_instance.CaseDescriptionSet("Line 2", append=True)
         saw_instance.CaseDescriptionClear()
 
-    @pytest.mark.order(901)
+    @pytest.mark.order(90100)
     def test_case_save_external_with_ties(self, saw_instance, temp_file):
         tmp_pwb = temp_file(".pwb")
         try:
@@ -1159,21 +1156,21 @@ class TestCaseActionsExtended:
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("SaveExternalSystem with ties not available")
 
-    @pytest.mark.order(902)
+    @pytest.mark.order(90200)
     def test_case_scale_gen(self, saw_instance):
         try:
             saw_instance.Scale("GEN", "FACTOR", [1.0], "SYSTEM")
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("Scale GEN not available")
 
-    @pytest.mark.order(903)
+    @pytest.mark.order(90300)
     def test_case_scale_load_mw(self, saw_instance):
         try:
             saw_instance.Scale("LOAD", "MW", [100.0, 50.0], "SYSTEM")
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("Scale LOAD MW not available")
 
-    @pytest.mark.order(904)
+    @pytest.mark.order(90400)
     def test_case_load_ems(self, saw_instance, temp_file):
         tmp = temp_file(".hdb")
         try:
@@ -1181,7 +1178,7 @@ class TestCaseActionsExtended:
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("LoadEMS not available")
 
-    @pytest.mark.order(905)
+    @pytest.mark.order(90500)
     def test_case_renumber_custom_index(self, saw_instance):
         try:
             saw_instance.RenumberAreas(custom_integer_index=1)
@@ -1199,13 +1196,13 @@ class TestCaseActionsExtended:
 class TestPowerFlowExtendedGaps:
     """Tests to hit remaining uncovered lines in powerflow.py."""
 
-    @pytest.mark.order(710)
+    @pytest.mark.order(71000)
     def test_powerflow_solve_with_method(self, saw_instance):
         """Test SolvePowerFlow with explicit method parameter."""
         saw_instance.SolvePowerFlow("RECTNEWT")
         saw_instance.SolvePowerFlow()
 
-    @pytest.mark.order(711)
+    @pytest.mark.order(71100)
     def test_powerflow_condition_voltage_pockets(self, saw_instance):
         """Test VoltageConditioning."""
         try:
@@ -1213,7 +1210,7 @@ class TestPowerFlowExtendedGaps:
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("Voltage conditioning not available")
 
-    @pytest.mark.order(712)
+    @pytest.mark.order(71200)
     def test_powerflow_diff_write_removed_epc(self, saw_instance, temp_file):
         """Test DiffCaseWriteRemovedEPC."""
         tmp_epc = temp_file(".epc")
@@ -1230,7 +1227,7 @@ class TestPowerFlowExtendedGaps:
 class TestSensitivityTopologyExtended:
     """Tests to hit remaining uncovered lines in sensitivity.py and topology.py."""
 
-    @pytest.mark.order(720)
+    @pytest.mark.order(72000)
     def test_sensitivity_lodf_post_closure(self, saw_instance):
         """Test CalculateLODF with post_closure_lcdf='YES'."""
         branches = saw_instance.GetParametersMultipleElement("Branch", ["BusNum", "BusNum:1", "LineCircuit"])
@@ -1243,7 +1240,7 @@ class TestSensitivityTopologyExtended:
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("LODF post closure not available")
 
-    @pytest.mark.order(721)
+    @pytest.mark.order(72100)
     def test_sensitivity_ptdf_multiple_directions(self, saw_instance):
         """Test CalculatePTDFMultipleDirections."""
         try:
@@ -1251,7 +1248,7 @@ class TestSensitivityTopologyExtended:
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("PTDF multiple directions not available")
 
-    @pytest.mark.order(722)
+    @pytest.mark.order(72200)
     def test_sensitivity_line_loading_replicator(self, saw_instance):
         """Test LineLoadingReplicatorCalculate."""
         branches = saw_instance.GetParametersMultipleElement("Branch", ["BusNum", "BusNum:1", "LineCircuit"])
@@ -1266,7 +1263,7 @@ class TestSensitivityTopologyExtended:
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("LineLoadingReplicatorCalculate not available")
 
-    @pytest.mark.order(723)
+    @pytest.mark.order(72300)
     def test_topology_path_distance(self, saw_instance):
         """Test DeterminePathDistance."""
         buses = saw_instance.GetParametersMultipleElement("Bus", ["BusNum"])
@@ -1278,7 +1275,7 @@ class TestSensitivityTopologyExtended:
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("DeterminePathDistance not available")
 
-    @pytest.mark.order(724)
+    @pytest.mark.order(72400)
     def test_topology_set_bus_field_from_closest(self, saw_instance):
         """Test SetBusFieldFromClosest with all required args."""
         try:
@@ -1286,7 +1283,7 @@ class TestSensitivityTopologyExtended:
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("SetBusFieldFromClosest not available")
 
-    @pytest.mark.order(725)
+    @pytest.mark.order(72500)
     def test_topology_save_consolidated_case(self, saw_instance, temp_file):
         """Test SaveConsolidatedCase."""
         tmp = temp_file(".pwb")

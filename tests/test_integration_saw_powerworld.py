@@ -1,23 +1,22 @@
 """
-Integration tests for SAW base, general, oneline, modify, regions, and case actions.
+Integration tests for core SAW COM operations.
 
-WHAT THIS TESTS:
-- Base SAW operations (save, load, properties, state)
-- General commands (file ops, modes, scripts)
-- Oneline diagram operations
-- Modify operations (create/delete objects, merge, split)
-- Regions operations
-- Case actions (equivalence, renumber, scale)
+These are **integration tests** that require a live connection to PowerWorld
+Simulator via the SimAuto COM interface. They test the foundational SAW
+class operations: case save/load, state management, general commands, file
+operations, modify operations (create/delete objects, merge, split), region
+operations, and case actions (equivalence, renumber, scale).
 
-NOTE: Power flow, matrices, sensitivity, contingency, fault, GIC, ATC, transient,
+NOTE: Power flow, sensitivity, contingency, fault, GIC, ATC, transient,
       and time step tests are in their dedicated test files:
       - test_integration_powerflow.py
       - test_integration_contingency.py
       - test_integration_analysis.py
 
-DEPENDENCIES:
-- PowerWorld Simulator installed and SimAuto registered
-- Valid PowerWorld case file configured in tests/config_test.py
+REQUIREMENTS:
+    - PowerWorld Simulator installed with SimAuto COM registered
+    - A valid PowerWorld case file path set in ``tests/config_test.py``
+      (variable ``SAW_TEST_CASE``) or via the ``SAW_TEST_CASE`` env variable
 
 USAGE:
     pytest tests/test_integration_saw_powerworld.py -v
@@ -49,7 +48,7 @@ def saw_instance(saw_session):
 class TestBase:
     """Tests for base SAW operations."""
 
-    @pytest.mark.order(1)
+    @pytest.mark.order(100)
     def test_save_case(self, saw_instance, temp_file):
         tmp_pwb = temp_file(".pwb")
         saw_instance.SaveCase(tmp_pwb)
@@ -64,12 +63,12 @@ class TestBase:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(2)
+    @pytest.mark.order(200)
     def test_get_header(self, saw_instance):
         header = saw_instance.GetCaseHeader()
         assert header is not None
 
-    @pytest.mark.order(3)
+    @pytest.mark.order(300)
     def test_change_parameters(self, saw_instance):
         buses = saw_instance.GetParametersMultipleElement("Bus", ["BusNum", "BusName"])
         if buses is not None and not buses.empty:
@@ -83,7 +82,7 @@ class TestBase:
 
             saw_instance.ChangeParametersSingleElement("Bus", ["BusNum", "BusName"], [bus_num, original_name])
 
-    @pytest.mark.order(4)
+    @pytest.mark.order(400)
     def test_get_parameters(self, saw_instance):
         df = saw_instance.GetParametersMultipleElement("Bus", ["BusNum", "BusName"])
         assert df is not None
@@ -93,13 +92,13 @@ class TestBase:
         s = saw_instance.GetParametersSingleElement("Bus", ["BusNum", "BusName"], [bus_num, ""])
         assert isinstance(s, pd.Series)
 
-    @pytest.mark.order(5)
+    @pytest.mark.order(500)
     def test_list_devices(self, saw_instance):
         df = saw_instance.ListOfDevices("Bus")
         assert df is not None
         assert not df.empty
 
-    @pytest.mark.order(7)
+    @pytest.mark.order(700)
     def test_state(self, saw_instance):
         saw_instance.StoreState("TestState")
         saw_instance.RestoreState("TestState")
@@ -107,11 +106,11 @@ class TestBase:
         saw_instance.SaveState()
         saw_instance.LoadState()
 
-    @pytest.mark.order(8)
+    @pytest.mark.order(800)
     def test_run_script_2(self, saw_instance):
         saw_instance.RunScriptCommand2("LogAdd(\"Test\");", "Testing...")
 
-    @pytest.mark.order(9)
+    @pytest.mark.order(900)
     def test_field_list(self, saw_instance):
         df = saw_instance.GetFieldList("Bus")
         assert not df.empty
@@ -119,7 +118,7 @@ class TestBase:
         df_spec = saw_instance.GetSpecificFieldList("Bus", ["BusNum", "BusName"])
         assert not df_spec.empty
 
-    @pytest.mark.order(500)
+    @pytest.mark.order(50000)
     def test_update_ui_and_exec_aux(self, saw_instance):
         """Test update_ui and exec_aux operations."""
         saw_instance.update_ui()
@@ -133,7 +132,7 @@ class TestBase:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(501)
+    @pytest.mark.order(50100)
     def test_change_parameters_rect(self, saw_instance):
         """Test ChangeParametersMultipleElementRect."""
         buses = saw_instance.GetParametersMultipleElement("Bus", ["BusNum", "BusName"])
@@ -145,7 +144,7 @@ class TestBase:
             df.iloc[0, df.columns.get_loc("BusName")] = original_name
             saw_instance.ChangeParametersMultipleElementRect("Bus", ["BusNum", "BusName"], df)
 
-    @pytest.mark.order(502)
+    @pytest.mark.order(50200)
     def test_list_devices_variants(self, saw_instance):
         """Test ListOfDevices variants."""
         result1 = saw_instance.ListOfDevicesAsVariantStrings("Bus")
@@ -156,7 +155,7 @@ class TestBase:
         result = saw_instance.GetParametersMultipleElementFlatOutput("Bus", ["BusNum", "BusName"])
         assert result is None or len(result) > 0
 
-    @pytest.mark.order(503)
+    @pytest.mark.order(50300)
     def test_send_to_excel(self, saw_instance):
         """Test SendToExcel operation."""
         try:
@@ -164,7 +163,7 @@ class TestBase:
         except (PowerWorldError, Exception):
             pass
 
-    @pytest.mark.order(504)
+    @pytest.mark.order(50400)
     def test_set_data(self, saw_instance):
         """Test SetData operation."""
         buses = saw_instance.GetParametersMultipleElement("Bus", ["BusNum", "BusName"])
@@ -175,7 +174,7 @@ class TestBase:
             saw_instance.SetData("Bus", ["BusName"], ["TempName"], f"BusNum = {bus_num}")
             saw_instance.SetData("Bus", ["BusName"], [original_name], f"BusNum = {bus_num}")
 
-    @pytest.mark.order(505)
+    @pytest.mark.order(50500)
     def test_simauto_property_errors(self, saw_instance):
         """Test set_simauto_property validation errors."""
         # Invalid property name
@@ -190,7 +189,7 @@ class TestBase:
         with pytest.raises(ValueError, match="not a valid path"):
             saw_instance.set_simauto_property("CurrentDir", "C:\\NonExistent\\Path\\12345")
 
-    @pytest.mark.order(506)
+    @pytest.mark.order(50600)
     def test_change_parameters_flat_input(self, saw_instance):
         """Test ChangeParametersMultipleElementFlatInput."""
         from esapp.saw._exceptions import Error
@@ -214,7 +213,7 @@ class TestBase:
                     "Bus", ["BusNum", "BusName"], 1, [[bus_num, "Test"]]
                 )
 
-    @pytest.mark.order(507)
+    @pytest.mark.order(50700)
     def test_change_parameters_multiple_element(self, saw_instance):
         """Test ChangeParametersMultipleElement with nested list."""
         buses = saw_instance.GetParametersMultipleElement("Bus", ["BusNum", "BusName"])
@@ -229,19 +228,19 @@ class TestBase:
                 "Bus", ["BusNum", "BusName"], [[bus_num, original_name]]
             )
 
-    @pytest.mark.order(508)
+    @pytest.mark.order(50800)
     def test_get_specific_field_max_num(self, saw_instance):
         """Test GetSpecificFieldMaxNum operation."""
         max_num = saw_instance.GetSpecificFieldMaxNum("Bus", "CustomFloat")
         assert isinstance(max_num, int)
 
-    @pytest.mark.order(509)
+    @pytest.mark.order(50900)
     def test_get_params_rect_typed(self, saw_instance):
         """Test GetParamsRectTyped operation."""
         df = saw_instance.GetParamsRectTyped("Bus", ["BusNum", "BusName"])
         assert df is None or isinstance(df, pd.DataFrame)
 
-    @pytest.mark.order(510)
+    @pytest.mark.order(51000)
     def test_open_case_type(self, saw_instance):
         """Test OpenCaseType operation."""
         # Use existing case file path
@@ -256,7 +255,7 @@ class TestBase:
         # Reopen original case
         saw_instance.OpenCase()
 
-    @pytest.mark.order(511)
+    @pytest.mark.order(51100)
     def test_exec_aux_double_quotes(self, saw_instance):
         """Test exec_aux with double quote replacement."""
         aux_content = "SCRIPT { LogAdd('test double quotes'); }"
@@ -265,7 +264,7 @@ class TestBase:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(512)
+    @pytest.mark.order(51200)
     def test_set_logging_level(self, saw_instance):
         """Test set_logging_level operation."""
         import logging
@@ -276,14 +275,14 @@ class TestBase:
 class TestGeneral:
     """Tests for general SAW operations."""
 
-    @pytest.mark.order(95)
+    @pytest.mark.order(9500)
     def test_log(self, saw_instance, temp_file):
         saw_instance.LogAdd("SAW Validator Test Message")
         tmp_log = temp_file(".txt")
         saw_instance.LogSave(tmp_log)
         assert os.path.exists(tmp_log)
 
-    @pytest.mark.order(96)
+    @pytest.mark.order(9600)
     def test_file_ops(self, saw_instance, temp_file):
         tmp1 = temp_file(".txt")
         saw_instance.WriteTextToFile(tmp1, "Hello")
@@ -300,18 +299,18 @@ class TestGeneral:
         saw_instance.DeleteFile(tmp3)
         assert not os.path.exists(tmp3)
 
-    @pytest.mark.order(98)
+    @pytest.mark.order(9800)
     def test_aux(self, saw_instance, temp_file):
         tmp_aux = temp_file(".aux")
         saw_instance.SaveData(tmp_aux, "AUX", "Bus", ["BusNum", "BusName"])
         saw_instance.LoadAux(tmp_aux)
 
-    @pytest.mark.order(99)
+    @pytest.mark.order(9900)
     def test_select(self, saw_instance):
         saw_instance.SelectAll("Bus")
         saw_instance.UnSelectAll("Bus")
 
-    @pytest.mark.order(520)
+    @pytest.mark.order(52000)
     def test_log_clear_and_show(self, saw_instance):
         """Test log clear, add, datetime, and show operations."""
         saw_instance.LogClear()
@@ -323,7 +322,7 @@ class TestGeneral:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(521)
+    @pytest.mark.order(52100)
     def test_save_data_variants(self, saw_instance, temp_file):
         """Test SaveData variants."""
         tmp_aux = temp_file(".aux")
@@ -332,7 +331,7 @@ class TestGeneral:
         assert os.path.exists(tmp_aux)
         saw_instance.SaveData(tmp_csv, "CSV", "Bus", ["BusNum", "BusName"], filter_name="SELECTED")
 
-    @pytest.mark.order(522)
+    @pytest.mark.order(52200)
     def test_save_object_fields(self, saw_instance, temp_file):
         """Test SaveObjectFields operation."""
         tmp_txt = temp_file(".txt")
@@ -341,13 +340,13 @@ class TestGeneral:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(523)
+    @pytest.mark.order(52300)
     def test_enter_mode(self, saw_instance):
         """Test EnterMode operations."""
         saw_instance.EnterMode("EDIT")
         saw_instance.EnterMode("RUN")
 
-    @pytest.mark.order(524)
+    @pytest.mark.order(52400)
     def test_set_current_directory(self, saw_instance):
         """Test SetCurrentDirectory operation."""
         temp_dir = tf.gettempdir()
@@ -356,7 +355,7 @@ class TestGeneral:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(525)
+    @pytest.mark.order(52500)
     def test_load_script(self, saw_instance, temp_file):
         """Test LoadScript operation."""
         tmp_script = temp_file(".pws")
@@ -367,7 +366,7 @@ class TestGeneral:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(526)
+    @pytest.mark.order(52600)
     def test_stop_aux_file(self, saw_instance):
         """Test StopAuxFile operation."""
         try:
@@ -375,7 +374,7 @@ class TestGeneral:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(527)
+    @pytest.mark.order(52700)
     def test_import_data(self, saw_instance, temp_file):
         """Test ImportData operation."""
         tmp_csv = temp_file(".csv")
@@ -386,7 +385,7 @@ class TestGeneral:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(528)
+    @pytest.mark.order(52800)
     def test_load_data(self, saw_instance, temp_file):
         """Test LoadData operation."""
         tmp_aux = temp_file(".aux")
@@ -396,7 +395,7 @@ class TestGeneral:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(529)
+    @pytest.mark.order(52900)
     def test_save_data_with_extra(self, saw_instance, temp_file):
         """Test SaveDataWithExtra operation."""
         tmp_csv = temp_file(".csv")
@@ -408,7 +407,7 @@ class TestGeneral:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(530)
+    @pytest.mark.order(53000)
     def test_send_to_excel_advanced(self, saw_instance):
         """Test SendToExcelAdvanced operation."""
         try:
@@ -419,7 +418,7 @@ class TestGeneral:
         except (PowerWorldError, Exception):
             pass
 
-    @pytest.mark.order(531)
+    @pytest.mark.order(53100)
     def test_set_sub_data(self, saw_instance):
         """Test SetSubData operation."""
         try:
@@ -435,19 +434,19 @@ class TestGeneral:
 class TestModify:
     """Tests for modify operations (destructive - run late, order 100-199)."""
 
-    @pytest.mark.order(120)
+    @pytest.mark.order(12000)
     def test_create_delete(self, saw_instance):
         dummy_bus = 99999
         saw_instance.CreateData("Bus", ["BusNum", "BusName"], [dummy_bus, "SAW_TEST"])
         saw_instance.Delete("Bus", f"BusNum = {dummy_bus}")
 
-    @pytest.mark.order(134)
+    @pytest.mark.order(13400)
     def test_superarea(self, saw_instance):
         saw_instance.CreateData("SuperArea", ["Name"], ["TestSuperArea"])
         saw_instance.SuperAreaAddAreas("TestSuperArea", "ALL")
         saw_instance.SuperAreaRemoveAreas("TestSuperArea", "ALL")
 
-    @pytest.mark.order(135)
+    @pytest.mark.order(13500)
     def test_interface_ops(self, saw_instance):
         saw_instance.InjectionGroupRemoveDuplicates()
         saw_instance.InterfaceRemoveDuplicates()
@@ -461,7 +460,7 @@ class TestModify:
         saw_instance.CreateData("Contingency", ["Name"], ["TestCtg"])
         saw_instance.InterfaceAddElementsFromContingency("TestInt", "TestCtg")
 
-    @pytest.mark.order(510)
+    @pytest.mark.order(51000)
     def test_refine_model(self, saw_instance):
         """Test RefineModel operation."""
         try:
@@ -469,7 +468,7 @@ class TestModify:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(511)
+    @pytest.mark.order(51100)
     def test_participation_factors(self, saw_instance):
         """Test SetParticipationFactors operation."""
         gens = saw_instance.ListOfDevices("Gen")
@@ -479,7 +478,7 @@ class TestModify:
             except PowerWorldError:
                 pass
 
-    @pytest.mark.order(512)
+    @pytest.mark.order(51200)
     def test_merge_buses(self, saw_instance):
         """Test MergeBuses operation."""
         buses = saw_instance.ListOfDevices("Bus")
@@ -490,7 +489,7 @@ class TestModify:
             except PowerWorldError:
                 pass
 
-    @pytest.mark.order(513)
+    @pytest.mark.order(51300)
     def test_gen_pmax_reactive(self, saw_instance):
         """Test SetGenPMaxFromReactiveCapabilityCurve operation."""
         try:
@@ -498,7 +497,7 @@ class TestModify:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(514)
+    @pytest.mark.order(51400)
     def test_branch_mva_limit_reorder(self, saw_instance):
         """Test BranchMVALimitReorder operation."""
         try:
@@ -507,7 +506,7 @@ class TestModify:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(515)
+    @pytest.mark.order(51500)
     def test_create_line_derive_existing(self, saw_instance):
         """Test CreateLineDeriveExisting operation."""
         branches = saw_instance.ListOfDevices("Branch")
@@ -519,7 +518,7 @@ class TestModify:
             except PowerWorldError:
                 pass
 
-    @pytest.mark.order(516)
+    @pytest.mark.order(51600)
     def test_directions_auto_insert(self, saw_instance):
         """Test DirectionsAutoInsert operation."""
         try:
@@ -527,7 +526,7 @@ class TestModify:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(517)
+    @pytest.mark.order(51700)
     def test_injection_group_create(self, saw_instance):
         """Test InjectionGroupCreate operation."""
         try:
@@ -535,7 +534,7 @@ class TestModify:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(518)
+    @pytest.mark.order(51800)
     def test_interfaces_auto_insert(self, saw_instance):
         """Test InterfacesAutoInsert operation."""
         try:
@@ -543,7 +542,7 @@ class TestModify:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(519)
+    @pytest.mark.order(51900)
     def test_move(self, saw_instance):
         """Test Move operation."""
         gens = saw_instance.ListOfDevices("Gen")
@@ -556,7 +555,7 @@ class TestModify:
             except PowerWorldError:
                 pass
 
-    @pytest.mark.order(520)
+    @pytest.mark.order(52000)
     def test_reassign_ids(self, saw_instance):
         """Test ReassignIDs operation."""
         try:
@@ -564,7 +563,7 @@ class TestModify:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(521)
+    @pytest.mark.order(52100)
     def test_rename_injection_group(self, saw_instance):
         """Test RenameInjectionGroup operation."""
         try:
@@ -572,7 +571,7 @@ class TestModify:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(522)
+    @pytest.mark.order(52200)
     def test_split_bus(self, saw_instance):
         """Test SplitBus operation."""
         buses = saw_instance.ListOfDevices("Bus")
@@ -583,7 +582,7 @@ class TestModify:
             except PowerWorldError:
                 pass
 
-    @pytest.mark.order(523)
+    @pytest.mark.order(52300)
     def test_tap_transmission_line(self, saw_instance):
         """Test TapTransmissionLine operation."""
         branches = saw_instance.ListOfDevices("Branch")
@@ -597,42 +596,42 @@ class TestModify:
 class TestRegions:
     """Tests for regions operations (destructive - run late, order 200-299)."""
 
-    @pytest.mark.order(200)
+    @pytest.mark.order(20000)
     def test_region_update_buses(self, saw_instance):
         """Test RegionUpdateBuses operation."""
         saw_instance.RegionUpdateBuses()
 
-    @pytest.mark.order(201)
+    @pytest.mark.order(20100)
     def test_region_rename(self, saw_instance):
         """Test RegionRename operation."""
         saw_instance.RegionRename("OldRegion", "NewRegion")
 
-    @pytest.mark.order(202)
+    @pytest.mark.order(20200)
     def test_region_rename_class(self, saw_instance):
         """Test RegionRenameClass operation."""
         saw_instance.RegionRenameClass("OldClass", "NewClass")
 
-    @pytest.mark.order(203)
+    @pytest.mark.order(20300)
     def test_region_rename_proper1(self, saw_instance):
         """Test RegionRenameProper1 operation."""
         saw_instance.RegionRenameProper1("OldP1", "NewP1")
 
-    @pytest.mark.order(204)
+    @pytest.mark.order(20400)
     def test_region_rename_proper2(self, saw_instance):
         """Test RegionRenameProper2 operation."""
         saw_instance.RegionRenameProper2("OldP2", "NewP2")
 
-    @pytest.mark.order(205)
+    @pytest.mark.order(20500)
     def test_region_rename_proper3(self, saw_instance):
         """Test RegionRenameProper3 operation."""
         saw_instance.RegionRenameProper3("OldP3", "NewP3")
 
-    @pytest.mark.order(206)
+    @pytest.mark.order(20600)
     def test_region_rename_proper12_flip(self, saw_instance):
         """Test RegionRenameProper12Flip operation."""
         saw_instance.RegionRenameProper12Flip()
 
-    @pytest.mark.order(207)
+    @pytest.mark.order(20700)
     def test_region_load_shapefile(self, saw_instance, temp_file):
         """Test RegionLoadShapefile operation."""
         # Create a dummy shapefile path (won't exist, but tests the call)
@@ -646,7 +645,7 @@ class TestRegions:
 class TestCaseActions:
     """Tests for case actions (highly destructive - run last, order 300+)."""
 
-    @pytest.mark.order(300)
+    @pytest.mark.order(30000)
     def test_all_ops(self, saw_instance, temp_file):
         """Test all case action operations together."""
         # Case description
@@ -684,7 +683,7 @@ class TestCaseActions:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(302)
+    @pytest.mark.order(30200)
     def test_new_case(self, saw_instance):
         """Test NewCase operation."""
         # Store original path to reopen
@@ -696,7 +695,7 @@ class TestCaseActions:
         # Reopen original case
         saw_instance.OpenCase(original_path)
 
-    @pytest.mark.order(303)
+    @pytest.mark.order(30300)
     def test_renumber_files(self, saw_instance, temp_file):
         """Test renumbering file operations."""
         tmp_csv = temp_file(".csv")
@@ -714,7 +713,7 @@ class TestCaseActions:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(999)
+    @pytest.mark.order(99900)
     def test_renumber(self, saw_instance):
         """Test renumbering operations (run last as they modify keys)."""
         saw_instance.RenumberAreas()
@@ -727,7 +726,7 @@ class TestCaseActions:
 class TestSubData:
     """Integration tests for GetSubData - retrieving nested SubData from AUX exports."""
 
-    @pytest.mark.order(400)
+    @pytest.mark.order(40000)
     def test_gen_ops(self, saw_instance):
         """Test GetSubData with various generator configurations."""
         # Basic fields only
@@ -756,7 +755,7 @@ class TestSubData:
         df_filtered = saw_instance.GetSubData("Gen", ["BusNum", "GenID"], filter_name="GenStatus=Closed")
         assert df_filtered is not None and len(df_filtered) <= len(df_all)
 
-    @pytest.mark.order(401)
+    @pytest.mark.order(40100)
     def test_other_types(self, saw_instance):
         """Test GetSubData with other object types."""
         # Load BidCurve
@@ -790,7 +789,7 @@ class TestSubData:
 class TestDataAccess:
     """Integration tests for data access, saving, and property accessors."""
 
-    @pytest.mark.order(411)
+    @pytest.mark.order(41100)
     def test_retrieval(self, saw_instance):
         """Test data retrieval operations."""
         # GetParametersMultipleElement
@@ -817,7 +816,7 @@ class TestDataAccess:
         df2 = saw_instance.GetFieldList("Bus")
         assert df1.equals(df2)
 
-    @pytest.mark.order(412)
+    @pytest.mark.order(41200)
     def test_properties_and_errors(self, saw_instance):
         """Test property accessors and error handling."""
         # ProcessID
@@ -844,7 +843,7 @@ class TestDataAccess:
 class TestTopology:
     """Tests for topology analysis operations."""
 
-    @pytest.mark.order(450)
+    @pytest.mark.order(45000)
     def test_all_ops(self, saw_instance, temp_file):
         """Test all topology operations together."""
         # Basic topology operations
@@ -903,7 +902,7 @@ class TestTopology:
 class TestPVQV:
     """Tests for PV and QV analysis operations."""
 
-    @pytest.mark.order(460)
+    @pytest.mark.order(46000)
     def test_all_ops(self, saw_instance, temp_file):
         """Test all PV and QV operations together."""
         tmp_aux = temp_file(".aux")
@@ -953,7 +952,7 @@ class TestPVQV:
 class TestTimestep:
     """Tests for timestep simulation operations."""
 
-    @pytest.mark.order(470)
+    @pytest.mark.order(47000)
     def test_timestep_basic(self, saw_instance):
         """Test basic timestep operations."""
         try:
@@ -962,7 +961,7 @@ class TestTimestep:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(471)
+    @pytest.mark.order(47100)
     def test_timestep_modify(self, saw_instance):
         """Test timestep modify operations."""
         try:
@@ -971,7 +970,7 @@ class TestTimestep:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(472)
+    @pytest.mark.order(47200)
     def test_timestep_save_pww(self, saw_instance, temp_file):
         """Test TimeStepSavePWW operation."""
         tmp_pww = temp_file(".pww")
@@ -980,7 +979,7 @@ class TestTimestep:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(473)
+    @pytest.mark.order(47300)
     def test_timestep_save_tsb(self, saw_instance, temp_file):
         """Test TimeStepSaveTSB operation."""
         tmp_tsb = temp_file(".tsb")
@@ -989,7 +988,7 @@ class TestTimestep:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(474)
+    @pytest.mark.order(47400)
     def test_timestep_save_csv(self, saw_instance, temp_file):
         """Test timestep CSV save operations."""
         tmp_csv = temp_file(".csv")
@@ -1002,7 +1001,7 @@ class TestTimestep:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(475)
+    @pytest.mark.order(47500)
     def test_timestep_single_point(self, saw_instance):
         """Test TimeStepDoSinglePoint operation."""
         try:
@@ -1010,7 +1009,7 @@ class TestTimestep:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(476)
+    @pytest.mark.order(47600)
     def test_timestep_do_run(self, saw_instance):
         """Test TimeStepDoRun operation."""
         try:
@@ -1019,7 +1018,7 @@ class TestTimestep:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(477)
+    @pytest.mark.order(47700)
     def test_timestep_clear_results(self, saw_instance):
         """Test TimeStepClearResults operation."""
         try:
@@ -1028,7 +1027,7 @@ class TestTimestep:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(478)
+    @pytest.mark.order(47800)
     def test_timestep_append_pww(self, saw_instance, temp_file):
         """Test TimeStepAppendPWW operations."""
         tmp_pww = temp_file(".pww")
@@ -1038,7 +1037,7 @@ class TestTimestep:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(479)
+    @pytest.mark.order(47900)
     def test_timestep_load_operations(self, saw_instance, temp_file):
         """Test timestep load operations."""
         tmp_pww = temp_file(".pww")
@@ -1061,7 +1060,7 @@ class TestTimestep:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(480)
+    @pytest.mark.order(48000)
     def test_timestep_save_fields(self, saw_instance):
         """Test TimeStepSaveFieldsSet and Clear operations."""
         try:
@@ -1071,7 +1070,7 @@ class TestTimestep:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(481)
+    @pytest.mark.order(48100)
     def test_timestep_lat_lon_operations(self, saw_instance, temp_file):
         """Test timestep lat/lon operations."""
         tmp_pww = temp_file(".pww")
@@ -1084,7 +1083,7 @@ class TestTimestep:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(482)
+    @pytest.mark.order(48200)
     def test_timestep_save_pww_range(self, saw_instance, temp_file):
         """Test TimeStepSavePWWRange operation."""
         tmp_pww = temp_file(".pww")
@@ -1097,7 +1096,7 @@ class TestTimestep:
 class TestPowerflow:
     """Tests for powerflow operations."""
 
-    @pytest.mark.order(480)
+    @pytest.mark.order(48000)
     def test_all_ops(self, saw_instance):
         """Test all powerflow operations together."""
         # Solution aid operations
@@ -1154,7 +1153,7 @@ class TestPowerflow:
 class TestSensitivity:
     """Tests for sensitivity analysis operations."""
 
-    @pytest.mark.order(550)
+    @pytest.mark.order(55000)
     def test_tap_sense(self, saw_instance):
         """Test CalculateTapSense operation."""
         try:
@@ -1163,7 +1162,7 @@ class TestSensitivity:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(551)
+    @pytest.mark.order(55100)
     def test_volt_self_sense(self, saw_instance):
         """Test CalculateVoltSelfSense operation."""
         try:
@@ -1172,7 +1171,7 @@ class TestSensitivity:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(552)
+    @pytest.mark.order(55200)
     def test_volt_sense(self, saw_instance):
         """Test CalculateVoltSense operation."""
         buses = saw_instance.ListOfDevices("Bus")
@@ -1183,7 +1182,7 @@ class TestSensitivity:
             except PowerWorldError:
                 pass
 
-    @pytest.mark.order(553)
+    @pytest.mark.order(55300)
     def test_loss_sense(self, saw_instance):
         """Test CalculateLossSense operation."""
         try:
@@ -1192,7 +1191,7 @@ class TestSensitivity:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(554)
+    @pytest.mark.order(55400)
     def test_ptdf_multiple_directions(self, saw_instance):
         """Test CalculatePTDFMultipleDirections operation."""
         try:
@@ -1201,7 +1200,7 @@ class TestSensitivity:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(555)
+    @pytest.mark.order(55500)
     def test_out_of_service_sensitivities(self, saw_instance):
         """Test SetSensitivitiesAtOutOfServiceToClosest operation."""
         try:
@@ -1209,7 +1208,7 @@ class TestSensitivity:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(556)
+    @pytest.mark.order(55600)
     def test_flow_sense(self, saw_instance):
         """Test CalculateFlowSense operation."""
         try:
@@ -1217,7 +1216,7 @@ class TestSensitivity:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(557)
+    @pytest.mark.order(55700)
     def test_ptdf(self, saw_instance):
         """Test CalculatePTDF operation."""
         try:
@@ -1225,7 +1224,7 @@ class TestSensitivity:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(558)
+    @pytest.mark.order(55800)
     def test_lodf(self, saw_instance):
         """Test CalculateLODF operation."""
         try:
@@ -1234,7 +1233,7 @@ class TestSensitivity:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(559)
+    @pytest.mark.order(55900)
     def test_lodf_advanced(self, saw_instance, temp_file):
         """Test CalculateLODFAdvanced operation."""
         tmp_csv = temp_file(".csv")
@@ -1243,7 +1242,7 @@ class TestSensitivity:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(560)
+    @pytest.mark.order(56000)
     def test_lodf_screening(self, saw_instance, temp_file):
         """Test CalculateLODFScreening operation."""
         tmp_csv = temp_file(".csv")
@@ -1254,7 +1253,7 @@ class TestSensitivity:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(561)
+    @pytest.mark.order(56100)
     def test_shift_factors(self, saw_instance):
         """Test CalculateShiftFactors operations."""
         try:
@@ -1266,7 +1265,7 @@ class TestSensitivity:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(562)
+    @pytest.mark.order(56200)
     def test_lodf_matrix(self, saw_instance):
         """Test CalculateLODFMatrix operation."""
         try:
@@ -1274,7 +1273,7 @@ class TestSensitivity:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(563)
+    @pytest.mark.order(56300)
     def test_volt_to_transfer_sense(self, saw_instance):
         """Test CalculateVoltToTransferSense operation."""
         try:
@@ -1282,7 +1281,7 @@ class TestSensitivity:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(564)
+    @pytest.mark.order(56400)
     def test_line_loading_replicator(self, saw_instance):
         """Test LineLoadingReplicator operations."""
         try:
@@ -1300,7 +1299,7 @@ class TestSensitivity:
 class TestTransient:
     """Tests for transient stability operations."""
 
-    @pytest.mark.order(600)
+    @pytest.mark.order(60000)
     def test_ts_basic(self, saw_instance, temp_file):
         """Test basic transient operations."""
         tmp_aux = temp_file(".aux")
@@ -1320,7 +1319,7 @@ class TestTransient:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(601)
+    @pytest.mark.order(60100)
     def test_ts_initialize(self, saw_instance):
         """Test TSInitialize operation."""
         try:
@@ -1328,7 +1327,7 @@ class TestTransient:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(602)
+    @pytest.mark.order(60200)
     def test_ts_result_storage(self, saw_instance):
         """Test TSResultStorageSetAll and TSStoreResponse operations."""
         try:
@@ -1339,7 +1338,7 @@ class TestTransient:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(603)
+    @pytest.mark.order(60300)
     def test_ts_clear_results(self, saw_instance):
         """Test TSClearResultsFromRAM operations."""
         try:
@@ -1350,7 +1349,7 @@ class TestTransient:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(604)
+    @pytest.mark.order(60400)
     def test_ts_write_operations(self, saw_instance, temp_file):
         """Test TS write operations."""
         tmp_aux = temp_file(".aux")
@@ -1379,7 +1378,7 @@ class TestTransient:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(605)
+    @pytest.mark.order(60500)
     def test_ts_load_operations(self, saw_instance, temp_file):
         """Test TS load operations."""
         tmp_dyr = temp_file(".dyr")
@@ -1396,7 +1395,7 @@ class TestTransient:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(606)
+    @pytest.mark.order(60600)
     def test_ts_solve(self, saw_instance):
         """Test TSSolve operations."""
         ctgs = saw_instance.ListOfDevices("TSContingency")
@@ -1412,7 +1411,7 @@ class TestTransient:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(607)
+    @pytest.mark.order(60700)
     def test_ts_clear_models(self, saw_instance):
         """Test TSClearAllModels and TSClearModelsforObjects operations."""
         try:
@@ -1420,7 +1419,7 @@ class TestTransient:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(608)
+    @pytest.mark.order(60800)
     def test_ts_auto_insert_relay(self, saw_instance):
         """Test TSAutoInsertDistRelay and TSAutoInsertZPOTT operations."""
         try:
@@ -1432,7 +1431,7 @@ class TestTransient:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(609)
+    @pytest.mark.order(60900)
     def test_ts_calculate_operations(self, saw_instance):
         """Test TS calculation operations."""
         try:
@@ -1444,7 +1443,7 @@ class TestTransient:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(610)
+    @pytest.mark.order(61000)
     def test_ts_playin_signals(self, saw_instance):
         """Test PlayIn signal operations."""
         import numpy as np
@@ -1460,7 +1459,7 @@ class TestTransient:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(611)
+    @pytest.mark.order(61100)
     def test_ts_join_ctgs(self, saw_instance, temp_file):
         """Test TSJoinActiveCTGs operation."""
         tmp_file = temp_file(".aux")
@@ -1469,7 +1468,7 @@ class TestTransient:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(612)
+    @pytest.mark.order(61200)
     def test_ts_plot_series(self, saw_instance):
         """Test TSPlotSeriesAdd operation."""
         try:
@@ -1477,7 +1476,7 @@ class TestTransient:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(613)
+    @pytest.mark.order(61300)
     def test_ts_run_result_analyzer(self, saw_instance):
         """Test TSRunResultAnalyzer operation."""
         try:
@@ -1485,7 +1484,7 @@ class TestTransient:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(614)
+    @pytest.mark.order(61400)
     def test_ts_run_until_specified_time(self, saw_instance):
         """Test TSRunUntilSpecifiedTime operation."""
         ctgs = saw_instance.ListOfDevices("TSContingency")
@@ -1496,7 +1495,7 @@ class TestTransient:
             except PowerWorldError:
                 pass
 
-    @pytest.mark.order(615)
+    @pytest.mark.order(61500)
     def test_ts_save_dynamic_models(self, saw_instance, temp_file):
         """Test TSSaveDynamicModels operation."""
         tmp_aux = temp_file(".aux")
@@ -1505,7 +1504,7 @@ class TestTransient:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(616)
+    @pytest.mark.order(61600)
     def test_ts_get_vcurve_data(self, saw_instance, temp_file):
         """Test TSGetVCurveData operation."""
         tmp_file = temp_file(".csv")
@@ -1514,7 +1513,7 @@ class TestTransient:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(617)
+    @pytest.mark.order(61700)
     def test_ts_disable_machine_model(self, saw_instance):
         """Test TSDisableMachineModelNonZeroDerivative operation."""
         try:
@@ -1522,7 +1521,7 @@ class TestTransient:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(618)
+    @pytest.mark.order(61800)
     def test_ts_set_selected_for_references(self, saw_instance):
         """Test TSSetSelectedForTransientReferences operation."""
         try:
@@ -1530,7 +1529,7 @@ class TestTransient:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(619)
+    @pytest.mark.order(61900)
     def test_ts_save_two_bus_equivalent(self, saw_instance, temp_file):
         """Test TSSaveTwoBusEquivalent operation."""
         tmp_pwb = temp_file(".pwb")
@@ -1542,7 +1541,7 @@ class TestTransient:
             except PowerWorldError:
                 pass
 
-    @pytest.mark.order(620)
+    @pytest.mark.order(62000)
     def test_ts_auto_save_plots(self, saw_instance):
         """Test TSAutoSavePlots operation."""
         try:
@@ -1550,7 +1549,7 @@ class TestTransient:
         except PowerWorldError:
             pass
 
-    @pytest.mark.order(621)
+    @pytest.mark.order(62100)
     def test_ts_load_relay_files(self, saw_instance, temp_file):
         """Test TSLoadRDB and TSLoadRelayCSV operations."""
         tmp_rdb = temp_file(".rdb")

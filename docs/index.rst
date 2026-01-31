@@ -10,6 +10,5 @@ with PowerWorld Simulator.
 
    overview
    examples/index
-   formulations/index
    api/index
    dev/index

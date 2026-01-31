@@ -1,14 +1,18 @@
-from typing import Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union
+import logging
 
-from .apps.gic import GIC
-from .apps.network import Network
-from .apps.dynamics import Dynamics
-from .apps.static import Statics
+import numpy as np
+import pandas as pd
+from pandas import DataFrame, concat
+from scipy.sparse import csr_matrix
+
+from .utils.gic import GIC
+from .utils.network import Network
+from .utils.dynamics import get_ts_results, process_ts_results
 from .indexable import Indexable
-from .components import Bus, Branch, Gen, Load, Shunt, Area, Zone, Substation, Contingency
+from .components import Bus, Branch, Gen, Load, Shunt, Area, Zone, Substation, Contingency, Sim_Solution_Options
 from .saw import SAW, create_object_string
 
-import pandas as pd
 import tempfile
 import os
 
@@ -28,8 +32,6 @@ class GridWorkBench(Indexable):
         # Applications
         self.network = Network()
         self.gic     = GIC()
-        self.dyn     = Dynamics()
-        self.statics = Statics()
 
         if fname:
             self.fname = fname
@@ -46,44 +48,247 @@ class GridWorkBench(Indexable):
         super().set_esa(esa)
         self.network.set_esa(esa)
         self.gic.set_esa(esa)
-        self.dyn.set_esa(esa)
-        self.statics.set_esa(esa)
 
-    # --- Delegation to Statics ---
+    # --- Solver Options (from Statics) ---
 
-    def voltage(self, complex: bool = True, pu: bool = True) -> Union[pd.Series, Tuple[pd.Series, pd.Series]]:
-        """Retrieves bus voltages. Delegates to ``statics.voltage()``."""
-        return self.statics.voltage(complex=complex, pu=pu)
+    def _set_option(self, key: str, enable: bool) -> None:
+        """Set a Sim_Solution_Options boolean flag."""
+        self[Sim_Solution_Options, key] = 'YES' if enable else 'NO'
 
-    def set_voltages(self, V):
-        """Sets bus voltages from a complex vector. Delegates to ``statics.set_voltages()``."""
-        self.statics.set_voltages(V)
+    def set_do_one_iteration(self, enable: bool = True) -> None:
+        """Enable/disable single iteration mode for power flow."""
+        self._set_option('DoOneIteration', enable)
 
-    def violations(self, v_min=0.9, v_max=1.1):
-        """Returns bus voltage violations. Delegates to ``statics.violations()``."""
-        return self.statics.violations(v_min, v_max)
+    def set_max_iterations(self, val: int = 250) -> None:
+        """Set maximum number of iterations for power flow convergence."""
+        self[Sim_Solution_Options, 'MaxItr'] = val
 
-    def mismatch(self, asComplex=False):
-        """Returns bus mismatches. Delegates to ``statics.mismatch()``."""
-        return self.statics.mismatch(asComplex)
+    def set_disable_angle_rotation(self, enable: bool = True) -> None:
+        """Enable/disable angle rotation during power flow."""
+        self._set_option('DisableAngleRotation', enable)
 
-    def netinj(self, asComplex=False):
-        """Net injection at each bus. Delegates to ``statics.netinj()``."""
-        return self.statics.netinj(asComplex)
+    def set_disable_opt_mult(self, enable: bool = True) -> None:
+        """Enable/disable optimal multiplier during power flow."""
+        self._set_option('DisableOptMult', enable)
 
-    def ybus(self, dense=False):
-        """Returns the Y-Bus Matrix. Delegates to ``statics.ybus()``."""
-        return self.statics.ybus(dense)
+    def enable_inner_ss_check(self, enable: bool = True) -> None:
+        """Enable/disable inner steady-state contingency check."""
+        self._set_option('SSContPFInnerLoop', enable)
 
-    def branch_admittance(self):
-        """Branch admittance matrices Yf and Yt. Delegates to ``statics.branch_admittance()``."""
-        return self.statics.branch_admittance()
+    def disable_gen_mvr_check(self, enable: bool = True) -> None:
+        """Enable/disable generator MVAR limit checking."""
+        self._set_option('DisableGenMVRCheck', enable)
 
-    def jacobian(self, dense=False, form='R'):
-        """Power flow Jacobian matrix. Delegates to ``statics.jacobian()``."""
-        return self.statics.jacobian(dense, form=form)
+    def enable_inner_check_gen_vars(self, enable: bool = True) -> None:
+        """Enable/disable inner loop generator VAR checking."""
+        self._set_option('ChkVars', enable)
 
-    # --- Delegation to Network ---
+    def enable_inner_backoff_gen_vars(self, enable: bool = True) -> None:
+        """Enable/disable inner loop generator VAR backoff."""
+        self._set_option('ChkVars:1', enable)
+
+    # --- Bus Voltage & Analysis ---
+
+    def voltage(
+        self,
+        complex: bool = True,
+        pu: bool = True,
+    ) -> Union[pd.Series, Tuple[pd.Series, pd.Series]]:
+        """
+        Retrieve bus voltages.
+
+        Parameters
+        ----------
+        complex : bool, default True
+            If True, return complex voltage. Else (magnitude, angle_rad).
+        pu : bool, default True
+            If True, per-unit. Else kV.
+
+        Returns
+        -------
+        pd.Series or tuple of pd.Series
+        """
+        fields = ["BusPUVolt", "BusAngle"] if pu else ["BusKVVolt", "BusAngle"]
+        df = self[Bus, fields]
+        mag = df[fields[0]]
+        ang = df['BusAngle'] * np.pi / 180.0
+        if complex:
+            return mag * np.exp(1j * ang)
+        return mag, ang
+
+    def set_voltages(self, V: np.ndarray) -> None:
+        """
+        Set bus voltages from a complex vector.
+
+        Parameters
+        ----------
+        V : np.ndarray
+            Complex voltage vector (per-unit).
+        """
+        V_df = np.vstack([np.abs(V), np.angle(V, deg=True)]).T
+        self[Bus, ["BusPUVolt", "BusAngle"]] = V_df
+
+    def violations(self, v_min: float = 0.9, v_max: float = 1.1) -> DataFrame:
+        """
+        Return bus voltage violations.
+
+        Parameters
+        ----------
+        v_min : float, default 0.9
+            Low voltage threshold (pu).
+        v_max : float, default 1.1
+            High voltage threshold (pu).
+
+        Returns
+        -------
+        DataFrame
+            Columns 'Low' and 'High' with violating bus voltages.
+        """
+        v = self.voltage(complex=False, pu=True)[0]
+        low = v[v < v_min]
+        high = v[v > v_max]
+        return DataFrame({'Low': low, 'High': high})
+
+    def mismatch(self, asComplex: bool = False):
+        """
+        Return bus power mismatches.
+
+        Parameters
+        ----------
+        asComplex : bool, default False
+            If True, return P + jQ as complex Series.
+
+        Returns
+        -------
+        tuple of pd.Series or pd.Series
+            (P, Q) mismatches or complex S = P + jQ.
+        """
+        df = self[Bus, ["BusMismatchP", "BusMismatchQ"]]
+        P = df['BusMismatchP']
+        Q = df['BusMismatchQ']
+        if asComplex:
+            return P + 1j * Q
+        return P, Q
+
+    def netinj(self, asComplex: bool = False):
+        """
+        Sum of all generator, load, bus shunt, and switched shunt P and Q.
+
+        Parameters
+        ----------
+        asComplex : bool, default False
+            If True, return P + jQ as complex array.
+
+        Returns
+        -------
+        tuple of np.ndarray or np.ndarray
+            (P, Q) or complex S = P + jQ.
+        """
+        df = self[Bus, ['BusNetMW', 'BusNetMVR']]
+        P = df['BusNetMW'].to_numpy()
+        Q = df['BusNetMVR'].to_numpy()
+        if asComplex:
+            return P + 1j * Q
+        return P, Q
+
+    # --- Matrix Retrieval ---
+
+    def ybus(self, dense: bool = False):
+        """
+        Return the Y-Bus matrix.
+
+        Parameters
+        ----------
+        dense : bool, default False
+            If True, return dense array. Else sparse CSR.
+
+        Returns
+        -------
+        np.ndarray or scipy.sparse.csr_matrix
+        """
+        return self.esa.get_ybus(dense)
+
+    def branch_admittance(self) -> Tuple[csr_matrix, csr_matrix]:
+        """
+        Compute branch admittance matrices Yf and Yt.
+
+        Returns
+        -------
+        tuple of csr_matrix
+            (Yf, Yt) branch-bus admittance matrices.
+        """
+        bus_df = self[Bus, ["BusNum"]]
+        branch_df = self[Branch, [
+            "BusNum", "BusNum:1", "LineCircuit",
+            "LineR", "LineX", "LineC", "LineTap", "LinePhase",
+        ]]
+
+        nb = len(bus_df)
+        nl = len(branch_df)
+
+        Ys = 1 / (branch_df["LineR"].to_numpy()
+                   + 1j * branch_df["LineX"].to_numpy())
+        Bc = branch_df["LineC"].to_numpy()
+        tap = (branch_df["LineTap"].to_numpy()
+               * np.exp(1j * np.pi / 180 * branch_df["LinePhase"].to_numpy()))
+        Ytt = Ys + 1j * Bc / 2
+        Yff = Ytt / (tap * np.conj(tap))
+        Yft = -Ys / np.conj(tap)
+        Ytf = -Ys / tap
+
+        bus_to_idx = {bus: idx for idx, bus in enumerate(bus_df["BusNum"])}
+        f = np.array([bus_to_idx[b] for b in branch_df["BusNum"]])
+        t = np.array([bus_to_idx[b] for b in branch_df["BusNum:1"]])
+
+        i = np.r_[range(nl), range(nl)]
+        Yf = csr_matrix(
+            (np.hstack([Yff.reshape(-1), Yft.reshape(-1)]),
+             (i, np.hstack([f, t]))),
+            (nl, nb),
+        )
+        Yt = csr_matrix(
+            (np.hstack([Ytf.reshape(-1), Ytt.reshape(-1)]),
+             (i, np.hstack([f, t]))),
+            (nl, nb),
+        )
+        return Yf, Yt
+
+    def jacobian(self, dense: bool = False, form: str = 'R'):
+        """
+        Get the power flow Jacobian matrix.
+
+        Parameters
+        ----------
+        dense : bool, default False
+            If True, return dense array. Else sparse CSR.
+        form : str, default 'R'
+            Coordinate form: 'R' (rectangular), 'P' (polar), 'DC' (B').
+
+        Returns
+        -------
+        np.ndarray or scipy.sparse.csr_matrix
+        """
+        return self.esa.get_jacobian(dense, form=form)
+
+    def jacobian_with_ids(self, dense: bool = False, form: str = 'R'):
+        """
+        Get the Jacobian matrix with row/column ID labels.
+
+        Parameters
+        ----------
+        dense : bool, default False
+            If True, return dense array. Else sparse CSR.
+        form : str, default 'R'
+            Coordinate form: 'R' (rectangular), 'P' (polar), 'DC' (B').
+
+        Returns
+        -------
+        tuple
+            (matrix, row_ids) where row_ids describes each row/column.
+        """
+        return self.esa.get_jacobian_with_ids(dense, form=form)
+
+    # --- Network Delegation ---
 
     def busmap(self):
         """Bus number to matrix index mapping. Delegates to ``network.busmap()``."""
@@ -113,6 +318,59 @@ class GridWorkBench(Indexable):
         self.esa.SolvePowerFlow(method)
         if getvolts:
             return self.voltage()
+
+    def ts_solve(self, ctgs: Union[str, List[str]], fields: List[str]) -> Tuple[DataFrame, DataFrame]:
+        """
+        Run transient stability simulation for the specified contingencies.
+
+        Handles auto-correction, initialization, solving each contingency,
+        result retrieval, processing, and concatenation.
+
+        Parameters
+        ----------
+        ctgs : Union[str, List[str]]
+            A single contingency name or a list of names.
+        fields : List[str]
+            Retrieval field strings (e.g., from TSWatch.prepare).
+
+        Returns
+        -------
+        Tuple[DataFrame, DataFrame]
+            (Metadata, Time-Series Data).
+        """
+        logger = logging.getLogger(__name__)
+        ctgs_list = [ctgs] if isinstance(ctgs, str) else list(ctgs)
+
+        if not fields:
+            logger.warning("No fields provided. Simulation will run but no results will be retrieved.")
+
+        self.esa.TSAutoCorrect()
+        self.esa.TSInitialize()
+
+        all_meta_frames = []
+        all_data_frames = {}
+
+        for ctg in ctgs_list:
+            logger.info(f"Solving contingency: {ctg}")
+            self.esa.TSSolve(ctg)
+            meta, df = get_ts_results(self.esa, ctg, fields)
+
+            if meta is None or df is None or df.empty:
+                logger.warning(f"No results returned for contingency: {ctg}")
+                continue
+
+            meta, df = process_ts_results(meta, df, ctg)
+            if not df.empty:
+                all_data_frames[ctg] = df
+                all_meta_frames.append(meta)
+
+        if not all_meta_frames:
+            return DataFrame(), DataFrame()
+
+        final_meta = concat(all_meta_frames, axis=0, ignore_index=True).set_index('ColHeader')
+        final_data = concat(all_data_frames.values(), axis=1, keys=all_data_frames.keys()).sort_index(axis=1)
+
+        return final_meta, final_data
 
     def flatstart(self) -> None:
         """Resets the case to a flat start (1.0 pu voltage, 0.0 angle)."""
@@ -238,43 +496,9 @@ class GridWorkBench(Indexable):
             [bus1, bus2, ckt, "Closed"],
         )
 
-    def set_gen(self, bus, id, mw=None, mvar=None, status=None):
-        """Sets generator parameters."""
-        param_map = {"GenMW": mw, "GenMVR": mvar, "GenStatus": status}
-        params = {k: v for k, v in param_map.items() if v is not None}
-        if params:
-            fields = ["BusNum", "GenID"] + list(params.keys())
-            values = [bus, id] + list(params.values())
-            self.esa.ChangeParametersSingleElement("Gen", fields, values)
-
-    def set_load(self, bus, id, mw=None, mvar=None, status=None):
-        """Sets load parameters."""
-        param_map = {"LoadMW": mw, "LoadMVR": mvar, "LoadStatus": status}
-        params = {k: v for k, v in param_map.items() if v is not None}
-        if params:
-            fields = ["BusNum", "LoadID"] + list(params.keys())
-            values = [bus, id] + list(params.values())
-            self.esa.ChangeParametersSingleElement("Load", fields, values)
-
-    def scale_load(self, factor):
-        """Scales system load by a factor."""
-        self.esa.Scale("LOAD", "FACTOR", [factor], "SYSTEM")
-
-    def scale_gen(self, factor):
-        """Scales system generation by a factor."""
-        self.esa.Scale("GEN", "FACTOR", [factor], "SYSTEM")
-
     def path_distance(self, start_element_str):
         """Calculates distance from a starting element to all buses."""
         return self.esa.DeterminePathDistance(start_element_str)
-
-    def network_cut(self, bus_on_side, branch_filter="SELECTED"):
-        """Selects objects on one side of a network cut."""
-        self.esa.SetSelectedFromNetworkCut(
-            True, bus_on_side,
-            branch_filter=branch_filter,
-            objects_to_select=["Bus", "Gen", "Load"],
-        )
 
     # --- Difference Flows ---
 
@@ -286,34 +510,8 @@ class GridWorkBench(Indexable):
         """Sets the difference mode (PRESENT, BASE, DIFFERENCE, CHANGE)."""
         self.esa.DiffCaseMode(mode)
 
-    def islands(self):
-        """Returns information about islands."""
-        return self.esa.DetermineBranchesThatCreateIslands()
-
-    # --- Sensitivity & Faults ---
-
-    def ptdf(self, seller, buyer, method='DC'):
-        """Calculates PTDF between seller and buyer."""
-        return self.esa.CalculatePTDF(seller, buyer, method)
-
-    def lodf(self, branch, method='DC'):
-        """Calculates LODF for a branch."""
-        return self.esa.CalculateLODF(branch, method)
-
-    def fault(self, bus_num, fault_type='SLG', r=0.0, x=0.0):
-        """Runs a fault at a specified bus number."""
-        return self.esa.RunFault(
-            create_object_string("Bus", bus_num), fault_type, r, x,
-        )
-
     def shortest_path(self, start_bus, end_bus):
         """Determines the shortest path between two buses."""
         start_str = create_object_string("Bus", start_bus)
         end_str = create_object_string("Bus", end_bus)
         return self.esa.DetermineShortestPath(start_str, end_str)
-
-    # --- Advanced Analysis ---
-
-    def solve_opf(self):
-        """Solves Primal LP OPF."""
-        return self.esa.SolvePrimalLP()

@@ -1,62 +1,77 @@
-Utilities
-=========
+Utilities & Analysis
+====================
 
-ESA++ includes utility modules for mathematical operations, geographic analysis, and visualization.
+The ``esapp.utils`` package provides analysis modules, visualization tools, and general helpers.
 
-Math Tools
-----------
-
-Mathematical utilities for power system calculations.
-
-.. currentmodule:: esapp.utils.mathtools
-
-.. automodule:: esapp.utils.mathtools
-   :members:
-
-Mapping & GIS
--------------
-
-Geographic visualization and mapping utilities.
-
-.. currentmodule:: esapp.utils.map
-
-.. automodule:: esapp.utils.map
-   :members:
-
-3D Visualization
+Analysis Modules
 ----------------
 
-Three-dimensional bus visualization.
+These modules are accessible as attributes of ``GridWorkBench`` or can be used standalone.
+
+Contingency Builder
+~~~~~~~~~~~~~~~~~~~
+
+Fluent API for defining transient stability contingencies.
+
+.. currentmodule:: esapp.utils.contingency
+
+.. autoclass:: ContingencyBuilder
+   :members:
+
+.. autoclass:: SimAction
+   :members:
+
+GIC Analysis
+~~~~~~~~~~~~
+
+Geomagnetically Induced Current (GIC) analysis tools.
+
+.. currentmodule:: esapp.utils.gic
+
+.. autoclass:: GIC
+   :members:
+   :show-inheritance:
+
+Network Topology
+~~~~~~~~~~~~~~~~
+
+Network graph analysis including incidence matrices, Laplacians, and path calculations.
+
+.. currentmodule:: esapp.utils.network
+
+.. autoclass:: Network
+   :members:
+   :show-inheritance:
+
+.. autoclass:: BranchType
+   :members:
+
+Dynamics
+~~~~~~~~
+
+Transient stability simulation utilities for field-watching and result processing.
+
+.. currentmodule:: esapp.utils.dynamics
+
+.. autoclass:: TSWatch
+   :members:
+
+.. autofunction:: get_ts_results
+
+.. autofunction:: process_ts_results
+
+B3D File Format
+---------------
+
+Binary 3D electric field data I/O.
 
 .. currentmodule:: esapp.utils.b3d
 
 .. automodule:: esapp.utils.b3d
    :members:
 
-Mesh Generation
+General Helpers
 ---------------
-
-Mesh generation for GIC and geographic analysis.
-
-.. currentmodule:: esapp.utils.mesh
-
-.. automodule:: esapp.utils.mesh
-   :members:
-
-Decorators
-----------
-
-Function decorators for caching and validation.
-
-.. currentmodule:: esapp.utils.decorators
-
-.. automodule:: esapp.utils.decorators
-   :members:
-
-Miscellaneous
--------------
-
-General helper functions.
 
 .. currentmodule:: esapp.utils.misc
 

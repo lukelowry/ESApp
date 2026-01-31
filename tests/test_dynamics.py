@@ -1,24 +1,23 @@
 """
-Unit tests for the Dynamics transient stability simulation module.
+Unit tests for transient stability utilities.
 
-Tests the ContingencyBuilder, SimAction enum, and Dynamics class functionality
-using mocked dependencies (no PowerWorld required).
+These are **unit tests** that do NOT require PowerWorld Simulator. All
+PowerWorld interactions are mocked. They test the pure-Python transient
+stability utilities: ContingencyBuilder, SimAction (esapp.utils.contingency),
+TSWatch, get_ts_results, process_ts_results (esapp.utils.dynamics), and
+GridWorkBench.ts_solve (esapp.workbench).
 
 USAGE:
     pytest tests/test_dynamics.py -v
 """
 import pytest
-import os
-from unittest.mock import MagicMock, Mock, patch, PropertyMock
+from unittest.mock import MagicMock
 import pandas as pd
 import numpy as np
 
-from esapp.apps.dynamics import (
-    Dynamics,
-    ContingencyBuilder,
-    SimAction,
-    TS,
-)
+from esapp.utils.contingency import ContingencyBuilder, SimAction
+from esapp.utils.dynamics import TSWatch, get_ts_results, process_ts_results
+from esapp.components import TS
 
 
 # =============================================================================
@@ -208,543 +207,265 @@ class TestContingencyBuilder:
 
 
 # =============================================================================
-# Dynamics Class Tests
+# TSWatch Tests
 # =============================================================================
 
-@pytest.fixture
-def mock_dynamics():
-    """Create a Dynamics instance with mocked ESA."""
-    dyn = Dynamics()
+class TestTSWatch:
+    """Tests for the TSWatch utility class."""
 
-    # Mock the ESA object
-    mock_esa = MagicMock()
-    mock_esa.TSGetResults.return_value = (
-        pd.DataFrame({'ColHeader': ['Bus 1 | TSBusVPU'], 'ObjectType': ['Bus'],
-                      'PrimaryKey': ['1'], 'SecondaryKey': [None], 'VariableName': ['VPU']}),
-        pd.DataFrame({'time': [0.0, 0.1], 'Bus 1 | TSBusVPU': [1.0, 0.95]})
-    )
-    mock_esa.TSResultStorageSetAll.return_value = None
-    mock_esa.GetParamsRectTyped.return_value = pd.DataFrame({'ObjectID': ['Bus 1', 'Bus 2']})
-    mock_esa.ChangeParametersMultipleElementRect.return_value = None
-    mock_esa.TSAutoCorrect.return_value = None
-    mock_esa.TSInitialize.return_value = None
-    mock_esa.TSSolve.return_value = None
-    mock_esa.TSWriteModels.return_value = None
+    def test_init_empty(self):
+        """TSWatch initializes with empty watch fields."""
+        tsw = TSWatch()
+        assert tsw.fields == {}
 
-    dyn.esa = mock_esa
-    return dyn
-
-
-class TestDynamicsInit:
-    """Tests for Dynamics initialization."""
-
-    def test_default_runtime(self):
-        """Dynamics initializes with default runtime of 5.0."""
-        dyn = Dynamics()
-        assert dyn.runtime == 5.0
-
-    def test_empty_pending_ctgs(self):
-        """Dynamics initializes with empty pending contingencies."""
-        dyn = Dynamics()
-        assert dyn._pending_ctgs == {}
-
-    def test_empty_watch_fields(self):
-        """Dynamics initializes with empty watch fields."""
-        dyn = Dynamics()
-        assert dyn._watch_fields == {}
-
-
-class TestDynamicsWatch:
-    """Tests for the watch() method."""
-
-    def test_watch_stores_fields(self, mock_dynamics):
+    def test_watch_stores_fields(self):
         """watch() stores field names for object type."""
         from esapp.components import Gen
-        mock_dynamics.watch(Gen, [TS.Gen.P, TS.Gen.W])
-        assert Gen in mock_dynamics._watch_fields
-        assert mock_dynamics._watch_fields[Gen] == ['TSGenP', 'TSGenW']
+        tsw = TSWatch()
+        tsw.watch(Gen, [TS.Gen.P, TS.Gen.W])
+        assert Gen in tsw.fields
+        assert tsw.fields[Gen] == ['TSGenP', 'TSGenW']
 
-    def test_watch_returns_self(self, mock_dynamics):
+    def test_watch_returns_self(self):
         """watch() returns self for method chaining."""
         from esapp.components import Bus
-        result = mock_dynamics.watch(Bus, [TS.Bus.VPU])
-        assert result is mock_dynamics
+        tsw = TSWatch()
+        result = tsw.watch(Bus, [TS.Bus.VPU])
+        assert result is tsw
 
-    def test_watch_converts_tsfield_to_string(self, mock_dynamics):
+    def test_watch_converts_tsfield_to_string(self):
         """watch() converts TSField objects to their string names."""
         from esapp.components import Gen
-        mock_dynamics.watch(Gen, [TS.Gen.Delta])
-        assert mock_dynamics._watch_fields[Gen] == ['TSGenDelta']
+        tsw = TSWatch()
+        tsw.watch(Gen, [TS.Gen.Delta])
+        assert tsw.fields[Gen] == ['TSGenDelta']
 
-
-class TestDynamicsContingency:
-    """Tests for contingency-related methods."""
-
-    def test_contingency_creates_builder(self, mock_dynamics):
-        """contingency() creates and stores a ContingencyBuilder."""
-        mock_dynamics.runtime = 8.0
-        builder = mock_dynamics.contingency("TestCtg")
-
-        assert isinstance(builder, ContingencyBuilder)
-        assert builder.name == "TestCtg"
-        assert builder.runtime == 8.0
-        assert "TestCtg" in mock_dynamics._pending_ctgs
-
-    def test_bus_fault_creates_contingency(self, mock_dynamics):
-        """bus_fault() creates a complete bus fault contingency."""
-        mock_dynamics.bus_fault("Fault1", "101", fault_time=1.0, duration=0.1)
-
-        assert "Fault1" in mock_dynamics._pending_ctgs
-        builder = mock_dynamics._pending_ctgs["Fault1"]
-        assert len(builder._events) == 2
-
-        # Check fault event
-        assert builder._events[0][0] == 1.0
-        assert builder._events[0][3] == "FAULT 3PB SOLID"
-
-        # Check clear event
-        assert builder._events[1][0] == pytest.approx(1.1)
-        assert builder._events[1][3] == "CLEARFAULT"
-
-    def test_bus_fault_default_params(self, mock_dynamics):
-        """bus_fault() uses correct default parameters."""
-        mock_dynamics.bus_fault("Fault1", "101")
-        builder = mock_dynamics._pending_ctgs["Fault1"]
-
-        assert builder._events[0][0] == 1.0
-        assert builder._events[1][0] == pytest.approx(1.0833)  # 1.0 + 0.0833
-
-    def test_upload_contingency_not_found_raises(self, mock_dynamics):
-        """upload_contingency() raises ValueError for unknown contingency."""
-        with pytest.raises(ValueError, match="not found in pending list"):
-            mock_dynamics.upload_contingency("NonExistent")
-
-    def test_upload_contingency_removes_from_pending(self, mock_dynamics):
-        """upload_contingency() removes contingency from pending list."""
-        mock_dynamics.bus_fault("Fault1", "101")
-        assert "Fault1" in mock_dynamics._pending_ctgs
-
-        mock_dynamics.upload_contingency("Fault1")
-        assert "Fault1" not in mock_dynamics._pending_ctgs
-
-
-class TestDynamicsGetResults:
-    """Tests for get_results() method."""
-
-    def test_get_results_returns_tuple(self, mock_dynamics):
-        """get_results() returns tuple of DataFrames."""
-        meta, data = mock_dynamics.get_results("Ctg1", ["Field1"])
-        assert isinstance(meta, pd.DataFrame)
-        assert isinstance(data, pd.DataFrame)
-
-    def test_get_results_calls_tsgetresults(self, mock_dynamics):
-        """get_results() calls esa.TSGetResults with correct args."""
-        mock_dynamics.get_results("Ctg1", ["Field1", "Field2"])
-        mock_dynamics.esa.TSGetResults.assert_called_once_with(
-            "SEPARATE", ["Ctg1"], ["Field1", "Field2"]
-        )
-
-    def test_get_results_handles_none(self, mock_dynamics):
-        """get_results() returns (None, None) when TSGetResults returns None."""
-        mock_dynamics.esa.TSGetResults.return_value = None
-        meta, data = mock_dynamics.get_results("Ctg1", ["Field1"])
-        assert meta is None
-        assert data is None
-
-
-class TestDynamicsPrepareEnvironment:
-    """Tests for _prepare_environment() method."""
-
-    def test_prepare_environment_enables_storage(self, mock_dynamics):
-        """_prepare_environment() calls TSResultStorageSetAll for watched types."""
+    def test_prepare_enables_storage(self):
+        """prepare() calls TSResultStorageSetAll for watched types."""
         from esapp.components import Gen
-        mock_dynamics.watch(Gen, [TS.Gen.P])
-        mock_dynamics._prepare_environment()
-        mock_dynamics.esa.TSResultStorageSetAll.assert_called()
+        tsw = TSWatch()
+        tsw.watch(Gen, [TS.Gen.P])
 
-    def test_prepare_environment_returns_field_list(self, mock_dynamics):
-        """_prepare_environment() returns list of field specifications."""
+        mock_wb = MagicMock()
+        mock_wb.__getitem__ = MagicMock(return_value=pd.DataFrame({'ObjectID': ['Gen 1']}))
+
+        tsw.prepare(mock_wb)
+        mock_wb.esa.TSResultStorageSetAll.assert_called()
+
+    def test_prepare_returns_field_list(self):
+        """prepare() returns list of field specifications."""
         from esapp.components import Bus
-        mock_dynamics.watch(Bus, [TS.Bus.VPU])
-        mock_dynamics.esa.GetParamsRectTyped.return_value = pd.DataFrame({'ObjectID': ['Bus 1']})
+        tsw = TSWatch()
+        tsw.watch(Bus, [TS.Bus.VPU])
 
-        fields = mock_dynamics._prepare_environment()
+        mock_wb = MagicMock()
+        mock_wb.__getitem__ = MagicMock(return_value=pd.DataFrame({'ObjectID': ['Bus 1']}))
+
+        fields = tsw.prepare(mock_wb)
         assert isinstance(fields, list)
         assert len(fields) > 0
         assert 'Bus 1 | TSBusVPU' in fields
 
-    def test_prepare_environment_handles_empty_objects(self, mock_dynamics):
-        """_prepare_environment() handles case with no objects of watched type."""
+    def test_prepare_handles_empty_objects(self):
+        """prepare() handles case with no objects of watched type."""
         from esapp.components import Gen
-        mock_dynamics.watch(Gen, [TS.Gen.P])
-        mock_dynamics.esa.GetParamsRectTyped.return_value = pd.DataFrame({'ObjectID': []})
+        tsw = TSWatch()
+        tsw.watch(Gen, [TS.Gen.P])
 
-        fields = mock_dynamics._prepare_environment()
+        mock_wb = MagicMock()
+        mock_wb.__getitem__ = MagicMock(return_value=pd.DataFrame({'ObjectID': []}))
+
+        fields = tsw.prepare(mock_wb)
         assert fields == []
 
 
-class TestDynamicsProcessResults:
-    """Tests for _process_results() method."""
+# =============================================================================
+# get_ts_results Tests
+# =============================================================================
 
-    def test_process_results_sets_time_index(self, mock_dynamics):
-        """_process_results() sets 'time' column as index."""
+class TestGetTSResults:
+    """Tests for the get_ts_results() function."""
+
+    def test_returns_tuple(self):
+        """get_ts_results() returns tuple of DataFrames."""
+        mock_esa = MagicMock()
+        mock_esa.TSGetResults.return_value = (
+            pd.DataFrame({'ColHeader': ['Bus 1 | TSBusVPU']}),
+            pd.DataFrame({'time': [0.0, 0.1], 'Bus 1 | TSBusVPU': [1.0, 0.95]})
+        )
+        meta, data = get_ts_results(mock_esa, "Ctg1", ["Field1"])
+        assert isinstance(meta, pd.DataFrame)
+        assert isinstance(data, pd.DataFrame)
+
+    def test_calls_tsgetresults(self):
+        """get_ts_results() calls esa.TSGetResults with correct args."""
+        mock_esa = MagicMock()
+        mock_esa.TSGetResults.return_value = (pd.DataFrame(), pd.DataFrame())
+        get_ts_results(mock_esa, "Ctg1", ["Field1", "Field2"])
+        mock_esa.TSGetResults.assert_called_once_with(
+            "SEPARATE", ["Ctg1"], ["Field1", "Field2"]
+        )
+
+    def test_handles_none(self):
+        """get_ts_results() returns (None, None) when TSGetResults returns None."""
+        mock_esa = MagicMock()
+        mock_esa.TSGetResults.return_value = None
+        meta, data = get_ts_results(mock_esa, "Ctg1", ["Field1"])
+        assert meta is None
+        assert data is None
+
+
+# =============================================================================
+# process_ts_results Tests
+# =============================================================================
+
+class TestProcessTSResults:
+    """Tests for the process_ts_results() function."""
+
+    def test_sets_time_index(self):
+        """process_ts_results() sets 'time' column as index."""
         meta = pd.DataFrame({'ColHeader': ['Col1'], 'ObjectType': ['Bus'],
                              'PrimaryKey': ['1'], 'SecondaryKey': [None], 'VariableName': ['VPU']})
         df = pd.DataFrame({'time': [0.0, 0.1], 'Col1': [1.0, 0.95]})
 
-        _, result_df = mock_dynamics._process_results(meta, df, "Ctg1")
+        _, result_df = process_ts_results(meta, df, "Ctg1")
         assert result_df.index.name == "time"
 
-    def test_process_results_renames_columns(self, mock_dynamics):
-        """_process_results() renames metadata columns."""
+    def test_renames_columns(self):
+        """process_ts_results() renames metadata columns."""
         meta = pd.DataFrame({'ColHeader': ['Col1'], 'ObjectType': ['Bus'],
                              'PrimaryKey': ['1'], 'SecondaryKey': [None], 'VariableName': ['VPU']})
         df = pd.DataFrame({'time': [0.0], 'Col1': [1.0]})
 
-        result_meta, _ = mock_dynamics._process_results(meta, df, "Ctg1")
+        result_meta, _ = process_ts_results(meta, df, "Ctg1")
         assert 'Object' in result_meta.columns
         assert 'ID-A' in result_meta.columns
         assert 'Metric' in result_meta.columns
         assert 'Contingency' in result_meta.columns
 
-    def test_process_results_handles_empty_df(self, mock_dynamics):
-        """_process_results() returns empty DataFrames for empty input."""
+    def test_handles_empty_df(self):
+        """process_ts_results() returns empty DataFrames for empty input."""
         meta = pd.DataFrame()
         df = pd.DataFrame()
 
-        result_meta, result_df = mock_dynamics._process_results(meta, df, "Ctg1")
+        result_meta, result_df = process_ts_results(meta, df, "Ctg1")
         assert result_meta.empty
         assert result_df.empty
 
-    def test_process_results_handles_none_df(self, mock_dynamics):
-        """_process_results() handles None DataFrame."""
+    def test_handles_none_df(self):
+        """process_ts_results() handles None DataFrame."""
         meta = pd.DataFrame({'ColHeader': ['Col1']})
 
-        result_meta, result_df = mock_dynamics._process_results(meta, None, "Ctg1")
+        result_meta, result_df = process_ts_results(meta, None, "Ctg1")
         assert result_meta.empty
         assert result_df.empty
 
-    def test_process_results_casts_to_float32(self, mock_dynamics):
-        """_process_results() casts data to float32."""
+    def test_casts_to_float32(self):
+        """process_ts_results() casts data to float32."""
         meta = pd.DataFrame({'ColHeader': ['Col1'], 'ObjectType': ['Bus'],
                              'PrimaryKey': ['1'], 'SecondaryKey': [None], 'VariableName': ['VPU']})
         df = pd.DataFrame({'time': [0.0], 'Col1': [1.0]})
 
-        _, result_df = mock_dynamics._process_results(meta, df, "Ctg1")
+        _, result_df = process_ts_results(meta, df, "Ctg1")
         assert result_df['Col1'].dtype == np.float32
 
-
-class TestDynamicsListModels:
-    """Tests for list_models() method."""
-
-    def test_list_models_returns_dataframe(self, mock_dynamics):
-        """list_models() returns a DataFrame."""
-        with patch('os.path.exists', return_value=True), \
-             patch('os.remove'), \
-             patch('builtins.open', create=True) as mock_open:
-            mock_open.return_value.__enter__.return_value.read.return_value = (
-                'DATA (MachineModel_GENROU, [Field1])\n'
-                '{\n}\n'
-                'DATA (Exciter_EXST1, [Field1])\n'
-                '{\n}\n'
-            )
-            result = mock_dynamics.list_models()
-            assert isinstance(result, pd.DataFrame)
-            assert 'Category' in result.columns
-            assert 'Model' in result.columns
-
-    def test_list_models_categorizes_machine_models(self, mock_dynamics):
-        """list_models() correctly categorizes machine models."""
-        with patch('os.path.exists', return_value=True), \
-             patch('os.remove'), \
-             patch('builtins.open', create=True) as mock_open:
-            mock_open.return_value.__enter__.return_value.read.return_value = (
-                'DATA (MachineModel_GENROU, [Field1])\n{\n}\n'
-            )
-            result = mock_dynamics.list_models()
-            assert 'Machine' in result['Category'].values
-            assert 'GENROU' in result['Model'].values
-
-    def test_list_models_categorizes_exciters(self, mock_dynamics):
-        """list_models() correctly categorizes exciter models."""
-        with patch('os.path.exists', return_value=True), \
-             patch('os.remove'), \
-             patch('builtins.open', create=True) as mock_open:
-            mock_open.return_value.__enter__.return_value.read.return_value = (
-                'DATA (Exciter_EXST1, [Field1])\n{\n}\n'
-            )
-            result = mock_dynamics.list_models()
-            assert 'Exciter' in result['Category'].values
-
-    def test_list_models_categorizes_governors(self, mock_dynamics):
-        """list_models() correctly categorizes governor models."""
-        with patch('os.path.exists', return_value=True), \
-             patch('os.remove'), \
-             patch('builtins.open', create=True) as mock_open:
-            mock_open.return_value.__enter__.return_value.read.return_value = (
-                'DATA (Governor_TGOV1, [Field1])\n{\n}\n'
-            )
-            result = mock_dynamics.list_models()
-            assert 'Governor' in result['Category'].values
-
-    def test_list_models_handles_no_file(self, mock_dynamics):
-        """list_models() returns empty DataFrame when no file created."""
-        with patch('os.path.exists', return_value=False):
-            result = mock_dynamics.list_models()
-            assert result.empty
-
-    def test_list_models_skips_network_objects(self, mock_dynamics):
-        """list_models() skips Gen, Load, Bus, etc. network objects."""
-        with patch('os.path.exists', return_value=True), \
-             patch('os.remove'), \
-             patch('builtins.open', create=True) as mock_open:
-            mock_open.return_value.__enter__.return_value.read.return_value = (
-                'DATA (Gen, [Field1])\n{\n}\n'
-                'DATA (Bus, [Field1])\n{\n}\n'
-                'DATA (MachineModel_GENROU, [Field1])\n{\n}\n'
-            )
-            result = mock_dynamics.list_models()
-            # Should only have GENROU, not Gen or Bus
-            assert len(result) == 1
-            assert 'GENROU' in result['Model'].values
-
-
-class TestDynamicsSolve:
-    """Tests for solve() method."""
-
-    def test_solve_accepts_single_contingency(self, mock_dynamics):
-        """solve() accepts a single contingency name as string."""
-        mock_dynamics.bus_fault("Fault1", "101")
-        mock_dynamics.esa.TSGetResults.return_value = (
-            pd.DataFrame({'ColHeader': ['Col1'], 'ObjectType': ['Bus'],
-                          'PrimaryKey': ['1'], 'SecondaryKey': [None], 'VariableName': ['VPU']}),
-            pd.DataFrame({'time': [0.0], 'Col1': [1.0]})
-        )
-
-        meta, data = mock_dynamics.solve("Fault1")
-        mock_dynamics.esa.TSSolve.assert_called()
-
-    def test_solve_accepts_list_of_contingencies(self, mock_dynamics):
-        """solve() accepts a list of contingency names."""
-        mock_dynamics.bus_fault("Fault1", "101")
-        mock_dynamics.bus_fault("Fault2", "102")
-
-        mock_dynamics.solve(["Fault1", "Fault2"])
-        assert mock_dynamics.esa.TSSolve.call_count == 2
-
-    def test_solve_uploads_pending_contingencies(self, mock_dynamics):
-        """solve() uploads pending contingencies before solving."""
-        mock_dynamics.bus_fault("Fault1", "101")
-        assert "Fault1" in mock_dynamics._pending_ctgs
-
-        mock_dynamics.solve("Fault1")
-        assert "Fault1" not in mock_dynamics._pending_ctgs
-
-    def test_solve_calls_ts_initialize(self, mock_dynamics):
-        """solve() calls TSAutoCorrect and TSInitialize."""
-        mock_dynamics.bus_fault("Fault1", "101")
-        mock_dynamics.solve("Fault1")
-
-        mock_dynamics.esa.TSAutoCorrect.assert_called_once()
-        mock_dynamics.esa.TSInitialize.assert_called_once()
-
-    def test_solve_returns_empty_when_no_results(self, mock_dynamics):
-        """solve() returns empty DataFrames when no results."""
-        mock_dynamics.bus_fault("Fault1", "101")
-        mock_dynamics.esa.TSGetResults.return_value = (None, None)
-
-        meta, data = mock_dynamics.solve("Fault1")
-        assert meta.empty
-        assert data.empty
-
-
-class TestDynamicsUploadContingencyEdgeCases:
-    """Tests for upload_contingency edge cases."""
-
-    def test_upload_contingency_empty_elements(self, mock_dynamics):
-        """upload_contingency() handles contingency with no events."""
-        # Create a contingency with no events
-        mock_dynamics.contingency("EmptyCtg")
-        mock_dynamics.upload_contingency("EmptyCtg")
-        # Should not raise, just upload header without elements
-        assert "EmptyCtg" not in mock_dynamics._pending_ctgs
-
-    def test_upload_contingency_updates_runtime(self, mock_dynamics):
-        """upload_contingency() updates builder runtime to Dynamics runtime."""
-        mock_dynamics.runtime = 15.0
-        mock_dynamics.contingency("TestCtg")
-        mock_dynamics.upload_contingency("TestCtg")
-        # Verify the contingency was uploaded (removed from pending)
-        assert "TestCtg" not in mock_dynamics._pending_ctgs
-
-
-class TestDynamicsListModelsCategories:
-    """Tests for list_models() categorization of all model types."""
-
-    def test_list_models_categorizes_stabilizers(self, mock_dynamics):
-        """list_models() correctly categorizes stabilizer models."""
-        with patch('os.path.exists', return_value=True), \
-             patch('os.remove'), \
-             patch('builtins.open', create=True) as mock_open:
-            mock_open.return_value.__enter__.return_value.read.return_value = (
-                'DATA (Stabilizer_PSS2A, [Field1])\n{\n}\n'
-            )
-            result = mock_dynamics.list_models()
-            assert 'Stabilizer' in result['Category'].values
-            assert 'PSS2A' in result['Model'].values
-
-    def test_list_models_categorizes_plant_controllers(self, mock_dynamics):
-        """list_models() correctly categorizes plant controller models."""
-        with patch('os.path.exists', return_value=True), \
-             patch('os.remove'), \
-             patch('builtins.open', create=True) as mock_open:
-            mock_open.return_value.__enter__.return_value.read.return_value = (
-                'DATA (PlantController_REPC_A, [Field1])\n{\n}\n'
-            )
-            result = mock_dynamics.list_models()
-            assert 'Plant Controller' in result['Category'].values
-            assert 'REPC_A' in result['Model'].values
-
-    def test_list_models_categorizes_relays(self, mock_dynamics):
-        """list_models() correctly categorizes relay models."""
-        with patch('os.path.exists', return_value=True), \
-             patch('os.remove'), \
-             patch('builtins.open', create=True) as mock_open:
-            mock_open.return_value.__enter__.return_value.read.return_value = (
-                'DATA (RelayModel_DISTR1, [Field1])\n{\n}\n'
-            )
-            result = mock_dynamics.list_models()
-            assert 'Relay' in result['Category'].values
-            assert 'DISTR1' in result['Model'].values
-
-    def test_list_models_categorizes_load_models(self, mock_dynamics):
-        """list_models() correctly categorizes load characteristic models."""
-        with patch('os.path.exists', return_value=True), \
-             patch('os.remove'), \
-             patch('builtins.open', create=True) as mock_open:
-            mock_open.return_value.__enter__.return_value.read.return_value = (
-                'DATA (LoadModel_CIM5, [Field1])\n{\n}\n'
-            )
-            result = mock_dynamics.list_models()
-            assert 'Load Characteristic' in result['Category'].values
-            assert 'CIM5' in result['Model'].values
-
-    def test_list_models_categorizes_other_models(self, mock_dynamics):
-        """list_models() categorizes unknown models as 'Other'."""
-        with patch('os.path.exists', return_value=True), \
-             patch('os.remove'), \
-             patch('builtins.open', create=True) as mock_open:
-            mock_open.return_value.__enter__.return_value.read.return_value = (
-                'DATA (UnknownModel_XYZ, [Field1])\n{\n}\n'
-            )
-            result = mock_dynamics.list_models()
-            assert 'Other' in result['Category'].values
-            assert 'UnknownModel_XYZ' in result['Model'].values
-
-    def test_list_models_empty_data(self, mock_dynamics):
-        """list_models() returns empty DataFrame with correct columns when no models."""
-        with patch('os.path.exists', return_value=True), \
-             patch('os.remove'), \
-             patch('builtins.open', create=True) as mock_open:
-            mock_open.return_value.__enter__.return_value.read.return_value = (
-                'DATA (Gen, [Field1])\n{\n}\n'
-                'DATA (Bus, [Field1])\n{\n}\n'
-            )
-            result = mock_dynamics.list_models()
-            assert result.empty
-            assert list(result.columns) == ["Category", "Model", "Object Type"]
-
-    def test_list_models_skips_shunt_and_branch(self, mock_dynamics):
-        """list_models() skips Shunt and Branch network objects."""
-        with patch('os.path.exists', return_value=True), \
-             patch('os.remove'), \
-             patch('builtins.open', create=True) as mock_open:
-            mock_open.return_value.__enter__.return_value.read.return_value = (
-                'DATA (Shunt, [Field1])\n{\n}\n'
-                'DATA (Branch, [Field1])\n{\n}\n'
-                'DATA (Load, [Field1])\n{\n}\n'
-            )
-            result = mock_dynamics.list_models()
-            assert result.empty
-
-
-class TestDynamicsSolveWarnings:
-    """Tests for solve() warning conditions."""
-
-    def test_solve_warns_no_watch_fields(self, mock_dynamics, caplog):
-        """solve() logs warning when no fields are watched."""
-        import logging
-        mock_dynamics.bus_fault("Fault1", "101")
-        mock_dynamics.esa.TSGetResults.return_value = (None, None)
-
-        with caplog.at_level(logging.WARNING):
-            mock_dynamics.solve("Fault1")
-
-        assert "No fields watched" in caplog.text or mock_dynamics.esa.TSSolve.called
-
-    def test_solve_warns_no_results_for_ctg(self, mock_dynamics, caplog):
-        """solve() logs warning when contingency returns no results."""
-        import logging
-        from esapp.components import Gen
-        mock_dynamics.watch(Gen, [TS.Gen.P])
-        mock_dynamics.bus_fault("Fault1", "101")
-        mock_dynamics.esa.TSGetResults.return_value = (None, None)
-
-        with caplog.at_level(logging.WARNING):
-            mock_dynamics.solve("Fault1")
-
-        # Either warning logged or empty result returned
-        meta, data = mock_dynamics.esa.TSGetResults.return_value
-        assert meta is None
-
-    def test_solve_handles_empty_df_in_results(self, mock_dynamics):
-        """solve() handles empty DataFrame in results."""
-        from esapp.components import Gen
-        mock_dynamics.watch(Gen, [TS.Gen.P])
-        mock_dynamics.bus_fault("Fault1", "101")
-        mock_dynamics.esa.TSGetResults.return_value = (
-            pd.DataFrame({'ColHeader': ['Col1']}),
-            pd.DataFrame()  # Empty DataFrame
-        )
-
-        meta, data = mock_dynamics.solve("Fault1")
-        assert meta.empty
-        assert data.empty
-
-class TestDynamicsProcessResultsEdgeCases:
-    """Tests for _process_results() edge cases."""
-
-    def test_process_results_no_matching_columns(self, mock_dynamics):
-        """_process_results() handles case where no columns match metadata."""
+    def test_no_matching_columns(self):
+        """process_ts_results() handles case where no columns match metadata."""
         meta = pd.DataFrame({'ColHeader': ['NonExistent'], 'ObjectType': ['Bus'],
                              'PrimaryKey': ['1'], 'SecondaryKey': [None], 'VariableName': ['VPU']})
         df = pd.DataFrame({'time': [0.0], 'DifferentCol': [1.0]})
 
-        result_meta, result_df = mock_dynamics._process_results(meta, df, "Ctg1")
+        result_meta, result_df = process_ts_results(meta, df, "Ctg1")
         assert result_meta.empty
         assert result_df.empty
 
-    def test_process_results_no_time_column(self, mock_dynamics):
-        """_process_results() handles DataFrame without time column."""
+    def test_no_time_column(self):
+        """process_ts_results() handles DataFrame without time column."""
         meta = pd.DataFrame({'ColHeader': ['Col1'], 'ObjectType': ['Bus'],
                              'PrimaryKey': ['1'], 'SecondaryKey': [None], 'VariableName': ['VPU']})
         df = pd.DataFrame({'Col1': [1.0, 0.95]})
 
-        result_meta, result_df = mock_dynamics._process_results(meta, df, "Ctg1")
-        # Should still work, just won't set time as index
+        result_meta, result_df = process_ts_results(meta, df, "Ctg1")
         assert not result_df.empty
 
 
-class TestTSFieldReexport:
-    """Tests for TS re-export from dynamics module."""
+# =============================================================================
+# GridWorkBench.ts_solve Tests
+# =============================================================================
 
-    def test_ts_in_all(self):
-        """TS is included in __all__ for backward compatibility."""
-        from esapp.apps.dynamics import __all__
-        assert 'TS' in __all__
+class TestTSSolve:
+    """Tests for GridWorkBench.ts_solve() method."""
 
-    def test_ts_import_from_dynamics(self):
-        """TS can be imported from dynamics module."""
-        from esapp.apps.dynamics import TS
+    @pytest.fixture
+    def mock_wb(self):
+        """Create a mock workbench with ESA for ts_solve testing."""
+        from esapp.workbench import GridWorkBench
+
+        wb = object.__new__(GridWorkBench)
+        wb.esa = MagicMock()
+        wb.esa.TSAutoCorrect.return_value = None
+        wb.esa.TSInitialize.return_value = None
+        wb.esa.TSSolve.return_value = None
+        wb.esa.TSGetResults.return_value = (
+            pd.DataFrame({'ColHeader': ['Col1'], 'ObjectType': ['Bus'],
+                          'PrimaryKey': ['1'], 'SecondaryKey': [None], 'VariableName': ['VPU']}),
+            pd.DataFrame({'time': [0.0, 0.1], 'Col1': [1.0, 0.95]})
+        )
+        return wb
+
+    def test_accepts_single_contingency(self, mock_wb):
+        """ts_solve() accepts a single contingency name as string."""
+        meta, data = mock_wb.ts_solve("Fault1", ["Col1"])
+        mock_wb.esa.TSSolve.assert_called_once_with("Fault1")
+
+    def test_accepts_list_of_contingencies(self, mock_wb):
+        """ts_solve() accepts a list of contingency names."""
+        mock_wb.ts_solve(["Fault1", "Fault2"], ["Col1"])
+        assert mock_wb.esa.TSSolve.call_count == 2
+
+    def test_calls_ts_initialize(self, mock_wb):
+        """ts_solve() calls TSAutoCorrect and TSInitialize."""
+        mock_wb.ts_solve("Fault1", ["Col1"])
+        mock_wb.esa.TSAutoCorrect.assert_called_once()
+        mock_wb.esa.TSInitialize.assert_called_once()
+
+    def test_returns_empty_when_no_results(self, mock_wb):
+        """ts_solve() returns empty DataFrames when no results."""
+        mock_wb.esa.TSGetResults.return_value = (None, None)
+        meta, data = mock_wb.ts_solve("Fault1", ["Col1"])
+        assert meta.empty
+        assert data.empty
+
+    def test_handles_empty_df_in_results(self, mock_wb):
+        """ts_solve() handles empty DataFrame in results."""
+        mock_wb.esa.TSGetResults.return_value = (
+            pd.DataFrame({'ColHeader': ['Col1']}),
+            pd.DataFrame()
+        )
+        meta, data = mock_wb.ts_solve("Fault1", ["Col1"])
+        assert meta.empty
+        assert data.empty
+
+    def test_warns_no_fields(self, mock_wb, caplog):
+        """ts_solve() logs warning when no fields are provided."""
+        import logging
+        mock_wb.esa.TSGetResults.return_value = (None, None)
+        with caplog.at_level(logging.WARNING):
+            mock_wb.ts_solve("Fault1", [])
+        assert "No fields provided" in caplog.text
+
+
+# =============================================================================
+# TS Component Import Tests
+# =============================================================================
+
+class TestTSImport:
+    """Tests for TS import from esapp.components."""
+
+    def test_ts_has_gen(self):
+        """TS has Gen attribute."""
         assert hasattr(TS, 'Gen')
+
+    def test_ts_has_bus(self):
+        """TS has Bus attribute."""
         assert hasattr(TS, 'Bus')

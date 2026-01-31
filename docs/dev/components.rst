@@ -109,7 +109,8 @@ Usage Examples
     Bus.is_settable('BusNum')   # True (it's a key)
 
     # Transient stability fields
-    wb.dyn.watch(Gen, [TS.Gen.P, TS.Gen.W, TS.Gen.Delta])
+    tsw = TSWatch()
+    tsw.watch(Gen, [TS.Gen.P, TS.Gen.W, TS.Gen.Delta])
 
 Extending ESA++
 ---------------
@@ -125,7 +126,8 @@ Extending ESA++
 
 - General utilities → ``esapp/utils/``
 - SAW-specific helpers → ``esapp/saw/_helpers.py``
-- Domain analysis → ``esapp/apps/``
+- Domain analysis → ``esapp/utils/`` (GIC, Network, ContingencyBuilder)
+- Example applications → ``examples/`` (Statics, Dynamics)
 
 **Contributing Tests**
 

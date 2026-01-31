@@ -25,6 +25,8 @@ Test Coverage
      - SAW helpers: df_to_aux, path conversion, formatting
    * - ``test_dynamics.py``
      - Dynamics module: ContingencyBuilder, SimAction enum
+   * - ``test_utils.py``
+     - Utility modules: GIC, Network, math helpers
 
 **Integration Tests** — Require PowerWorld
 
@@ -42,6 +44,8 @@ Test Coverage
      - Power flow, matrices (Ybus, Jacobian), PTDF/LODF
    * - ``test_integration_contingency.py``
      - Contingency auto-insertion, solving, OTDF
+   * - ``test_integration_network.py``
+     - Network topology, incidence matrices, graph analysis
    * - ``test_integration_analysis.py``
      - GIC, ATC, transient stability, time step simulation
    * - ``test_integration_extended.py``

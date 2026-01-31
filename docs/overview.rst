@@ -24,7 +24,7 @@ Key Features
 - **Full SimAuto Coverage** — All PowerWorld API functions through modular mixins
 - **Pandas Integration** — Every query returns a DataFrame
 - **Transient Stability** — Fluent API with ``TS`` field intellisense
-- **Analysis Apps** — Built-in GIC, network topology, and modal analysis
+- **Analysis Utilities** — Built-in GIC, network topology, and contingency tools
 
 About
 -----
@@ -165,26 +165,29 @@ Extract system matrices for external analysis:
 Transient Stability
 -------------------
 
-The ``Dynamics`` app provides a fluent interface for time-domain simulation.
+Use ``TSWatch`` and ``ContingencyBuilder`` from ``esapp.utils`` for time-domain simulation.
 
 .. code-block:: python
 
     from esapp import GridWorkBench, TS
     from esapp.components import Gen, Bus
-    from plot_helpers import plot_dynamics
+    from esapp.utils import TSWatch, ContingencyBuilder, get_ts_results, process_ts_results
 
     wb = GridWorkBench("path/to/case.pwb")
 
-    # Configure simulation
-    wb.dyn.runtime = 10.0
-    wb.dyn.watch(Gen, [TS.Gen.P, TS.Gen.W, TS.Gen.Delta])
-    wb.dyn.watch(Bus, [TS.Bus.VPU])
+    # Register fields to record
+    tsw = TSWatch()
+    tsw.watch(Gen, [TS.Gen.P, TS.Gen.W, TS.Gen.Delta])
+    tsw.watch(Bus, [TS.Bus.VPU])
 
     # Define a fault contingency
-    (wb.dyn.contingency("BusFault")
-           .at(1.0).fault_bus("101")
-           .at(1.1).clear_fault("101"))
+    (ContingencyBuilder("BusFault")
+        .at(1.0).fault_bus("101")
+        .at(1.1).clear_fault("101")
+        .build(wb))
 
-    # Solve and plot
-    meta, results = wb.dyn.solve("BusFault")
-    plot_dynamics(meta, results)
+    # Prepare, solve, and retrieve results
+    fields = tsw.prepare(wb)
+    wb.esa.TSRunAndPause()
+    meta, results = get_ts_results(wb, fields)
+    results = process_ts_results(meta, results)

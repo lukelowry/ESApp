@@ -1,15 +1,18 @@
 """
-Integration tests for Contingency Analysis functionality against a live PowerWorld case.
+Integration tests for Contingency Analysis via the SAW interface.
 
-WHAT THIS TESTS:
-- Contingency auto-insertion and solving
-- Contingency cloning and conversion
-- OTDF calculations
-- Contingency result export
+These are **integration tests** that require a live connection to PowerWorld
+Simulator via the SimAuto COM interface. They test contingency auto-insertion,
+solving, cloning, conversion, OTDF calculations, fault analysis, and result
+export.
 
-DEPENDENCIES:
-- PowerWorld Simulator installed and SimAuto registered
-- Valid PowerWorld case file configured in tests/config_test.py
+REQUIREMENTS:
+    - PowerWorld Simulator installed with SimAuto COM registered
+    - A valid PowerWorld case file path set in ``tests/config_test.py``
+      (variable ``SAW_TEST_CASE``) or via the ``SAW_TEST_CASE`` env variable
+
+USAGE:
+    pytest tests/test_integration_contingency.py -v
 """
 
 import os
@@ -60,12 +63,12 @@ def _configure_limited_ctg_auto_insert(saw_instance):
 class TestContingency:
     """Tests for contingency analysis operations."""
 
-    @pytest.mark.order(50)
+    @pytest.mark.order(5000)
     def test_contingency_auto_insert(self, saw_instance):
         _configure_limited_ctg_auto_insert(saw_instance)
         saw_instance.CTGAutoInsert()
 
-    @pytest.mark.order(51)
+    @pytest.mark.order(5100)
     def test_contingency_solve(self, saw_instance):
         # Skip most contingencies to reduce runtime - only solve 1-2
         saw_instance.SetData("Contingency", ["Skip"], ["YES"], "ALL")
@@ -81,7 +84,7 @@ class TestContingency:
                     pass
         saw_instance.SolveContingencies()
 
-    @pytest.mark.order(52)
+    @pytest.mark.order(5200)
     def test_contingency_run_single(self, saw_instance):
         ctgs = saw_instance.ListOfDevices("Contingency")
         if ctgs is not None and not ctgs.empty:
@@ -89,7 +92,7 @@ class TestContingency:
             saw_instance.RunContingency(ctg_name)
             saw_instance.CTGApply(ctg_name)
 
-    @pytest.mark.order(53)
+    @pytest.mark.order(5300)
     def test_contingency_otdf(self, saw_instance):
         areas = saw_instance.GetParametersMultipleElement("Area", ["AreaNum"])
         if areas is not None and len(areas) >= 2:
@@ -97,7 +100,7 @@ class TestContingency:
             buyer = f'[AREA {areas.iloc[1]["AreaNum"]}]'
             saw_instance.CTGCalculateOTDF(seller, buyer)
 
-    @pytest.mark.order(54)
+    @pytest.mark.order(5400)
     def test_contingency_results_ops(self, saw_instance):
         """Test contingency result operations - skip slow comparison ops."""
         saw_instance.CTGClearAllResults()
@@ -110,7 +113,7 @@ class TestContingency:
         # as they can be very slow on large cases (O(n^2) comparison)
         saw_instance.CTGSort()
 
-    @pytest.mark.order(55)
+    @pytest.mark.order(5500)
     def test_contingency_combo(self, saw_instance):
         """Run combo solve BEFORE cloning to avoid solving duplicated contingencies."""
         saw_instance.CTGComboDeleteAllResults()
@@ -141,7 +144,7 @@ class TestContingency:
         except PowerWorldPrerequisiteError:
             pytest.skip("No active primary contingencies for Combo Analysis")
 
-    @pytest.mark.order(56)
+    @pytest.mark.order(5600)
     def test_contingency_clone(self, saw_instance):
         """Clone contingencies AFTER combo solve to avoid bloating solve operations."""
         ctgs = saw_instance.ListOfDevices("Contingency")
@@ -150,7 +153,7 @@ class TestContingency:
             saw_instance.CTGCloneOne(ctg_name, "ClonedCTG")
             saw_instance.CTGCloneMany("", "Many_", "_Suffix")
 
-    @pytest.mark.order(57)
+    @pytest.mark.order(5700)
     def test_contingency_convert(self, saw_instance):
         saw_instance.CTGConvertAllToDeviceCTG()
         saw_instance.CTGConvertToPrimaryCTG()
@@ -160,32 +163,32 @@ class TestContingency:
         _configure_limited_ctg_auto_insert(saw_instance)
         saw_instance.CTGPrimaryAutoInsert()
 
-    @pytest.mark.order(58)
+    @pytest.mark.order(5800)
     def test_contingency_create_interface(self, saw_instance):
         try:
             saw_instance.CTGCreateContingentInterfaces("")
         except PowerWorldPrerequisiteError:
             pytest.skip("Filter 'ALL' not found for CTGCreateContingentInterfaces")
 
-    @pytest.mark.order(59)
+    @pytest.mark.order(5900)
     def test_contingency_join(self, saw_instance):
         saw_instance.CTGJoinActiveCTGs(False, False, True)
 
-    @pytest.mark.order(60)
+    @pytest.mark.order(6000)
     def test_contingency_process_remedial(self, saw_instance):
         saw_instance.CTGProcessRemedialActionsAndDependencies(False)
 
-    @pytest.mark.order(61)
+    @pytest.mark.order(6100)
     def test_contingency_save_matrices(self, saw_instance, temp_file):
         tmp_csv = temp_file(".csv")
         saw_instance.CTGSaveViolationMatrices(tmp_csv, "CSVCOLHEADER", False, ["Branch"], True, True)
 
-    @pytest.mark.order(62)
+    @pytest.mark.order(6200)
     def test_contingency_verify(self, saw_instance, temp_file):
         tmp_txt = temp_file(".txt")
         saw_instance.CTGVerifyIteratedLinearActions(tmp_txt)
 
-    @pytest.mark.order(63)
+    @pytest.mark.order(6300)
     def test_contingency_write_results(self, saw_instance, temp_file):
         tmp_aux = temp_file(".aux")
         saw_instance.CTGWriteResultsAndOptions(tmp_aux)
@@ -203,7 +206,7 @@ class TestContingency:
 class TestFault:
     """Tests for fault analysis operations."""
 
-    @pytest.mark.order(53)
+    @pytest.mark.order(5300)
     def test_fault_run(self, saw_instance):
         buses = saw_instance.GetParametersMultipleElement("Bus", ["BusNum"])
         if buses is not None and not buses.empty:
@@ -213,13 +216,13 @@ class TestFault:
         else:
             pytest.skip("No buses found")
 
-    @pytest.mark.order(54)
+    @pytest.mark.order(5400)
     def test_fault_auto(self, saw_instance):
         # Configure limited auto-insert options (same object as CTG)
         _configure_limited_ctg_auto_insert(saw_instance)
         saw_instance.FaultAutoInsert()
 
-    @pytest.mark.order(55)
+    @pytest.mark.order(5500)
     def test_fault_multiple(self, saw_instance):
         _configure_limited_ctg_auto_insert(saw_instance)
         saw_instance.FaultAutoInsert()
@@ -232,7 +235,7 @@ class TestFault:
 class TestContingencyAdvanced:
     """Advanced contingency tests for edge cases and validation."""
 
-    @pytest.mark.order(64)
+    @pytest.mark.order(6400)
     def test_contingency_get_violations(self, saw_instance):
         """Test retrieving contingency violations."""
         # Run contingencies first to generate results
@@ -251,7 +254,7 @@ class TestContingencyAdvanced:
         except PowerWorldPrerequisiteError:
             pytest.skip("No contingencies to solve")
 
-    @pytest.mark.order(65)
+    @pytest.mark.order(6500)
     def test_contingency_results_dataframe(self, saw_instance):
         """Test that contingency results can be retrieved as DataFrame."""
         ctgs = saw_instance.ListOfDevices("Contingency")
@@ -261,7 +264,7 @@ class TestContingencyAdvanced:
             # Verify expected columns exist
             assert "CTGLabel" in ctgs.columns or len(ctgs.columns) > 0
 
-    @pytest.mark.order(66)
+    @pytest.mark.order(6600)
     def test_contingency_skip_behavior(self, saw_instance):
         """Test that skipped contingencies are not solved."""
         # Skip all contingencies
@@ -270,7 +273,7 @@ class TestContingencyAdvanced:
         # Solving should be quick since all are skipped
         saw_instance.SolveContingencies()
 
-    @pytest.mark.order(67)
+    @pytest.mark.order(6700)
     def test_contingency_restore_reference(self, saw_instance):
         """Test CTGRestoreReference restores case state."""
         # Store original state
@@ -289,7 +292,7 @@ class TestContingencyAdvanced:
 class TestFaultAdvanced:
     """Advanced fault analysis tests."""
 
-    @pytest.mark.order(56)
+    @pytest.mark.order(5600)
     def test_fault_types(self, saw_instance):
         """Test different fault types."""
         buses = saw_instance.GetParametersMultipleElement("Bus", ["BusNum"])
@@ -307,7 +310,7 @@ class TestFaultAdvanced:
                     # Some fault types may not be configured or may fail
                     continue
 
-    @pytest.mark.order(57)
+    @pytest.mark.order(5700)
     def test_fault_at_branch(self, saw_instance):
         """Test fault on branch midpoint."""
         branches = saw_instance.GetParametersMultipleElement("Branch", ["BusNum", "BusNum:1", "LineCircuit"])
@@ -325,7 +328,7 @@ class TestFaultAdvanced:
 class TestContingencyExport:
     """Tests for contingency export functionality."""
 
-    @pytest.mark.order(68)
+    @pytest.mark.order(6800)
     def test_contingency_produce_report(self, saw_instance, temp_file):
         """Test CTGProduceReport for report generation."""
         tmp_txt = temp_file(".txt")
@@ -335,7 +338,7 @@ class TestContingencyExport:
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("No contingency results for report")
 
-    @pytest.mark.order(69)
+    @pytest.mark.order(6900)
     def test_contingency_write_pti(self, saw_instance, temp_file):
         """Test CTGWriteFilePTI for PTI format export."""
         tmp_pti = temp_file(".con")
@@ -345,7 +348,7 @@ class TestContingencyExport:
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("PTI export not available")
 
-    @pytest.mark.order(70)
+    @pytest.mark.order(7000)
     def test_contingency_write_all_options(self, saw_instance, temp_file):
         """Test CTGWriteAllOptions for options export."""
         tmp_aux = temp_file(".aux")
@@ -355,7 +358,7 @@ class TestContingencyExport:
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("Options export not available")
 
-    @pytest.mark.order(71)
+    @pytest.mark.order(7100)
     def test_contingency_compare_two_lists(self, saw_instance):
         """Test CTGCompareTwoListsofContingencyResults for comparing contingency results."""
         try:
@@ -363,7 +366,7 @@ class TestContingencyExport:
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("No contingency lists to compare")
 
-    @pytest.mark.order(72)
+    @pytest.mark.order(7200)
     def test_contingency_write_csv(self, saw_instance, temp_file):
         """Test saving contingency violations to CSV."""
         tmp_csv = temp_file(".csv")

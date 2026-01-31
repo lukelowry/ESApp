@@ -1,15 +1,18 @@
 """
-Integration tests for Power Flow functionality against a live PowerWorld case.
+Integration tests for Power Flow and Sensitivity via the SAW interface.
 
-WHAT THIS TESTS:
-- Power flow solution execution and result validation
-- Matrices (Ybus, Jacobian, Incidence)
-- Sensitivity calculations (PTDF, LODF, shift factors)
-- Diff case operations
+These are **integration tests** that require a live connection to PowerWorld
+Simulator via the SimAuto COM interface. They test power flow solution,
+matrix extraction (Y-bus, Jacobian, incidence), sensitivity calculations
+(PTDF, LODF, shift factors), topology analysis, and diff-case operations.
 
-DEPENDENCIES:
-- PowerWorld Simulator installed and SimAuto registered
-- Valid PowerWorld case file configured in tests/config_test.py
+REQUIREMENTS:
+    - PowerWorld Simulator installed with SimAuto COM registered
+    - A valid PowerWorld case file path set in ``tests/config_test.py``
+      (variable ``SAW_TEST_CASE``) or via the ``SAW_TEST_CASE`` env variable
+
+USAGE:
+    pytest tests/test_integration_powerflow.py -v
 """
 
 import os
@@ -37,69 +40,69 @@ def saw_instance(saw_session):
 class TestPowerFlow:
     """Tests for power flow solution and related operations."""
 
-    @pytest.mark.order(10)
+    @pytest.mark.order(1000)
     def test_powerflow_solve(self, saw_instance):
         saw_instance.SolvePowerFlow()
 
-    @pytest.mark.order(11)
+    @pytest.mark.order(1100)
     def test_powerflow_solve_retry(self, saw_instance):
         saw_instance.SolvePowerFlowWithRetry()
 
-    @pytest.mark.order(12)
+    @pytest.mark.order(1200)
     def test_powerflow_clear_solution_aid(self, saw_instance):
         saw_instance.ClearPowerFlowSolutionAidValues()
 
-    @pytest.mark.order(13)
+    @pytest.mark.order(1300)
     def test_powerflow_options(self, saw_instance):
         saw_instance.SetMVATolerance(0.1)
         saw_instance.SetDoOneIteration(False)
         saw_instance.SetInnerLoopCheckMVars(False)
 
-    @pytest.mark.order(15)
+    @pytest.mark.order(1500)
     def test_powerflow_min_pu_volt(self, saw_instance):
         v = saw_instance.GetMinPUVoltage()
         assert isinstance(v, float)
 
-    @pytest.mark.order(17)
+    @pytest.mark.order(1700)
     def test_powerflow_update_islands(self, saw_instance):
         saw_instance.UpdateIslandsAndBusStatus()
 
-    @pytest.mark.order(18)
+    @pytest.mark.order(1800)
     def test_powerflow_zero_mismatches(self, saw_instance):
         saw_instance.ZeroOutMismatches()
 
-    @pytest.mark.order(19)
+    @pytest.mark.order(1900)
     def test_powerflow_estimate_voltages(self, saw_instance):
         saw_instance.SelectAll("Bus")
         saw_instance.EstimateVoltages("SELECTED")
 
-    @pytest.mark.order(20)
+    @pytest.mark.order(2000)
     def test_powerflow_gen_force_ldc(self, saw_instance):
         saw_instance.GenForceLDC_RCC()
 
-    @pytest.mark.order(21)
+    @pytest.mark.order(2100)
     def test_powerflow_save_gen_limit(self, saw_instance, temp_file):
         tmp_txt = temp_file(".txt")
         saw_instance.SaveGenLimitStatusAction(tmp_txt)
         assert os.path.exists(tmp_txt)
 
-    @pytest.mark.order(22)
+    @pytest.mark.order(2200)
     def test_powerflow_diff_case(self, saw_instance):
         saw_instance.DiffCaseSetAsBase()
         saw_instance.DiffCaseMode("DIFFERENCE")
         saw_instance.DiffCaseRefresh()
         saw_instance.DiffCaseClearBase()
 
-    @pytest.mark.order(23)
+    @pytest.mark.order(2300)
     def test_powerflow_voltage_conditioning(self, saw_instance):
         saw_instance.VoltageConditioning()
 
-    @pytest.mark.order(24)
+    @pytest.mark.order(2400)
     def test_powerflow_flat_start(self, saw_instance):
         saw_instance.ResetToFlatStart()
         saw_instance.SolvePowerFlow()
 
-    @pytest.mark.order(25)
+    @pytest.mark.order(2500)
     def test_powerflow_diff_write(self, saw_instance, temp_file):
         tmp_aux = temp_file(".aux")
         tmp_epc = temp_file(".epc")
@@ -111,17 +114,17 @@ class TestPowerFlow:
 class TestMatrices:
     """Tests for matrix extraction (Ybus, Jacobian, etc.)."""
 
-    @pytest.mark.order(30)
+    @pytest.mark.order(3000)
     def test_matrix_ybus(self, saw_instance):
         ybus = saw_instance.get_ybus()
         assert ybus is not None
 
-    @pytest.mark.order(31)
+    @pytest.mark.order(3100)
     def test_matrix_gmatrix(self, saw_instance):
         gmat = saw_instance.get_gmatrix()
         assert gmat is not None
 
-    @pytest.mark.order(32)
+    @pytest.mark.order(3200)
     def test_matrix_jacobian(self, saw_instance):
         jac = saw_instance.get_jacobian()
         assert jac is not None
@@ -130,14 +133,14 @@ class TestMatrices:
 class TestSensitivity:
     """Tests for sensitivity calculations (PTDF, LODF, shift factors)."""
 
-    @pytest.mark.order(40)
+    @pytest.mark.order(4000)
     def test_sensitivity_volt_sense(self, saw_instance):
         buses = saw_instance.GetParametersMultipleElement("Bus", ["BusNum"])
         if buses is not None and not buses.empty:
             bus_num = buses.iloc[0]["BusNum"]
             saw_instance.CalculateVoltSense(bus_num)
 
-    @pytest.mark.order(41)
+    @pytest.mark.order(4100)
     def test_sensitivity_flow_sense(self, saw_instance):
         branches = saw_instance.GetParametersMultipleElement("Branch", ["BusNum", "BusNum:1", "LineCircuit"])
         if branches is not None and not branches.empty:
@@ -145,7 +148,7 @@ class TestSensitivity:
             branch_str = create_object_string("Branch", b["BusNum"], b["BusNum:1"], b["LineCircuit"])
             saw_instance.CalculateFlowSense(branch_str, "MW")
 
-    @pytest.mark.order(42)
+    @pytest.mark.order(4200)
     def test_sensitivity_ptdf(self, saw_instance):
         areas = saw_instance.GetParametersMultipleElement("Area", ["AreaNum"])
         if areas is not None and len(areas) >= 2:
@@ -154,7 +157,7 @@ class TestSensitivity:
             saw_instance.CalculatePTDF(seller, buyer)
             saw_instance.CalculateVoltToTransferSense(seller, buyer)
 
-    @pytest.mark.order(43)
+    @pytest.mark.order(4300)
     def test_sensitivity_lodf(self, saw_instance):
         branches = saw_instance.GetParametersMultipleElement("Branch", ["BusNum", "BusNum:1", "LineCircuit"])
         if branches is not None and not branches.empty:
@@ -162,7 +165,7 @@ class TestSensitivity:
             branch_str = create_object_string("Branch", b["BusNum"], b["BusNum:1"], b["LineCircuit"])
             saw_instance.CalculateLODF(branch_str)
 
-    @pytest.mark.order(44)
+    @pytest.mark.order(4400)
     def test_sensitivity_shift_factors(self, saw_instance):
         branches = saw_instance.GetParametersMultipleElement("Branch", ["BusNum", "BusNum:1", "LineCircuit", "LineStatus"])
         areas = saw_instance.GetParametersMultipleElement("Area", ["AreaNum"])
@@ -180,11 +183,11 @@ class TestSensitivity:
             else:
                 pytest.skip("No closed branches found for shift factors")
 
-    @pytest.mark.order(45)
+    @pytest.mark.order(4500)
     def test_sensitivity_lodf_matrix(self, saw_instance):
         saw_instance.CalculateLODFMatrix("OUTAGES", "ALL", "ALL")
 
-    @pytest.mark.order(36)
+    @pytest.mark.order(3600)
     def test_sensitivity_lodf_advanced(self, saw_instance, temp_file):
         """Test CalculateLODFAdvanced with full parameters."""
         tmp_csv = temp_file(".csv")
@@ -204,7 +207,7 @@ class TestSensitivity:
         except PowerWorldPrerequisiteError:
             pytest.skip("LODF Advanced not available")
 
-    @pytest.mark.order(37)
+    @pytest.mark.order(3700)
     def test_sensitivity_lodf_screening(self, saw_instance):
         """Test CalculateLODFScreening for screening mode."""
         try:
@@ -229,7 +232,7 @@ class TestSensitivity:
                 pytest.skip("LODF Screening not available")
             raise
 
-    @pytest.mark.order(38)
+    @pytest.mark.order(3800)
     def test_sensitivity_shift_factors_multiple(self, saw_instance):
         """Test CalculateShiftFactorsMultipleElement for multiple branches."""
         areas = saw_instance.GetParametersMultipleElement("Area", ["AreaNum"])
@@ -247,7 +250,7 @@ class TestSensitivity:
                     pytest.skip("No branches selected for shift factor calculation")
                 raise
 
-    @pytest.mark.order(39)
+    @pytest.mark.order(3900)
     def test_sensitivity_loss_sense(self, saw_instance):
         """Test CalculateLossSense for loss sensitivity."""
         try:
@@ -262,13 +265,13 @@ class TestTopology:
     """Tests for topology analysis operations."""
 
 
-    @pytest.mark.order(47)
+    @pytest.mark.order(4700)
     def test_topology_islands(self, saw_instance):
         df = saw_instance.DetermineBranchesThatCreateIslands()
         assert df is not None
         assert isinstance(df, pd.DataFrame)
 
-    @pytest.mark.order(48)
+    @pytest.mark.order(4800)
     def test_topology_shortest_path(self, saw_instance):
         buses = saw_instance.GetParametersMultipleElement("Bus", ["BusNum"])
         if buses is not None and len(buses) >= 2:
@@ -281,7 +284,7 @@ class TestTopology:
 class TestPowerFlowAdvanced:
     """Additional power flow tests for DC solution and advanced features."""
 
-    @pytest.mark.order(26)
+    @pytest.mark.order(2600)
     def test_powerflow_solve_dc(self, saw_instance):
         """Test DC power flow solution."""
         saw_instance.SolvePowerFlow("DC")
@@ -289,7 +292,7 @@ class TestPowerFlowAdvanced:
         # Run AC again to restore state for subsequent tests
         saw_instance.SolvePowerFlow()
 
-    @pytest.mark.order(27)
+    @pytest.mark.order(2700)
     def test_powerflow_agc(self, saw_instance):
         """Test AGC-related generator participation factors."""
         # AGC calculation via participation factors  
