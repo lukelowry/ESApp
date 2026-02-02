@@ -25,7 +25,9 @@ Architecture Overview
 GObject Base Class
 ~~~~~~~~~~~~~~~~~~
 
-Each component is an Enum subclass where members define fields:
+Each component is an Enum subclass where members define fields. A single-argument
+member (``ObjectString``) sets the PowerWorld object type, while 3-tuple members
+define fields with ``(PowerWorld name, data type, priority flags)``:
 
 .. code-block:: python
 
@@ -34,12 +36,15 @@ Each component is an Enum subclass where members define fields:
         """Number"""
         BusName = ("BusName", str, FieldPriority.SECONDARY | FieldPriority.REQUIRED | FieldPriority.EDITABLE)
         """Name"""
+        # ... more fields ...
+
+        ObjectString = 'Bus'  # Sets Bus.TYPE — must be last member
 
 The base class collects these into queryable properties:
 
 .. code-block:: python
 
-    Bus.TYPE        # 'Bus' - PowerWorld object type
+    Bus.TYPE        # 'Bus' - PowerWorld object type (from ObjectString)
     Bus.keys        # ['BusNum'] - primary key fields
     Bus.fields      # all field names
     Bus.secondary   # alternate identifier fields

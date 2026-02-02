@@ -36,20 +36,24 @@ Test Coverage
 
    * - File
      - Coverage
-   * - ``test_integration_saw_powerworld.py``
+   * - ``test_integration_saw_core.py``
      - Core SAW operations, file I/O, data retrieval
    * - ``test_integration_workbench.py``
      - GridWorkBench data access and indexing
-   * - ``test_integration_powerflow.py``
+   * - ``test_integration_saw_powerflow.py``
      - Power flow, matrices (Ybus, Jacobian), PTDF/LODF
-   * - ``test_integration_contingency.py``
+   * - ``test_integration_saw_contingency.py``
      - Contingency auto-insertion, solving, OTDF
    * - ``test_integration_network.py``
      - Network topology, incidence matrices, graph analysis
-   * - ``test_integration_analysis.py``
-     - GIC, ATC, transient stability, time step simulation
-   * - ``test_integration_extended.py``
+   * - ``test_integration_saw_gic.py``
+     - GIC analysis and calculations
+   * - ``test_integration_saw_modify.py``
+     - Case modification and data manipulation
+   * - ``test_integration_saw_operations.py``
      - Scheduled actions, weather, OPF, extended methods
+   * - ``test_integration_saw_transient.py``
+     - Transient stability simulation
 
 Configuration
 -------------
@@ -63,7 +67,7 @@ Running Tests
 .. code-block:: bash
 
     pytest tests/                           # Full suite
-    pytest tests/ -m "not integration"      # Unit only
+    pytest tests/ -m unit                   # Unit only
     pytest tests/ -m integration            # Integration only
     pytest tests/ --cov=esapp --cov-report=html  # With coverage
 

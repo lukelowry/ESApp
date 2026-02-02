@@ -118,7 +118,7 @@ Run power flow and check results:
 .. code-block:: python
 
     wb.pflow()                         # Solve power flow
-    low_v = wb.violations(v_min=0.95)  # Find voltage violations
+    low_v = wb.violations(v_min=0.9)   # Find voltage violations
     wb.save()                          # Save case
 
 Common Helpers
@@ -128,17 +128,14 @@ Shortcuts for frequent operations:
 
 .. code-block:: python
 
-    # Modify individual elements
-    wb.set_gen(bus=5, id="1", mw=150.0)
-    wb.set_load(bus=10, id="1", mw=90.0)
-
     # Switch branches
     wb.open_branch(bus1=1, bus2=2, ckt="1")
     wb.close_branch(bus1=1, bus2=2, ckt="1")
 
-    # Scale generation/load
-    wb.scale_gen(factor=1.05)
-    wb.scale_load(factor=0.95)
+    # Mode control
+    wb.edit_mode()                     # Enter EDIT mode
+    wb.run_mode()                      # Enter RUN mode
+    wb.flatstart()                     # Reset to 1.0 pu, 0 angle
 
 Direct SAW Access
 ~~~~~~~~~~~~~~~~~
@@ -148,7 +145,7 @@ For operations not wrapped by GridWorkBench, use the underlying SAW interface:
 .. code-block:: python
 
     saw = wb.esa
-    saw.SolveAC_OPF()
+    saw.SolvePrimalLP()
     saw.RunScriptCommand("EnterMode(Edit);")
 
 Network Matrices
@@ -158,9 +155,11 @@ Extract system matrices for external analysis:
 
 .. code-block:: python
 
-    Y = wb.ybus()                # Admittance matrix
-    A = wb.network.incidence()   # Incidence matrix
-    L = wb.network.laplacian()   # Graph Laplacian
+    from esapp.utils import BranchType
+
+    Y = wb.ybus()                              # Admittance matrix
+    A = wb.network.incidence()                 # Incidence matrix
+    L = wb.network.laplacian(BranchType.LENGTH)  # Graph Laplacian
 
 Transient Stability
 -------------------
@@ -181,13 +180,18 @@ Use ``TSWatch`` and ``ContingencyBuilder`` from ``esapp.utils`` for time-domain 
     tsw.watch(Bus, [TS.Bus.VPU])
 
     # Define a fault contingency
-    (ContingencyBuilder("BusFault")
+    ctg = (ContingencyBuilder("BusFault")
         .at(1.0).fault_bus("101")
-        .at(1.1).clear_fault("101")
-        .build(wb))
+        .at(1.1).clear_fault("101"))
+    ctg_df, elem_df = ctg.to_dataframes()
+
+    # Write contingency to PowerWorld
+    from esapp.components import TSContingency, TSContingencyElement
+    wb[TSContingency] = ctg_df
+    wb[TSContingencyElement] = elem_df
 
     # Prepare, solve, and retrieve results
     fields = tsw.prepare(wb)
-    wb.esa.TSRunAndPause()
-    meta, results = get_ts_results(wb, fields)
-    results = process_ts_results(meta, results)
+    wb.esa.TSSolve("BusFault")
+    meta, results = get_ts_results(wb.esa, "BusFault", fields)
+    meta, results = process_ts_results(meta, results, "BusFault")
