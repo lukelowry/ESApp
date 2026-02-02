@@ -2,7 +2,6 @@
 
 
 from esapp.saw._enums import YesNo
-from esapp.saw._helpers import pack_args
 
 
 class FaultMixin:
@@ -47,14 +46,13 @@ class FaultMixin:
         """
         # If location is None, it is omitted from the arguments
         if location is not None:
-            args = pack_args(element, location, fault_type, r, x)
+            return self._run_script("Fault", element, location, fault_type, r, x)
         else:
-            args = pack_args(element, fault_type, r, x)
-        return self.RunScriptCommand(f"Fault({args});")
+            return self._run_script("Fault", element, fault_type, r, x)
 
     def FaultClear(self):
         """Clears a single fault that has been calculated with the Fault command."""
-        return self.RunScriptCommand("FaultClear;")
+        return self._run_script("FaultClear")
 
     def FaultAutoInsert(self):
         """Inserts multiple fault definitions using the Ctg_AutoInsert_Options object.
@@ -63,7 +61,7 @@ class FaultMixin:
         Ctg_AutoInsert_Options object that are relevant for fault analysis.
         Faults can only be inserted for transmission lines or buses.
         """
-        return self.RunScriptCommand("FaultAutoInsert;")
+        return self._run_script("FaultAutoInsert")
 
     def FaultMultiple(self, use_dummy_bus: bool = False):
         """Runs fault analysis on a list of defined faults.
@@ -77,7 +75,7 @@ class FaultMixin:
             terminal bus closest to the specified location. Defaults to False.
         """
         dummy = YesNo.from_bool(use_dummy_bus)
-        return self.RunScriptCommand(f"FaultMultiple({dummy});")
+        return self._run_script("FaultMultiple", dummy)
 
     def LoadPTISEQData(self, filename: str, version: int = 33):
         """Loads sequence data in the PTI format.
@@ -89,4 +87,4 @@ class FaultMixin:
         version : int, optional
             Integer representing the PTI version of the SEQ file. Defaults to 33.
         """
-        return self.RunScriptCommand(f'LoadPTISEQData("{filename}", {version});')
+        return self._run_script("LoadPTISEQData", f'"{filename}"', version)

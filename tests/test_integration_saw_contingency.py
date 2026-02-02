@@ -1,5 +1,5 @@
 """
-Integration tests for Contingency Analysis via the SAW interface.
+Integration tests for Contingency Analysis and Fault Analysis via SAW.
 
 These are **integration tests** that require a live connection to PowerWorld
 Simulator via the SimAuto COM interface. They test contingency auto-insertion,
@@ -11,15 +11,24 @@ REQUIREMENTS:
     - A valid PowerWorld case file path set in ``tests/config_test.py``
       (variable ``SAW_TEST_CASE``) or via the ``SAW_TEST_CASE`` env variable
 
+RELATED TEST FILES:
+    - test_integration_saw_core.py          -- base SAW operations, logging, I/O
+    - test_integration_saw_modify.py        -- destructive modify, region, case actions
+    - test_integration_saw_powerflow.py     -- power flow, matrices, sensitivity, topology
+    - test_integration_saw_gic.py           -- GIC analysis
+    - test_integration_saw_transient.py     -- transient stability
+    - test_integration_saw_operations.py    -- ATC, OPF, PV/QV, time step, weather, scheduled
+    - test_integration_workbench.py         -- GridWorkBench facade and statics
+    - test_integration_network.py           -- Network topology
+
 USAGE:
-    pytest tests/test_integration_contingency.py -v
+    pytest tests/test_integration_saw_contingency.py -v
 """
 
 import os
 import pytest
 import pandas as pd
 
-# Order markers for integration tests - contingency tests run mid-sequence (order 50-69)
 pytestmark = [
     pytest.mark.integration,
     pytest.mark.requires_case,
@@ -43,14 +52,12 @@ def _configure_limited_ctg_auto_insert(saw_instance):
     Deletes existing contingencies and configures auto-insert. Uses all kV levels
     to ensure contingencies are created regardless of the test case's voltage range.
     """
-    # Delete existing contingencies to start fresh
     saw_instance.SetData("Contingency", ["Skip"], ["NO"], "ALL")
     try:
         saw_instance.RunScriptCommand("Delete(Contingency);")
     except (PowerWorldPrerequisiteError, PowerWorldError):
-        pass  # Expected if no contingencies exist yet
+        pass
 
-    # Configure auto-insert: delete existing, use all kV levels
     saw_instance.SetData(
         "CTG_AutoInsert_Options",
         ["CtgAutoInsDeleteExistCtgs", "DOCUseAllkV"],
@@ -59,20 +66,7 @@ def _configure_limited_ctg_auto_insert(saw_instance):
 
 
 def _trim_contingencies(saw_instance, max_active=5, delete_excess=False):
-    """Skip all contingencies then un-skip only *max_active* to limit runtime.
-
-    Parameters
-    ----------
-    saw_instance : SAW
-        The SAW instance.
-    max_active : int
-        Number of contingencies to leave active (un-skipped).
-    delete_excess : bool
-        If True, delete excess contingencies so that only *max_active*
-        contingencies remain. Uses the SELECTED filter to bulk-delete.
-        Useful for functions like CTGSkipWithIdenticalActions that process
-        all contingencies regardless of skip status.
-    """
+    """Skip all contingencies then un-skip only *max_active* to limit runtime."""
     saw_instance.SetData("Contingency", ["Skip"], ["YES"], "ALL")
     ctgs = saw_instance.ListOfDevices("Contingency")
     if ctgs is None or ctgs.empty:
@@ -84,8 +78,6 @@ def _trim_contingencies(saw_instance, max_active=5, delete_excess=False):
             "Contingency", [name_col, "Skip"], [name, "NO"]
         )
     if delete_excess and len(ctgs) > max_active:
-        # Select ALL contingencies, then un-select the ones we want to keep,
-        # then delete the still-selected (excess) contingencies.
         saw_instance.SelectAll("Contingency")
         for name in keep_names:
             saw_instance.ChangeParametersSingleElement(
@@ -107,7 +99,6 @@ class TestContingency:
 
     @pytest.mark.order(5100)
     def test_contingency_solve(self, saw_instance):
-        # Skip most contingencies to reduce runtime - only solve 1-2
         saw_instance.SetData("Contingency", ["Skip"], ["YES"], "ALL")
         ctgs = saw_instance.ListOfDevices("Contingency")
         assert ctgs is not None and not ctgs.empty, "No contingencies found after auto-insert"
@@ -116,27 +107,25 @@ class TestContingency:
             saw_instance.ChangeParametersSingleElement(
                 "Contingency", [name_col, "Skip"], [name, "NO"]
             )
-        saw_instance.SolveContingencies()
+        saw_instance.CTGSolveAll()
 
     @pytest.mark.order(5200)
     def test_contingency_run_single(self, saw_instance):
         ctgs = saw_instance.ListOfDevices("Contingency")
         assert ctgs is not None and not ctgs.empty, "No contingencies found"
         ctg_name = ctgs.iloc[0]["CTGLabel"]
-        saw_instance.RunContingency(ctg_name)
+        saw_instance.CTGSolve(ctg_name)
         saw_instance.CTGApply(ctg_name)
 
     @pytest.mark.order(5300)
     def test_contingency_otdf(self, saw_instance):
         areas = saw_instance.GetParametersMultipleElement("Area", ["AreaNum"])
         if areas is None or len(areas) < 2:
-            # Create a second area with a bus for OTDF testing
             buses = saw_instance.GetParametersMultipleElement("Bus", ["BusNum", "AreaNum"])
             assert buses is not None and not buses.empty, "Test case must contain buses"
             existing_areas = set(int(a) for a in areas["AreaNum"]) if areas is not None else set()
             next_area = max(existing_areas, default=0) + 1
             saw_instance.CreateData("Area", ["AreaNum", "AreaName"], [next_area, f"TestArea{next_area}"])
-            # Move a bus into the new area
             area_counts = buses["AreaNum"].value_counts()
             largest_area = area_counts.index[0]
             donor = buses[buses["AreaNum"] == largest_area]
@@ -173,7 +162,6 @@ class TestContingency:
         saw_instance.CTGAutoInsert()
         saw_instance.CTGConvertToPrimaryCTG()
 
-        # Optimize: Skip most contingencies to avoid long runtimes
         saw_instance.SetData("Contingency", ["Skip"], ["YES"], "ALL")
 
         ctgs = saw_instance.ListOfDevices("Contingency")
@@ -194,7 +182,6 @@ class TestContingency:
         """Clone contingencies AFTER combo solve to avoid bloating solve operations."""
         ctgs = saw_instance.ListOfDevices("Contingency")
         if ctgs is None or ctgs.empty:
-            # Re-create contingencies if the combo test cleared them
             _configure_limited_ctg_auto_insert(saw_instance)
             saw_instance.CTGAutoInsert()
             _trim_contingencies(saw_instance, max_active=3)
@@ -210,7 +197,6 @@ class TestContingency:
         saw_instance.CTGConvertToPrimaryCTG()
         saw_instance.CTGCreateExpandedBreakerCTGs()
         saw_instance.CTGCreateStuckBreakerCTGs()
-        # Configure limited auto-insert before CTGPrimaryAutoInsert
         _configure_limited_ctg_auto_insert(saw_instance)
         saw_instance.CTGPrimaryAutoInsert()
 
@@ -222,7 +208,7 @@ class TestContingency:
     def test_contingency_join(self, saw_instance):
         saw_instance.CTGJoinActiveCTGs(False, False, True)
 
-    @pytest.mark.order(6000)
+    @pytest.mark.order(5990)
     def test_contingency_process_remedial(self, saw_instance):
         saw_instance.CTGProcessRemedialActionsAndDependencies(False)
 
@@ -260,7 +246,6 @@ class TestContingency:
         """CTGDeleteWithIdenticalActions completes without error."""
         _configure_limited_ctg_auto_insert(saw_instance)
         saw_instance.CTGAutoInsert()
-        # Trim and delete excess to avoid long runtimes
         _trim_contingencies(saw_instance, max_active=5, delete_excess=True)
         saw_instance.CTGDeleteWithIdenticalActions()
 
@@ -282,14 +267,13 @@ class TestContingency:
         _configure_limited_ctg_auto_insert(saw_instance)
         saw_instance.CTGAutoInsert()
 
-        # Skip most to avoid long runtime
         saw_instance.SetData("Contingency", ["Skip"], ["YES"], "ALL")
         ctgs = saw_instance.ListOfDevices("Contingency")
         assert ctgs is not None and not ctgs.empty, "No contingencies found after auto-insert"
         name_col = "CTGLabel" if "CTGLabel" in ctgs.columns else ctgs.columns[0]
         saw_instance.SetData("Contingency", [name_col, "Skip"], [ctgs.iloc[0][name_col], "NO"])
 
-        saw_instance.SolveContingencies()
+        saw_instance.CTGSolveAll()
 
     @pytest.mark.order(6500)
     def test_contingency_results_dataframe(self, saw_instance):
@@ -304,7 +288,7 @@ class TestContingency:
     def test_contingency_skip_behavior(self, saw_instance):
         """Test that skipped contingencies are not solved."""
         saw_instance.SetData("Contingency", ["Skip"], ["YES"], "ALL")
-        saw_instance.SolveContingencies()
+        saw_instance.CTGSolveAll()
 
     @pytest.mark.order(6700)
     def test_contingency_restore_reference(self, saw_instance):
@@ -323,7 +307,7 @@ class TestContingency:
 class TestFault:
     """Tests for fault analysis operations."""
 
-    @pytest.mark.order(5300)
+    @pytest.mark.order(5350)
     def test_fault_run(self, saw_instance):
         buses = saw_instance.GetParametersMultipleElement("Bus", ["BusNum"])
         assert buses is not None and not buses.empty, "No buses found"
@@ -331,12 +315,12 @@ class TestFault:
         saw_instance.RunFault(bus_str, "SLG")
         saw_instance.FaultClear()
 
-    @pytest.mark.order(5400)
+    @pytest.mark.order(5450)
     def test_fault_auto(self, saw_instance):
         _configure_limited_ctg_auto_insert(saw_instance)
         saw_instance.FaultAutoInsert()
 
-    @pytest.mark.order(5500)
+    @pytest.mark.order(5550)
     def test_fault_multiple(self, saw_instance):
         _configure_limited_ctg_auto_insert(saw_instance)
         saw_instance.FaultAutoInsert()
@@ -347,7 +331,7 @@ class TestFault:
                 pytest.skip("No active faults defined after FaultAutoInsert for this case")
             raise
 
-    @pytest.mark.order(5600)
+    @pytest.mark.order(5650)
     def test_fault_types(self, saw_instance):
         """Test different fault types."""
         buses = saw_instance.GetParametersMultipleElement("Bus", ["BusNum"])
@@ -359,9 +343,9 @@ class TestFault:
             saw_instance.RunFault(bus_str, ftype)
             saw_instance.FaultClear()
 
-    @pytest.mark.order(5700)
+    @pytest.mark.order(5750)
     def test_fault_at_branch(self, saw_instance):
-        """Test fault on branch midpoint (line only — transformers can hang PW)."""
+        """Test fault on branch midpoint (line only -- transformers can hang PW)."""
         branches = saw_instance.GetParametersMultipleElement(
             "Branch", ["BusNum", "BusNum:1", "LineCircuit", "BranchDeviceType"]
         )
@@ -402,7 +386,6 @@ class TestContingencyExport:
     @pytest.mark.order(7100)
     def test_contingency_compare_two_lists(self, saw_instance, temp_file):
         """Test CTGCompareTwoListsofContingencyResults for comparing contingency results."""
-        # Save current contingency results to two files for comparison
         list1 = temp_file(".aux")
         list2 = temp_file(".aux")
         try:
@@ -416,8 +399,12 @@ class TestContingencyExport:
     def test_contingency_write_csv(self, saw_instance, temp_file):
         """Test saving contingency violations to CSV."""
         tmp_csv = temp_file(".csv")
-        # Save violation results using the violation matrix method
         saw_instance.CTGSaveViolationMatrices(
             tmp_csv, "CSVCOLHEADER", False, ["Branch"], True, True
         )
         assert os.path.exists(tmp_csv)
+
+
+if __name__ == "__main__":
+    import sys
+    sys.exit(pytest.main(["-v", __file__]))

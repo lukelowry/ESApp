@@ -98,7 +98,7 @@ class PowerWorldPrerequisiteError(PowerWorldError):
     Nuance:
     Many PowerWorld script commands (as defined in the Auxiliary File Format)
     require specific data structures to be populated before execution. For example,
-    `CTGSolve` requires defined contingencies, and `DetermineATC` requires defined
+    `CTGSolve` requires defined contingencies, and `ATCDetermine` requires defined
     transfer directions. This error indicates a setup issue rather than a
     fundamental system failure.
     """

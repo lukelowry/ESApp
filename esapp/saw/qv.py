@@ -5,7 +5,7 @@ from pathlib import Path
 import pandas as pd
 
 from esapp.saw._enums import YesNo
-from ._helpers import get_temp_filepath, pack_args
+from ._helpers import get_temp_filepath
 
 
 class QVMixin:
@@ -44,8 +44,7 @@ class QVMixin:
             If the SimAuto call fails.
         """
         app = YesNo.from_bool(append)
-        args = pack_args(f'"{filename}"', app, key_field)
-        return self.RunScriptCommand(f"QVDataWriteOptionsAndResults({args});")
+        return self._run_script("QVDataWriteOptionsAndResults", f'"{filename}"', app, key_field)
 
     def QVDeleteAllResults(self):
         """
@@ -67,9 +66,9 @@ class QVMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        return self.RunScriptCommand("QVDeleteAllResults;")
+        return self._run_script("QVDeleteAllResults")
 
-    def RunQV(self, filename: str = None) -> pd.DataFrame:
+    def QVRun(self, filename: str = None, make_base_solvable: bool = True, write_case_after_solve: bool = False) -> pd.DataFrame:
         """
         Run a QV (Reactive Power-Voltage) analysis.
 
@@ -85,6 +84,12 @@ class QVMixin:
         filename : str, optional
             Path to a CSV file to save results. If None, a temporary file is
             used and results are returned as a DataFrame. Defaults to None.
+        make_base_solvable : bool, optional
+            If True, attempts to fix the base case if it is not solvable
+            before running the QV analysis. Defaults to True.
+        write_case_after_solve : bool, optional
+            If True, writes the case file after each QV solve point.
+            Defaults to False.
 
         Returns
         -------
@@ -97,20 +102,17 @@ class QVMixin:
         ------
         PowerWorldError
             If the SimAuto call fails or the QV analysis does not complete.
-
-        Notes
-        -----
-        The base case must be solvable. If it's not, the method will attempt
-        a solvability analysis to fix the issue (InErrorMakeBaseSolvable=YES).
         """
+        mbs = YesNo.from_bool(make_base_solvable)
+        wcas = YesNo.from_bool(write_case_after_solve)
         if filename:
-            self.RunScriptCommand(f'QVRun("{filename}", YES, NO);')
+            self._run_script("QVRun", f'"{filename}"', mbs, wcas)
             return None
         else:
             temp_path = get_temp_filepath(".csv")
 
             try:
-                self.RunScriptCommand(f'QVRun("{temp_path}", YES, NO);')
+                self._run_script("QVRun", f'"{temp_path}"', mbs, wcas)
                 if os.path.exists(temp_path) and os.path.getsize(temp_path) > 0:
                     return pd.read_csv(temp_path)
                 else:
@@ -140,7 +142,7 @@ class QVMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        return self.RunScriptCommand("QVSelectSingleBusPerSuperBus;")
+        return self._run_script("QVSelectSingleBusPerSuperBus")
 
     def QVWriteCurves(self, filename: str, include_quantities: bool = True, filter_name: str = "", append: bool = False):
         """
@@ -178,8 +180,7 @@ class QVMixin:
         """
         iq = YesNo.from_bool(include_quantities)
         app = YesNo.from_bool(append)
-        args = pack_args(f'"{filename}"', iq, f'"{filter_name}"', app)
-        return self.RunScriptCommand(f"QVWriteCurves({args});")
+        return self._run_script("QVWriteCurves", f'"{filename}"', iq, f'"{filter_name}"', app)
 
     def QVWriteResultsAndOptions(self, filename: str, append: bool = True):
         """
@@ -216,5 +217,4 @@ class QVMixin:
             If the SimAuto call fails.
         """
         app = YesNo.from_bool(append)
-        args = pack_args(f'"{filename}"', app)
-        return self.RunScriptCommand(f"QVWriteResultsAndOptions({args});")
+        return self._run_script("QVWriteResultsAndOptions", f'"{filename}"', app)

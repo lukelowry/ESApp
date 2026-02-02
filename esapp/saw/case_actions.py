@@ -1,14 +1,162 @@
 """Case Actions specific functions."""
-from typing import List
+import os
+from typing import List, Union
 
 from ._enums import YesNo
-from ._helpers import format_list, pack_args
+from ._exceptions import PowerWorldError
+from ._helpers import convert_list_to_variant, convert_to_windows_path, format_list
 
 
 class CaseActionsMixin:
     """Mixin for Case Actions functions."""
 
+    def get_version_and_builddate(self) -> tuple:
+        """Retrieves the PowerWorld Simulator version string and executable build date.
 
+        This method queries the 'PowerWorldSession' object for its version and build date.
+
+        Returns
+        -------
+        tuple
+            A tuple containing:
+            - str: The version string of PowerWorld Simulator (e.g., "22.0.0.0").
+            - datetime.datetime: The build date of the PowerWorld Simulator executable.
+
+        """
+        return self._com_call(
+            "GetParametersSingleElement",
+            "PowerWorldSession",
+            convert_list_to_variant(["Version", "ExeBuildDate"]),
+            convert_list_to_variant(["", ""]),
+        )
+
+    def OpenCase(self, FileName: Union[str, None] = None) -> None:
+        """Opens a PowerWorld case file.
+
+        Parameters
+        ----------
+        FileName : Union[str, None], optional
+            Path to the .pwb or .pwx file. If None, it attempts to reopen the
+            last file path stored in `self.pwb_file_path`.
+
+        Returns
+        -------
+        None
+
+        Raises
+        ------
+        TypeError
+            If `FileName` is None and no previous `pwb_file_path` is set.
+        PowerWorldError
+            If the SimAuto call fails (e.g., file not found).
+        """
+        if FileName is None:
+            if self.pwb_file_path is None:
+                raise TypeError("When OpenCase is called for the first time, a FileName is required.")
+        else:
+            self.pwb_file_path = FileName
+        try:
+            return self._com_call("OpenCase", self.pwb_file_path)
+        except PowerWorldError as e:
+            hints = [f"Failed to open case: '{self.pwb_file_path}'"]
+            if not os.path.exists(self.pwb_file_path):
+                hints.append(f"File does not exist at the specified path.")
+            else:
+                hints.append("The file exists but PowerWorld could not open it.")
+                hints.append("Possible causes:")
+                hints.append("  - PowerWorld Simulator is not licensed or the license has expired")
+                hints.append("  - The file is corrupted or in an unsupported format")
+                hints.append("  - The file is locked by another process")
+            hints.append(f"Original error: {e.raw_message}")
+            raise PowerWorldError("\n".join(hints)) from e
+
+    def OpenCaseType(self, FileName: str, FileType: str, Options: Union[list, str, None] = None) -> None:
+        """Opens a case file of a specific type (e.g., PTI, GE) with options.
+
+        Parameters
+        ----------
+        FileName : str
+            Path to the file.
+            Different sets of optional parameters apply for the PTI and GE file formats.
+            The LoadTransactions and Star bus parameters are available for writing to RAW files.
+            MSLine, VarLimDead, and PostCTGAGC are for writing EPC files.
+            See `OpenCase` in the Auxiliary File Format PDF for more details on options.
+        FileType : str
+            The file format (e.g., 'PTI', 'GE', 'EPC').
+            Valid options include: PWB, PTI (latest version), PTI23-PTI35, GE (latest version),
+            GE14-GE23, CF, AUX, UCTE, AREVAHDB, OPENNETEMS.
+        Options : Union[list, str, None], optional
+            A list or string of format-specific options. Defaults to None.
+        """
+        self.pwb_file_path = FileName
+        if isinstance(Options, list):
+            options = convert_list_to_variant(Options)
+        elif isinstance(Options, str):
+            options = Options
+        else:
+            options = ""
+        try:
+            return self._com_call("OpenCaseType", self.pwb_file_path, FileType, options)
+        except PowerWorldError as e:
+            hints = [f"Failed to open case: '{self.pwb_file_path}' (format: {FileType})"]
+            if not os.path.exists(self.pwb_file_path):
+                hints.append(f"File does not exist at the specified path.")
+            else:
+                hints.append("The file exists but PowerWorld could not open it.")
+                hints.append("Possible causes:")
+                hints.append("  - PowerWorld Simulator is not licensed or the license has expired")
+                hints.append(f"  - The file format '{FileType}' does not match the actual file contents")
+                hints.append("  - The file is corrupted or locked by another process")
+            hints.append(f"Original error: {e.raw_message}")
+            raise PowerWorldError("\n".join(hints)) from e
+
+    def CloseCase(self):
+        """Closes the currently open PowerWorld case without exiting the Simulator application.
+
+        Returns
+        -------
+        None
+
+        Raises
+        ------
+        PowerWorldError
+            If the SimAuto call fails.
+        """
+        return self._com_call("CloseCase")
+
+    def SaveCase(self, FileName=None, FileType="PWB", Overwrite=True):
+        """Saves the currently open PowerWorld case to a file.
+
+        Parameters
+        ----------
+        FileName : str, optional
+            Path to save the file. If None, the case is saved to its current path,
+            potentially overwriting the original file.
+        FileType : str, optional
+            The file format to save as (e.g., "PWB", "PTI", "GE"). Defaults to "PWB".
+        Overwrite : bool, optional
+            If True, overwrites an existing file at `FileName` without prompting.
+            Defaults to True.
+
+        Returns
+        -------
+        None
+
+        Raises
+        ------
+        TypeError
+            If `FileName` is None and no case has been opened previously.
+        PowerWorldError
+            If the SimAuto call fails (e.g., invalid path, permission issues).
+        """
+        if FileName is not None:
+            f = convert_to_windows_path(FileName)
+        elif self.pwb_file_path is None:
+            raise TypeError("SaveCase was called without a FileName, but OpenCase has not yet been called.")
+        else:
+            f = convert_to_windows_path(self.pwb_file_path)
+
+        return self._com_call("SaveCase", f, FileType, Overwrite)
 
     def CaseDescriptionClear(self):
         """Clears the case description.
@@ -24,7 +172,7 @@ class CaseActionsMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        return self.RunScriptCommand("CaseDescriptionClear;")
+        return self._run_script("CaseDescriptionClear")
 
     def CaseDescriptionSet(self, text: str, append: bool = False):
         """Sets or appends text to the case description.
@@ -47,7 +195,7 @@ class CaseActionsMixin:
             If the SimAuto call fails.
         """
         app = YesNo.from_bool(append)
-        return self.RunScriptCommand(f'CaseDescriptionSet("{text}", {app});')
+        return self._run_script("CaseDescriptionSet", f'"{text}"', app)
 
     def DeleteExternalSystem(self):
         """Deletes the part of the power system where the 'Equiv' field on buses is set to true.
@@ -63,7 +211,7 @@ class CaseActionsMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        return self.RunScriptCommand("DeleteExternalSystem;")
+        return self._run_script("DeleteExternalSystem")
 
     def Equivalence(self):
         """Equivalences the power system based on Equiv_Options.
@@ -80,7 +228,7 @@ class CaseActionsMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        return self.RunScriptCommand("Equivalence;")
+        return self._run_script("Equivalence")
 
     def LoadEMS(self, filename: str, filetype: str = "AREVAHDB"):
         """Opens an EMS (Energy Management System) file.
@@ -101,7 +249,7 @@ class CaseActionsMixin:
         PowerWorldError
             If the SimAuto call fails (e.g., file not found, invalid format).
         """
-        return self.RunScriptCommand(f'LoadEMS("{filename}", {filetype});')
+        return self._run_script("LoadEMS", f'"{filename}"', filetype)
 
     def NewCase(self):
         """Clears the existing case and opens a new, empty one.
@@ -115,7 +263,7 @@ class CaseActionsMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        return self.RunScriptCommand("NewCase;")
+        return self._run_script("NewCase")
 
     def Renumber3WXFormerStarBuses(self, filename: str, delimiter: str = "BOTH"):
         """Renumbers 3-winding transformer star buses based on user-specified values in a file.
@@ -138,7 +286,7 @@ class CaseActionsMixin:
         PowerWorldError
             If the SimAuto call fails (e.g., file not found, format error).
         """
-        return self.RunScriptCommand(f'Renumber3WXFormerStarBuses("{filename}", {delimiter});')
+        return self._run_script("Renumber3WXFormerStarBuses", f'"{filename}"', delimiter)
 
     def RenumberAreas(self, custom_integer_index: int = 0):
         """Renumbers Areas using the value in the specified Custom Integer field.
@@ -158,7 +306,7 @@ class CaseActionsMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        return self.RunScriptCommand(f"RenumberAreas({custom_integer_index});")
+        return self._run_script("RenumberAreas", custom_integer_index)
 
     def RenumberBuses(self, custom_integer_index: int = 1):
         """Renumbers Buses using the value in the specified Custom Integer field.
@@ -178,7 +326,7 @@ class CaseActionsMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        return self.RunScriptCommand(f"RenumberBuses({custom_integer_index});")
+        return self._run_script("RenumberBuses", custom_integer_index)
 
     def RenumberMSLineDummyBuses(self, filename: str, delimiter: str = "BOTH"):
         """Renumbers dummy buses of multisection lines based on a provided file.
@@ -199,7 +347,7 @@ class CaseActionsMixin:
         PowerWorldError
             If the SimAuto call fails (e.g., file not found, format error).
         """
-        return self.RunScriptCommand(f'RenumberMSLineDummyBuses("{filename}", {delimiter});')
+        return self._run_script("RenumberMSLineDummyBuses", f'"{filename}"', delimiter)
 
     def RenumberSubs(self, custom_integer_index: int = 2):
         """Renumbers Substations using the value in the specified Custom Integer field.
@@ -219,7 +367,7 @@ class CaseActionsMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        return self.RunScriptCommand(f"RenumberSubs({custom_integer_index});")
+        return self._run_script("RenumberSubs", custom_integer_index)
 
     def RenumberZones(self, custom_integer_index: int = 3):
         """Renumbers Zones using the value in the specified Custom Integer field.
@@ -239,7 +387,7 @@ class CaseActionsMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        return self.RunScriptCommand(f"RenumberZones({custom_integer_index});")
+        return self._run_script("RenumberZones", custom_integer_index)
 
     def RenumberCase(self):
         """Renumbers objects in the case according to the swap list in memory.
@@ -255,7 +403,7 @@ class CaseActionsMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        return self.RunScriptCommand("RenumberCase;")
+        return self._run_script("RenumberCase")
 
     def SaveExternalSystem(self, filename: str, filetype: str = "PWB", with_ties: bool = False):
         """Saves only buses where 'Equiv' is set to 'External' to a new case file.
@@ -282,7 +430,7 @@ class CaseActionsMixin:
             If the SimAuto call fails.
         """
         wt = YesNo.from_bool(with_ties)
-        return self.RunScriptCommand(f'SaveExternalSystem("{filename}", {filetype}, {wt});')
+        return self._run_script("SaveExternalSystem", f'"{filename}"', filetype, wt)
 
     def SaveMergedFixedNumBusCase(self, filename: str, filetype: str = "PWB"):
         """Saves the Merged FixedNumBus case.
@@ -305,7 +453,7 @@ class CaseActionsMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        return self.RunScriptCommand(f'SaveMergedFixedNumBusCase("{filename}", {filetype});')
+        return self._run_script("SaveMergedFixedNumBusCase", f'"{filename}"', filetype)
 
     def Scale(
         self,
@@ -344,4 +492,4 @@ class CaseActionsMixin:
             If the SimAuto call fails.
         """
         params = format_list(parameters, stringify=True)
-        return self.RunScriptCommand(f"Scale({scale_type}, {based_on}, {params}, {scale_marker});")
+        return self._run_script("Scale", scale_type, based_on, params, scale_marker)

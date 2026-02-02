@@ -2,7 +2,6 @@
 
 
 from esapp.saw._enums import YesNo
-from esapp.saw._helpers import pack_args
 
 
 class PVMixin:
@@ -22,9 +21,9 @@ class PVMixin:
         str
             The response from the PowerWorld script command.
         """
-        return self.RunScriptCommand("PVClear;")
+        return self._run_script("PVClear")
 
-    def RunPV(self, source: str, sink: str):
+    def PVRun(self, source: str, sink: str):
         """
         Start a PV (Power-Voltage) analysis.
 
@@ -51,10 +50,9 @@ class PVMixin:
 
         Examples
         --------
-        >>> saw.RunPV('[INJECTIONGROUP "SolarGen"]', '[INJECTIONGROUP "UrbanLoad"]')
+        >>> saw.PVRun('[INJECTIONGROUP "SolarGen"]', '[INJECTIONGROUP "UrbanLoad"]')
         """
-        args = pack_args(source, sink)
-        return self.RunScriptCommand(f"PVRun({args});")
+        return self._run_script("PVRun", source, sink)
 
     def PVDataWriteOptionsAndResults(self, filename: str, append: bool = True, key_field: str = "PRIMARY"):
         """
@@ -84,8 +82,7 @@ class PVMixin:
             The response from the PowerWorld script command.
         """
         app = YesNo.from_bool(append)
-        args = pack_args(f'"{filename}"', app, key_field)
-        return self.RunScriptCommand(f"PVDataWriteOptionsAndResults({args});")
+        return self._run_script("PVDataWriteOptionsAndResults", f'"{filename}"', app, key_field)
 
     def PVDestroy(self):
         """
@@ -102,7 +99,7 @@ class PVMixin:
         str
             The response from the PowerWorld script command.
         """
-        return self.RunScriptCommand("PVDestroy;")
+        return self._run_script("PVDestroy")
 
     def PVQVTrackSingleBusPerSuperBus(self):
         """
@@ -120,7 +117,7 @@ class PVMixin:
         str
             The response from the PowerWorld script command.
         """
-        return self.RunScriptCommand("PVQVTrackSingleBusPerSuperBus;")
+        return self._run_script("PVQVTrackSingleBusPerSuperBus")
 
     def PVSetSourceAndSink(self, source: str, sink: str):
         """
@@ -150,8 +147,7 @@ class PVMixin:
         --------
         >>> saw.PVSetSourceAndSink('[INJECTIONGROUP "SolarGen"]', '[INJECTIONGROUP "UrbanLoad"]')
         """
-        args = pack_args(source, sink)
-        return self.RunScriptCommand(f"PVSetSourceAndSink({args});")
+        return self._run_script("PVSetSourceAndSink", source, sink)
 
     def PVStartOver(self):
         """
@@ -169,7 +165,7 @@ class PVMixin:
         str
             The response from the PowerWorld script command.
         """
-        return self.RunScriptCommand("PVStartOver;")
+        return self._run_script("PVStartOver")
 
     def PVWriteInadequateVoltages(self, filename: str, append: bool = True, inadequate_type: str = "LOW"):
         """
@@ -198,8 +194,7 @@ class PVMixin:
             The response from the PowerWorld script command.
         """
         app = YesNo.from_bool(append)
-        args = pack_args(f'"{filename}"', app, inadequate_type)
-        return self.RunScriptCommand(f"PVWriteInadequateVoltages({args});")
+        return self._run_script("PVWriteInadequateVoltages", f'"{filename}"', app, inadequate_type)
 
     def PVWriteResultsAndOptions(self, filename: str, append: bool = True):
         """
@@ -229,8 +224,7 @@ class PVMixin:
             The response from the PowerWorld script command.
         """
         app = YesNo.from_bool(append)
-        args = pack_args(f'"{filename}"', app)
-        return self.RunScriptCommand(f"PVWriteResultsAndOptions({args});")
+        return self._run_script("PVWriteResultsAndOptions", f'"{filename}"', app)
 
     def RefineModel(self, object_type: str, filter_name: str, action: str, tolerance: float):
         """
@@ -259,5 +253,4 @@ class PVMixin:
             The response from the PowerWorld script command.
         """
         filt = f'"{filter_name}"' if filter_name else ""
-        args = pack_args(object_type, filt, action, tolerance)
-        return self.RunScriptCommand(f"RefineModel({args});")
+        return self._run_script("RefineModel", object_type, filt, action, tolerance)

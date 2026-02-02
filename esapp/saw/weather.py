@@ -2,7 +2,7 @@
 from typing import List
 
 from ._enums import YesNo
-from ._helpers import format_list, pack_args
+from ._helpers import format_list
 
 
 class WeatherMixin:
@@ -34,8 +34,7 @@ class WeatherMixin:
         """
         umax = YesNo.from_bool(update_max)
         umin = YesNo.from_bool(update_min)
-        args = pack_args(umax, umin)
-        return self.RunScriptCommand(f"WeatherLimitsGenUpdate({args});")
+        return self._run_script("WeatherLimitsGenUpdate", umax, umin)
 
     def TemperatureLimitsBranchUpdate(
         self, rating_set_precedence: str = "NORMAL", normal_rating_set: str = "DEFAULT", ctg_rating_set: str = "DEFAULT"
@@ -69,8 +68,7 @@ class WeatherMixin:
         str
             The response from the PowerWorld script command.
         """
-        args = pack_args(rating_set_precedence, normal_rating_set, ctg_rating_set)
-        return self.RunScriptCommand(f"TemperatureLimitsBranchUpdate({args});")
+        return self._run_script("TemperatureLimitsBranchUpdate", rating_set_precedence, normal_rating_set, ctg_rating_set)
 
     def WeatherPFWModelsSetInputs(self):
         """
@@ -91,7 +89,7 @@ class WeatherMixin:
         --------
         WeatherPFWModelsSetInputsAndApply : Sets inputs and applies to case.
         """
-        return self.RunScriptCommand("WeatherPFWModelsSetInputs;")
+        return self._run_script("WeatherPFWModelsSetInputs")
 
     def WeatherPFWModelsSetInputsAndApply(self, solve_pf: bool = True):
         """
@@ -126,7 +124,7 @@ class WeatherMixin:
         WeatherPWWLoadForDateTimeUTC : Loads weather data for a specific time.
         """
         spf = YesNo.from_bool(solve_pf)
-        return self.RunScriptCommand(f"WeatherPFWModelsSetInputsAndApply({spf});")
+        return self._run_script("WeatherPFWModelsSetInputsAndApply", spf)
 
     def WeatherPWWFileAllMeasValid(self, filename: str, field_list: List[str], start_time: str = "", end_time: str = ""):
         """
@@ -167,8 +165,7 @@ class WeatherMixin:
         ...     "2024-03-01T00:00Z", "2024-03-01T23:59Z")
         """
         fields = format_list(field_list)
-        args = pack_args(f'"{filename}"', fields, start_time or None, end_time or None)
-        return self.RunScriptCommand(f"WeatherPWWFileAllMeasValid({args});")
+        return self._run_script("WeatherPWWFileAllMeasValid", f'"{filename}"', fields, start_time or None, end_time or None)
 
     def WeatherPFWModelsRestoreDesignValues(self):
         """
@@ -189,7 +186,7 @@ class WeatherMixin:
         --------
         WeatherPFWModelsSetInputsAndApply : The method whose changes this restores.
         """
-        return self.RunScriptCommand("WeatherPFWModelsRestoreDesignValues;")
+        return self._run_script("WeatherPFWModelsRestoreDesignValues")
 
     def WeatherPWWLoadForDateTimeUTC(self, iso_datetime: str):
         """
@@ -220,7 +217,7 @@ class WeatherMixin:
         --------
         >>> saw.WeatherPWWLoadForDateTimeUTC("2024-03-06T18:00Z")
         """
-        return self.RunScriptCommand(f'WeatherPWWLoadForDateTimeUTC("{iso_datetime}");')
+        return self._run_script("WeatherPWWLoadForDateTimeUTC", f'"{iso_datetime}"')
 
     def WeatherPWWSetDirectory(self, directory: str, include_subdirs: bool = True):
         """
@@ -253,7 +250,7 @@ class WeatherMixin:
         >>> saw.WeatherPWWSetDirectory("C:/WeatherData/PWW", include_subdirs=True)
         """
         sub = YesNo.from_bool(include_subdirs)
-        return self.RunScriptCommand(f'WeatherPWWSetDirectory("{directory}", {sub});')
+        return self._run_script("WeatherPWWSetDirectory", f'"{directory}"', sub)
 
     def WeatherPWWFileCombine2(self, source1: str, source2: str, dest: str):
         """
@@ -287,7 +284,7 @@ class WeatherMixin:
         >>> saw.WeatherPWWFileCombine2("weather_march.pww", "weather_april.pww",
         ...     "weather_combined.pww")
         """
-        return self.RunScriptCommand(f'WeatherPWWFileCombine2("{source1}", "{source2}", "{dest}");')
+        return self._run_script("WeatherPWWFileCombine2", f'"{source1}"', f'"{source2}"', f'"{dest}"')
 
     def WeatherPWWFileGeoReduce(
         self, source: str, dest: str, min_lat: float, max_lat: float, min_lon: float, max_lon: float
@@ -332,5 +329,4 @@ class WeatherMixin:
         >>> saw.WeatherPWWFileGeoReduce("weather_full.pww", "weather_region.pww",
         ...     30.0, 40.0, -100.0, -90.0)
         """
-        args = pack_args(f'"{source}"', f'"{dest}"', min_lat, max_lat, min_lon, max_lon)
-        return self.RunScriptCommand(f"WeatherPWWFileGeoReduce({args});")
+        return self._run_script("WeatherPWWFileGeoReduce", f'"{source}"', f'"{dest}"', min_lat, max_lat, min_lon, max_lon)

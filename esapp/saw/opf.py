@@ -2,7 +2,6 @@
 
 
 from esapp.saw._enums import YesNo
-from esapp.saw._helpers import pack_args
 
 
 class OPFMixin:
@@ -36,8 +35,7 @@ class OPFMixin:
         """
         c1 = YesNo.from_bool(create_if_not_found1)
         c2 = YesNo.from_bool(create_if_not_found2)
-        args = pack_args(f'"{on_success_aux}"', f'"{on_fail_aux}"', c1, c2)
-        return self.RunScriptCommand(f"SolvePrimalLP({args});")
+        return self._run_script("SolvePrimalLP", f'"{on_success_aux}"', f'"{on_fail_aux}"', c1, c2)
 
     def InitializePrimalLP(self, on_success_aux: str = "", on_fail_aux: str = "", create_if_not_found1: bool = False, create_if_not_found2: bool = False):
         """Clears all structures and results of previous primal LP OPF solutions.
@@ -62,8 +60,7 @@ class OPFMixin:
         """
         c1 = YesNo.from_bool(create_if_not_found1)
         c2 = YesNo.from_bool(create_if_not_found2)
-        args = pack_args(f'"{on_success_aux}"', f'"{on_fail_aux}"', c1, c2)
-        return self.RunScriptCommand(f"InitializePrimalLP({args});")
+        return self._run_script("InitializePrimalLP", f'"{on_success_aux}"', f'"{on_fail_aux}"', c1, c2)
 
     def SolveSinglePrimalLPOuterLoop(self, on_success_aux: str = "", on_fail_aux: str = "", create_if_not_found1: bool = False, create_if_not_found2: bool = False):
         """Performs a single optimization iteration of LP OPF.
@@ -88,8 +85,7 @@ class OPFMixin:
         """
         c1 = YesNo.from_bool(create_if_not_found1)
         c2 = YesNo.from_bool(create_if_not_found2)
-        args = pack_args(f'"{on_success_aux}"', f'"{on_fail_aux}"', c1, c2)
-        return self.RunScriptCommand(f"SolveSinglePrimalLPOuterLoop({args});")
+        return self._run_script("SolveSinglePrimalLPOuterLoop", f'"{on_success_aux}"', f'"{on_fail_aux}"', c1, c2)
 
     def SolveFullSCOPF(self, bc_method: str = "OPF", on_success_aux: str = "", on_fail_aux: str = "", create_if_not_found1: bool = False, create_if_not_found2: bool = False):
         """Performs a full Security Constrained Optimal Power Flow (SCOPF).
@@ -117,8 +113,7 @@ class OPFMixin:
         """
         c1 = YesNo.from_bool(create_if_not_found1)
         c2 = YesNo.from_bool(create_if_not_found2)
-        args = pack_args(bc_method, f'"{on_success_aux}"', f'"{on_fail_aux}"', c1, c2)
-        return self.RunScriptCommand(f"SolveFullSCOPF({args});")
+        return self._run_script("SolveFullSCOPF", bc_method, f'"{on_success_aux}"', f'"{on_fail_aux}"', c1, c2)
 
     def OPFWriteResultsAndOptions(self, filename: str):
         """Writes out all information related to OPF analysis to an auxiliary file.
@@ -137,4 +132,4 @@ class OPFMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        return self.RunScriptCommand(f'OPFWriteResultsAndOptions("{filename}");')
+        return self._run_script("OPFWriteResultsAndOptions", f'"{filename}"')

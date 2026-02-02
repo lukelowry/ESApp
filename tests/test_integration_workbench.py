@@ -4,13 +4,23 @@ Integration tests for the GridWorkBench facade.
 These are **integration tests** that require a live connection to PowerWorld
 Simulator via the SimAuto COM interface. They test the top-level
 GridWorkBench facade: case I/O, simulation control, component retrieval,
-data modification, and delegation to sub-modules. Domain-specific analysis
-tests (statics, GIC, dynamics) are in test_integration_analysis.py.
+data modification, delegation to sub-modules, and workbench-level static
+analysis (power flow, voltage, Y-bus, Jacobian).
 
 REQUIREMENTS:
     - PowerWorld Simulator installed with SimAuto COM registered
     - A valid PowerWorld case file path set in ``tests/config_test.py``
       (variable ``SAW_TEST_CASE``) or via the ``SAW_TEST_CASE`` env variable
+
+RELATED TEST FILES:
+    - test_integration_saw_core.py          -- base SAW operations, logging, I/O
+    - test_integration_saw_modify.py        -- destructive modify, region, case actions
+    - test_integration_saw_powerflow.py     -- power flow, matrices, sensitivity, topology
+    - test_integration_saw_contingency.py   -- contingency and fault analysis
+    - test_integration_saw_gic.py           -- GIC analysis
+    - test_integration_saw_transient.py     -- transient stability
+    - test_integration_saw_operations.py    -- ATC, OPF, PV/QV, time step, weather, scheduled
+    - test_integration_network.py           -- Network topology
 
 USAGE:
     pytest tests/test_integration_workbench.py -v
@@ -199,6 +209,157 @@ class TestGridWorkBenchFunctions:
         assert not m.empty
 
         wb.buscoords()
+
+
+# -------------------------------------------------------------------------
+# Workbench-level Static Analysis
+# -------------------------------------------------------------------------
+
+class TestWorkbenchStatics:
+    """Workbench-level static analysis: power flow, voltage, Y-bus, Jacobian.
+
+    These complement the SAW-level tests in test_integration_saw_powerflow.py
+    by exercising the higher-level GridWorkBench delegation methods.
+    """
+
+    def test_pflow(self, wb):
+        """Power flow solve and voltage retrieval."""
+        v = wb.pflow(getvolts=True)
+        assert v is not None
+        assert len(v) > 0
+        assert np.iscomplexobj(v.values)
+
+    def test_pflow_no_volts(self, wb):
+        """Power flow without returning voltages."""
+        result = wb.pflow(getvolts=False)
+        assert result is None
+
+    def test_voltage_complex(self, wb):
+        """Complex voltage retrieval."""
+        v = wb.voltage(complex=True, pu=True)
+        assert np.iscomplexobj(v.values)
+        assert len(v) > 0
+
+    def test_voltage_tuple(self, wb):
+        """Magnitude + angle voltage retrieval."""
+        mag, ang = wb.voltage(complex=False, pu=True)
+        assert len(mag) > 0
+        assert len(ang) > 0
+
+    def test_voltage_kv(self, wb):
+        """KV voltage retrieval."""
+        v = wb.voltage(complex=True, pu=False)
+        assert len(v) > 0
+
+    def test_set_voltages(self, wb):
+        """Set bus voltages from complex vector."""
+        v = wb.voltage(complex=True)
+        wb.set_voltages(v)
+
+    def test_violations(self, wb):
+        """Bus voltage violations."""
+        viols = wb.violations(v_min=0.9, v_max=1.1)
+        assert isinstance(viols, pd.DataFrame)
+        assert 'Low' in viols.columns
+        assert 'High' in viols.columns
+
+    def test_violations_tight(self, wb):
+        """Tight voltage limits should produce violations."""
+        viols = wb.violations(v_min=0.999, v_max=1.001)
+        assert isinstance(viols, pd.DataFrame)
+
+    def test_mismatch(self, wb):
+        """Bus power mismatches."""
+        P, Q = wb.mismatch()
+        assert not P.empty
+        assert not Q.empty
+
+    def test_mismatch_complex(self, wb):
+        """Complex mismatch."""
+        S = wb.mismatch(asComplex=True)
+        assert np.iscomplexobj(S)
+
+    def test_netinj(self, wb):
+        """Net injection at each bus."""
+        P, Q = wb.netinj()
+        assert len(P) > 0
+        assert len(Q) > 0
+
+    def test_netinj_complex(self, wb):
+        """Complex net injection."""
+        S = wb.netinj(asComplex=True)
+        assert np.iscomplexobj(S)
+
+    def test_ybus(self, wb):
+        """Y-Bus matrix retrieval."""
+        Y = wb.ybus()
+        assert Y.shape[0] > 0
+        assert Y.shape[0] == Y.shape[1]
+
+    def test_ybus_dense(self, wb):
+        """Dense Y-Bus matrix."""
+        Y = wb.ybus(dense=True)
+        assert isinstance(Y, np.ndarray)
+        assert Y.shape[0] > 0
+
+    def test_branch_admittance(self, wb):
+        """Branch admittance matrices."""
+        Yf, Yt = wb.branch_admittance()
+        assert Yf.shape[0] > 0
+        assert Yt.shape[0] > 0
+        assert Yf.shape == Yt.shape
+
+    def test_jacobian(self, wb):
+        """Power flow Jacobian."""
+        wb.pflow(getvolts=False)
+        J = wb.jacobian()
+        assert J.shape[0] > 0
+
+    def test_jacobian_dense(self, wb):
+        """Dense Jacobian."""
+        J = wb.jacobian(dense=True)
+        assert isinstance(J, np.ndarray)
+
+    def test_jacobian_polar(self, wb):
+        """Polar Jacobian form."""
+        wb.pflow(getvolts=False)
+        J = wb.jacobian(dense=True, form='P')
+        assert isinstance(J, np.ndarray)
+        assert J.shape[0] > 0
+        assert J.shape[0] == J.shape[1]
+
+    def test_jacobian_with_ids(self, wb):
+        """Jacobian with row/column ID labels."""
+        wb.pflow(getvolts=False)
+        J, ids = wb.jacobian_with_ids(dense=True, form='P')
+        assert isinstance(J, np.ndarray)
+        assert isinstance(ids, list)
+        assert len(ids) > 0
+
+    def test_solver_options(self, wb):
+        """Solver option methods."""
+        wb.set_do_one_iteration(True)
+        wb.set_do_one_iteration(False)
+
+        wb.set_max_iterations(250)
+
+        wb.set_disable_angle_rotation(True)
+        wb.set_disable_angle_rotation(False)
+
+        wb.set_disable_opt_mult(True)
+        wb.set_disable_opt_mult(False)
+
+        wb.enable_inner_ss_check(True)
+        wb.enable_inner_ss_check(False)
+
+        wb.disable_gen_mvr_check(True)
+        wb.disable_gen_mvr_check(False)
+
+        wb.enable_inner_check_gen_vars(True)
+        wb.enable_inner_check_gen_vars(False)
+
+        wb.enable_inner_backoff_gen_vars(True)
+        wb.enable_inner_backoff_gen_vars(False)
 
 
 # -------------------------------------------------------------------------

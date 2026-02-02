@@ -284,7 +284,7 @@ class GIC(Indexable):
         solvepf : bool, default True
             Whether to include GIC results in power flow solution.
         """
-        self.esa.CalculateGIC(maxfield, direction, solvepf)
+        self.esa.GICCalculate(maxfield, direction, solvepf)
 
     def cleargic(self) -> None:
         """Clear all GIC calculation results from the case."""

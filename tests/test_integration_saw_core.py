@@ -3,23 +3,26 @@ Integration tests for core SAW COM operations.
 
 These are **integration tests** that require a live connection to PowerWorld
 Simulator via the SimAuto COM interface. They test the foundational SAW
-class operations: case save/load, state management, general commands, file
-operations, modify operations (create/delete objects, merge, split), region
-operations, and case actions (equivalence, renumber, scale).
-
-NOTE: Power flow, sensitivity, contingency, fault, GIC, ATC, transient,
-      and time step tests are in their dedicated test files:
-      - test_integration_powerflow.py
-      - test_integration_contingency.py
-      - test_integration_analysis.py
+class operations: case open/save, parameter get/set, state management,
+field lists, logging, file I/O, data import/export, and subdata retrieval.
 
 REQUIREMENTS:
     - PowerWorld Simulator installed with SimAuto COM registered
     - A valid PowerWorld case file path set in ``tests/config_test.py``
       (variable ``SAW_TEST_CASE``) or via the ``SAW_TEST_CASE`` env variable
 
+RELATED TEST FILES:
+    - test_integration_saw_modify.py       -- destructive modify, region, case actions
+    - test_integration_saw_powerflow.py    -- power flow, matrices, sensitivity, topology
+    - test_integration_saw_contingency.py  -- contingency and fault analysis
+    - test_integration_saw_gic.py          -- GIC analysis
+    - test_integration_saw_transient.py    -- transient stability
+    - test_integration_saw_operations.py   -- ATC, OPF, PV/QV, time step, weather, scheduled
+    - test_integration_workbench.py        -- GridWorkBench facade and statics
+    - test_integration_network.py          -- Network topology
+
 USAGE:
-    pytest tests/test_integration_saw_powerworld.py -v
+    pytest tests/test_integration_saw_core.py -v
 """
 
 import os
@@ -46,7 +49,7 @@ def saw_instance(saw_session):
 
 
 class TestBase:
-    """Tests for base SAW operations."""
+    """Tests for base SAW operations: case open/save, parameters, state, fields."""
 
     @pytest.mark.order(10)
     def test_open_case_error_nonexistent_file(self, saw_instance):
@@ -274,15 +277,37 @@ class TestBase:
 
 
 class TestGeneral:
-    """Tests for general SAW operations."""
+    """Tests for general SAW operations: logging, file I/O, data import/export."""
 
     @pytest.mark.order(9500)
-    def test_log(self, saw_instance, temp_file):
-        """LogAdd and LogSave write a log file to disk."""
+    def test_log_operations(self, saw_instance, temp_file):
+        """Log lifecycle: add, clear, show, datetime variants, save, save with append."""
         saw_instance.LogAdd("SAW Validator Test Message")
         tmp_log = temp_file(".txt")
         saw_instance.LogSave(tmp_log)
         assert os.path.exists(tmp_log)
+
+        # Clear and re-add
+        saw_instance.LogClear()
+        saw_instance.LogAdd("Test message")
+        saw_instance.LogAddDateTime("Timer")
+
+        # Show toggle
+        saw_instance.LogShow(show=True)
+        saw_instance.LogShow(show=False)
+
+        # DateTime variants
+        saw_instance.LogAddDateTime("TestLabel", include_date=True, include_time=True, include_milliseconds=False)
+        saw_instance.LogAddDateTime("TestLabel2", include_date=True, include_time=True, include_milliseconds=True)
+        saw_instance.LogAddDateTime("TestLabel3", include_date=False, include_time=False, include_milliseconds=False)
+
+        # Save with append
+        tmp = temp_file(".txt")
+        saw_instance.LogAdd("Test1")
+        saw_instance.LogSave(tmp, append=False)
+        saw_instance.LogAdd("Test2")
+        saw_instance.LogSave(tmp, append=True)
+        assert os.path.exists(tmp)
 
     @pytest.mark.order(9600)
     def test_file_ops(self, saw_instance, temp_file):
@@ -315,21 +340,29 @@ class TestGeneral:
         saw_instance.SelectAll("Bus")
         saw_instance.UnSelectAll("Bus")
 
-    @pytest.mark.order(52000)
-    def test_log_clear_and_add(self, saw_instance):
-        """LogClear, LogAdd, and LogAddDateTime operate without error."""
-        saw_instance.LogClear()
-        saw_instance.LogAdd("Test message")
-        saw_instance.LogAddDateTime("Timer")
-
     @pytest.mark.order(52100)
     def test_save_data_variants(self, saw_instance, temp_file):
-        """SaveData works for both AUX and CSV formats."""
+        """SaveData works for AUX, CSV, transposed, and non-sorted formats."""
         tmp_aux = temp_file(".aux")
         tmp_csv = temp_file(".csv")
         saw_instance.SaveData(tmp_aux, "AUX", "Bus", ["BusNum", "BusName"])
         assert os.path.exists(tmp_aux)
         saw_instance.SaveData(tmp_csv, "CSV", "Bus", ["BusNum", "BusName"], filter_name="SELECTED")
+
+        # Non-sorted AUX
+        tmp_aux2 = temp_file(".aux")
+        saw_instance.SaveData(
+            tmp_aux2, "AUX", "Bus", ["BusNum", "BusName"],
+            transpose=False, append=False,
+        )
+        assert os.path.exists(tmp_aux2)
+
+        # Transposed CSV
+        tmp_csv2 = temp_file(".csv")
+        saw_instance.SaveData(
+            tmp_csv2, "CSV", "Bus", ["BusNum", "BusName"],
+            transpose=True, append=False,
+        )
 
     @pytest.mark.order(52300)
     def test_enter_mode(self, saw_instance):
@@ -345,8 +378,6 @@ class TestGeneral:
         )
         assert branches is not None and not branches.empty
         b = branches.iloc[0]
-        # CTGElement format per AUX docs: Action ModelCriteria Status TimeDelay
-        # Action syntax: "BRANCH bus1 bus2 ckt OPEN" (object first, verb last)
         action = f'BRANCH {b["BusNum"]} {b["BusNum:1"]} {b["LineCircuit"]} OPEN'
 
         saw_instance.SetSubData(
@@ -387,69 +418,35 @@ class TestGeneral:
             "Contingency", ["Name"], ["CTGElement"]
         )
         assert isinstance(result, pd.DataFrame)
-        # Find our specific contingency and verify it has subdata
         match = result[result["Name"] == "TestCtgRoundtrip"]
         assert len(match) == 1
         assert len(match.iloc[0]["CTGElement"]) > 0
 
-    # --- Merged from TestGeneralExtended ---
-
-    @pytest.mark.order(67000)
-    def test_general_log_clear(self, saw_instance):
-        saw_instance.LogClear()
-
-    @pytest.mark.order(67100)
-    def test_general_log_show(self, saw_instance):
-        saw_instance.LogShow(show=True)
-        saw_instance.LogShow(show=False)
-
-    @pytest.mark.order(67200)
-    def test_general_log_add_datetime(self, saw_instance):
-        saw_instance.LogAddDateTime("TestLabel", include_date=True, include_time=True, include_milliseconds=False)
-
-    @pytest.mark.order(67300)
-    def test_general_log_add_datetime_all(self, saw_instance):
-        saw_instance.LogAddDateTime("TestLabel2", include_date=True, include_time=True, include_milliseconds=True)
-
-    @pytest.mark.order(67400)
-    def test_general_log_add_datetime_minimal(self, saw_instance):
-        saw_instance.LogAddDateTime("TestLabel3", include_date=False, include_time=False, include_milliseconds=False)
-
-    @pytest.mark.order(67500)
-    def test_general_log_save_append(self, saw_instance, temp_file):
-        tmp = temp_file(".txt")
-        saw_instance.LogAdd("Test1")
-        saw_instance.LogSave(tmp, append=False)
-        saw_instance.LogAdd("Test2")
-        saw_instance.LogSave(tmp, append=True)
-        assert os.path.exists(tmp)
-
     @pytest.mark.order(67600)
-    def test_general_set_current_directory(self, saw_instance, temp_dir):
+    def test_set_current_directory(self, saw_instance, temp_dir):
+        """SetCurrentDirectory with and without create_if_not_found."""
         saw_instance.SetCurrentDirectory(str(temp_dir))
-
-    @pytest.mark.order(67700)
-    def test_general_set_current_directory_create(self, saw_instance, temp_dir):
         new_dir = os.path.join(str(temp_dir), "test_subdir")
         saw_instance.SetCurrentDirectory(new_dir, create_if_not_found=True)
 
     @pytest.mark.order(67900)
-    def test_general_import_data(self, saw_instance, temp_file):
-        # PW's ImportData CSV format requires specific device-type metadata
-        # not present in simple CSVs. Use PTI format which works reliably.
+    def test_import_data(self, saw_instance, temp_file):
+        """ImportData round-trips PTI format."""
         tmp = temp_file(".raw")
         saw_instance.SaveData(tmp, "PTI", "Bus", ["BusNum", "BusName"])
         saw_instance.ImportData(tmp, "PTI", header_line=1, create_if_not_found=True)
 
     @pytest.mark.order(68000)
-    def test_general_load_csv(self, saw_instance, temp_file):
+    def test_load_csv(self, saw_instance, temp_file):
+        """LoadCSV loads a simple CSV file."""
         tmp_csv = temp_file(".csv")
         with open(tmp_csv, "w") as f:
             f.write("ObjectType,Bus\nBusNum,BusName\n1,TestBus\n")
         saw_instance.LoadCSV(tmp_csv, create_if_not_found=True)
 
     @pytest.mark.order(68100)
-    def test_general_save_data_with_extra(self, saw_instance, temp_file):
+    def test_save_data_with_extra(self, saw_instance, temp_file):
+        """SaveDataWithExtra writes CSV with header metadata."""
         tmp_csv = temp_file(".csv")
         saw_instance.SaveDataWithExtra(
             tmp_csv, "CSV", "Bus", ["BusNum", "BusName"],
@@ -457,60 +454,42 @@ class TestGeneral:
         )
         assert os.path.exists(tmp_csv)
 
-    @pytest.mark.order(68200)
-    def test_general_save_data_no_sort(self, saw_instance, temp_file):
-        tmp_aux = temp_file(".aux")
-        saw_instance.SaveData(
-            tmp_aux, "AUX", "Bus", ["BusNum", "BusName"],
-            transpose=False, append=False,
-        )
-        assert os.path.exists(tmp_aux)
-
-    @pytest.mark.order(68300)
-    def test_general_save_data_transposed(self, saw_instance, temp_file):
-        tmp_csv = temp_file(".csv")
-        saw_instance.SaveData(
-            tmp_csv, "CSV", "Bus", ["BusNum", "BusName"],
-            transpose=True, append=False,
-        )
-
     @pytest.mark.order(68400)
-    def test_general_load_aux_create(self, saw_instance, temp_file):
+    def test_load_aux_create(self, saw_instance, temp_file):
+        """LoadAux with create_if_not_found creates new objects."""
         tmp_aux = temp_file(".aux")
         with open(tmp_aux, "w") as f:
             f.write('DATA (Bus, [BusNum, BusName]) {\n99998 "TestNewBus"\n}\n')
         saw_instance.LoadAux(tmp_aux, create_if_not_found=True)
-        # Clean up
         try:
             saw_instance.Delete("Bus", "BusNum = 99998")
         except PowerWorldError:
             pass
 
     @pytest.mark.order(68500)
-    def test_general_load_aux_directory(self, saw_instance, temp_dir):
+    def test_load_aux_directory(self, saw_instance, temp_dir):
+        """LoadAuxDirectory with and without filter."""
         saw_instance.LoadAuxDirectory(str(temp_dir), filter_string="*.aux")
-
-    @pytest.mark.order(68600)
-    def test_general_load_aux_directory_no_filter(self, saw_instance, temp_dir):
         saw_instance.LoadAuxDirectory(str(temp_dir))
 
     @pytest.mark.order(68700)
-    def test_general_load_data(self, saw_instance, temp_file):
+    def test_load_data(self, saw_instance, temp_file):
+        """LoadData loads bus data from AUX."""
         tmp_aux = temp_file(".aux")
         with open(tmp_aux, "w") as f:
             f.write('DATA (Bus, [BusNum, BusName]) {\n1 "TestBus"\n}\n')
         saw_instance.LoadData(tmp_aux, "Bus")
 
     @pytest.mark.order(68800)
-    def test_general_stop_aux_file(self, saw_instance):
+    def test_stop_aux_file(self, saw_instance):
+        """StopAuxFile completes without error."""
         saw_instance.StopAuxFile()
 
     @pytest.mark.order(68900)
-    def test_general_select_all_no_filter(self, saw_instance):
+    def test_select_all_no_filter(self, saw_instance):
+        """SelectAll/UnSelectAll without filter."""
         saw_instance.SelectAll("Bus")
         saw_instance.UnSelectAll("Bus")
-
-    # --- Merged from TestGeneralGaps ---
 
     @pytest.mark.order(85100)
     def test_save_object_fields(self, saw_instance, temp_file):
@@ -528,7 +507,7 @@ class TestGeneral:
 
     @pytest.mark.order(85300)
     def test_delete_with_filter(self, saw_instance):
-        """Delete with specific area zone filter."""
+        """Delete with specific filter."""
         saw_instance.CreateData("Bus", ["BusNum", "BusName"], [99995, "DeleteTestBus"])
         saw_instance.Delete("Bus", "BusNum = 99995")
 
@@ -539,10 +518,10 @@ class TestGeneral:
         saw_instance.Delete("Bus", "BusNum = 99994")
 
     @pytest.mark.order(85500)
-    def test_send_to_excel_advanced(self, saw_instance):
-        """SendToExcelAdvanced completes without error (requires Excel)."""
+    def test_send_to_excel(self, saw_instance):
+        """SendtoExcel completes without error (requires Excel)."""
         try:
-            saw_instance.SendToExcelAdvanced(
+            saw_instance.SendtoExcel(
                 "Bus", ["BusNum", "BusName"],
                 workbook="TestWorkbook",
                 worksheet="Sheet1",
@@ -556,418 +535,29 @@ class TestGeneral:
             raise
 
 
-@pytest.mark.usefixtures("save_restore_state")
-class TestModify:
-    """Tests for modify operations (destructive - run late)."""
-
-    @pytest.mark.order(12000)
-    def test_create_delete(self, saw_instance):
-        """CreateData and Delete cycle for a bus."""
-        dummy_bus = 99999
-        saw_instance.CreateData(
-            "Bus",
-            ["BusNum", "BusName", "BusNomVolt"],
-            [dummy_bus, "SAW_TEST", 115]
-        )
-        saw_instance.Delete("Bus", f"BusNum = {dummy_bus}")
-
-    @pytest.mark.order(13400)
-    def test_superarea(self, saw_instance):
-        """SuperArea create, add areas, remove areas cycle."""
-        saw_instance.CreateData("SuperArea", ["Name"], ["TestSuperArea"])
-        saw_instance.SuperAreaAddAreas("TestSuperArea", "ALL")
-        saw_instance.SuperAreaRemoveAreas("TestSuperArea", "ALL")
-
-    @pytest.mark.order(13500)
-    def test_interface_ops(self, saw_instance):
-        """Interface creation and manipulation operations."""
-        saw_instance.InjectionGroupRemoveDuplicates()
-        saw_instance.InterfaceRemoveDuplicates()
-        saw_instance.DirectionsAutoInsertReference("Bus", "Slack")
-
-        saw_instance.InterfaceCreate("TestInt", True, "Branch", "SELECTED")
-        saw_instance.InterfaceFlatten("TestInt")
-        saw_instance.InterfaceFlattenFilter("ALL")
-        saw_instance.InterfaceModifyIsolatedElements()
-
-        saw_instance.CreateData("Contingency", ["Name"], ["TestCtg"])
-        saw_instance.InterfaceAddElementsFromContingency("TestInt", "TestCtg")
-
-    # --- Merged from TestModifyExtended ---
-
-    @pytest.mark.order(80000)
-    def test_modify_auto_insert_tieline(self, saw_instance):
-        saw_instance.AutoInsertTieLineTransactions()
-
-    @pytest.mark.order(80100)
-    def test_modify_branch_mva_limit_reorder(self, saw_instance):
-        saw_instance.BranchMVALimitReorder()
-
-    @pytest.mark.order(80200)
-    def test_modify_branch_mva_limit_reorder_with_filter(self, saw_instance):
-        saw_instance.BranchMVALimitReorder(filter_name="ALL")
-
-    @pytest.mark.order(80300)
-    def test_modify_calculate_rxbg(self, saw_instance):
-        try:
-            saw_instance.CalculateRXBGFromLengthConfigCondType()
-        except PowerWorldAddonError:
-            pytest.skip("TransLineCalc add-on not registered")
-
-    @pytest.mark.order(80400)
-    def test_modify_calculate_rxbg_selected(self, saw_instance):
-        try:
-            saw_instance.CalculateRXBGFromLengthConfigCondType(filter_name="SELECTED")
-        except PowerWorldAddonError:
-            pytest.skip("TransLineCalc add-on not registered")
-
-    @pytest.mark.order(80500)
-    def test_modify_clear_small_islands(self, saw_instance):
-        saw_instance.ClearSmallIslands()
-
-    @pytest.mark.order(80600)
-    def test_modify_init_gen_mvar_limits(self, saw_instance):
-        saw_instance.InitializeGenMvarLimits()
-
-    @pytest.mark.order(80700)
-    def test_modify_injection_groups_auto_insert(self, saw_instance):
-        saw_instance.InjectionGroupsAutoInsert()
-
-    @pytest.mark.order(80800)
-    def test_modify_injection_group_create(self, saw_instance):
-        saw_instance.InjectionGroupCreate("TestIG", "Gen", 1.0, "", append=True)
-
-    @pytest.mark.order(80900)
-    def test_modify_injection_group_create_no_append(self, saw_instance):
-        saw_instance.InjectionGroupCreate("TestIG2", "Gen", 1.0, "", append=False)
-
-    @pytest.mark.order(81000)
-    def test_modify_interfaces_auto_insert(self, saw_instance):
-        saw_instance.InterfacesAutoInsert("AREA", delete_existing=True, use_filters=False)
-
-    @pytest.mark.order(81100)
-    def test_modify_interfaces_auto_insert_with_filters(self, saw_instance):
-        saw_instance.InterfacesAutoInsert("AREA", delete_existing=False, use_filters=True, prefix="TEST_")
-
-    @pytest.mark.order(81200)
-    def test_modify_set_participation_factors(self, saw_instance):
-        saw_instance.SetParticipationFactors("CONSTANT", 1.0, "SYSTEM")
-
-    @pytest.mark.order(81300)
-    def test_modify_set_scheduled_voltage(self, saw_instance):
-        buses = saw_instance.GetParametersMultipleElement("Bus", ["BusNum"])
-        assert buses is not None and not buses.empty, "Test case must contain buses"
-        bus_key = create_object_string("Bus", buses.iloc[0]["BusNum"])
-        saw_instance.SetScheduledVoltageForABus(bus_key, 1.0)
-
-    @pytest.mark.order(81400)
-    def test_modify_set_interface_limit_sum(self, saw_instance):
-        saw_instance.SetInterfaceLimitToMonitoredElementLimitSum("ALL")
-
-    @pytest.mark.order(81500)
-    def test_modify_rotate_bus_angles(self, saw_instance):
-        buses = saw_instance.GetParametersMultipleElement("Bus", ["BusNum"])
-        assert buses is not None and not buses.empty, "Test case must contain buses"
-        bus_key = create_object_string("Bus", buses.iloc[0]["BusNum"])
-        saw_instance.RotateBusAnglesInIsland(bus_key, 0.0)
-
-    @pytest.mark.order(81600)
-    def test_modify_set_gen_pmax(self, saw_instance):
-        saw_instance.SetGenPMaxFromReactiveCapabilityCurve()
-
-    @pytest.mark.order(81700)
-    def test_modify_remove_3w_xformer(self, saw_instance):
-        saw_instance.Remove3WXformerContainer()
-
-    @pytest.mark.order(81800)
-    def test_modify_rename_injection_group(self, saw_instance):
-        saw_instance.InjectionGroupCreate("RenameTestIG", "Gen", 1.0, "")
-        saw_instance.RenameInjectionGroup("RenameTestIG", "RenamedIG")
-
-    @pytest.mark.order(81900)
-    def test_modify_reassign_ids(self, saw_instance):
-        saw_instance.ReassignIDs("Load", "BusName", filter_name="", use_right=False)
-
-    @pytest.mark.order(82000)
-    def test_modify_reassign_ids_right(self, saw_instance):
-        saw_instance.ReassignIDs("Load", "BusName", filter_name="ALL", use_right=True)
-
-    @pytest.mark.order(82100)
-    def test_modify_merge_line_terminals(self, saw_instance):
-        saw_instance.MergeLineTerminals("SELECTED")
-
-    @pytest.mark.order(82200)
-    def test_modify_merge_ms_line_sections(self, saw_instance):
-        saw_instance.MergeMSLineSections("SELECTED")
-
-    @pytest.mark.order(82300)
-    def test_modify_directions_auto_insert(self, saw_instance):
-        areas = saw_instance.GetParametersMultipleElement("Area", ["AreaNum"])
-        if areas is None or len(areas) < 2:
-            pytest.skip("DirectionsAutoInsert requires a case with at least 2 areas")
-        s = create_object_string("Area", areas.iloc[0]["AreaNum"])
-        b = create_object_string("Area", areas.iloc[1]["AreaNum"])
-        saw_instance.DirectionsAutoInsert(s, b, delete_existing=True, use_area_zone_filters=False)
-
-    @pytest.mark.order(82400)
-    def test_modify_directions_auto_insert_with_filters(self, saw_instance):
-        areas = saw_instance.GetParametersMultipleElement("Area", ["AreaNum"])
-        if areas is None or len(areas) < 2:
-            pytest.skip("DirectionsAutoInsert requires a case with at least 2 areas")
-        s = create_object_string("Area", areas.iloc[0]["AreaNum"])
-        b = create_object_string("Area", areas.iloc[1]["AreaNum"])
-        saw_instance.DirectionsAutoInsert(s, b, delete_existing=False, use_area_zone_filters=True)
-
-    @pytest.mark.order(82500)
-    def test_modify_directions_auto_insert_ref_opposite(self, saw_instance):
-        saw_instance.DirectionsAutoInsertReference("Bus", "Slack", delete_existing=True, opposite_direction=True)
-
-    @pytest.mark.order(82600)
-    def test_modify_change_system_mva_base(self, saw_instance):
-        saw_instance.ChangeSystemMVABase(100.0)
-
-    # --- Merged from TestModifyGaps ---
-    # These tests modify case topology, so each one saves/restores PW state
-    # to prevent corruption of tests in other classes that interleave via
-    # pytest-order between this class's early (14xxx) and late (80xxx) tests.
-
-    @pytest.mark.order(14000)
-    def test_create_line_derive_existing(self, saw_instance):
-        """CreateLineDeriveExisting creates a line from existing parameters."""
-        branches = saw_instance.GetParametersMultipleElement(
-            "Branch", ["BusNum", "BusNum:1", "LineCircuit", "BranchDeviceType"]
-        )
-        assert branches is not None and not branches.empty, "Test case must contain branches"
-        lines = branches[branches["BranchDeviceType"] == "Line"]
-        if lines.empty:
-            pytest.skip("No line branches available for CreateLineDeriveExisting test")
-        b = lines.iloc[0]
-        branch_id = create_object_string("Branch", b["BusNum"], b["BusNum:1"], b["LineCircuit"])
-        saw_instance.SaveState()
-        try:
-            saw_instance.CreateLineDeriveExisting(
-                int(b["BusNum"]), int(b["BusNum:1"]), "99",
-                10.0, branch_id, existing_length=5.0, zero_g=True,
-            )
-        finally:
-            saw_instance.LoadState()
-
-    @pytest.mark.order(14100)
-    def test_merge_buses(self, saw_instance):
-        """MergeBuses completes without error."""
-        buses = saw_instance.GetParametersMultipleElement("Bus", ["BusNum"])
-        assert buses is not None and not buses.empty, "Test case must contain buses"
-        bus_num = str(buses.iloc[0]["BusNum"]).strip()
-        bus_str = create_object_string("Bus", bus_num)
-        saw_instance.SaveState()
-        try:
-            saw_instance.SetData("Bus", ["BusNum", "Selected"], [bus_num, "YES"])
-            saw_instance.MergeBuses(bus_str, filter_name="SELECTED")
-        finally:
-            saw_instance.LoadState()
-
-    @pytest.mark.order(14200)
-    def test_move(self, saw_instance):
-        """Move a switched shunt (0% -- no-op)."""
-        shunts = saw_instance.GetParametersMultipleElement("Shunt", ["BusNum", "ShuntID"])
-        if shunts is None or shunts.empty:
-            pytest.skip("No switched shunts found for Move test")
-        shunt_key = create_object_string("Shunt", shunts.iloc[0]["BusNum"], shunts.iloc[0]["ShuntID"])
-        bus_key = create_object_string("Bus", shunts.iloc[0]["BusNum"])
-        saw_instance.SaveState()
-        try:
-            saw_instance.Move(shunt_key, bus_key, how_much=0.0, abort_on_error=True)
-        except PowerWorldError as e:
-            if "Unknown object" in str(e) or "not supported" in str(e).lower():
-                pytest.skip(f"Move not supported for this object type on this case: {e}")
-            raise
-        finally:
-            saw_instance.LoadState()
-
-    @pytest.mark.order(14300)
-    def test_split_bus(self, saw_instance):
-        """SplitBus creates a new bus from an existing one."""
-        buses = saw_instance.GetParametersMultipleElement("Bus", ["BusNum"])
-        assert buses is not None and not buses.empty, "Test case must contain buses"
-        bus_key = create_object_string("Bus", buses.iloc[0]["BusNum"])
-        saw_instance.SaveState()
-        try:
-            saw_instance.SplitBus(bus_key, 99997, insert_tie=True, line_open=False)
-        finally:
-            saw_instance.LoadState()
-
-    @pytest.mark.order(14400)
-    def test_tap_transmission_line(self, saw_instance):
-        """TapTransmissionLine taps a line at midpoint (lines only)."""
-        branches = saw_instance.GetParametersMultipleElement(
-            "Branch", ["BusNum", "BusNum:1", "LineCircuit", "BranchDeviceType"]
-        )
-        assert branches is not None and not branches.empty, "Test case must contain branches"
-        lines = branches[branches["BranchDeviceType"] == "Line"]
-        if lines.empty:
-            pytest.skip("No line branches available for TapTransmissionLine test")
-        b = lines.iloc[0]
-        branch_key = create_object_string("Branch", b["BusNum"], b["BusNum:1"], b["LineCircuit"])
-        saw_instance.SaveState()
-        try:
-            saw_instance.TapTransmissionLine(
-                branch_key, 50.0, 99996,
-                shunt_model="CAPACITANCE",
-                treat_as_ms_line=False,
-                update_onelines=False,
-                new_bus_name="TapBus",
-            )
-        finally:
-            saw_instance.LoadState()
-
-    @pytest.mark.order(14500)
-    def test_branch_mva_limit_with_limits(self, saw_instance):
-        """BranchMVALimitReorder with explicit limits list."""
-        saw_instance.SaveState()
-        try:
-            saw_instance.BranchMVALimitReorder(
-                filter_name="ALL",
-                limits=["A", "B", "C"],
-            )
-        finally:
-            saw_instance.LoadState()
-
-
-class TestRegions:
-    """Tests for region operations."""
-
-    @pytest.mark.order(20000)
-    def test_region_update_buses(self, saw_instance):
-        """RegionUpdateBuses completes without error."""
-        saw_instance.RegionUpdateBuses()
-
-    @pytest.mark.order(20100)
-    def test_region_rename(self, saw_instance):
-        """Region rename operations complete without error."""
-        saw_instance.RegionRename("OldRegion", "NewRegion")
-        saw_instance.RegionRenameClass("OldClass", "NewClass")
-        saw_instance.RegionRenameProper1("OldP1", "NewP1")
-        saw_instance.RegionRenameProper2("OldP2", "NewP2")
-        saw_instance.RegionRenameProper3("OldP3", "NewP3")
-        saw_instance.RegionRenameProper12Flip()
-
-    # --- Merged from TestRegionsGaps ---
-
-    @pytest.mark.order(85000)
-    def test_region_load_shapefile(self, saw_instance, temp_file):
-        """RegionLoadShapefile completes without error."""
-        tmp = temp_file(".shp")
-        saw_instance.RegionLoadShapefile(
-            tmp, "TestClass", ["Name"],
-            add_to_open_onelines=False,
-            display_style_name="",
-            delete_existing=True,
-        )
-
-
-class TestCaseActions:
-    """Tests for case actions (highly destructive - run last)."""
-
-    @pytest.mark.order(30000)
-    def test_case_description(self, saw_instance):
-        """CaseDescriptionSet and CaseDescriptionClear work."""
-        saw_instance.CaseDescriptionSet("Test Description")
-        saw_instance.CaseDescriptionClear()
-
-    @pytest.mark.order(30100)
-    def test_equivalence_and_external_system(self, saw_instance, temp_file):
-        """External system operations and equivalence."""
-        saw_instance.DeleteExternalSystem()
-        saw_instance.Equivalence()
-        tmp_pwb = temp_file(".pwb")
-        saw_instance.SaveExternalSystem(tmp_pwb)
-        saw_instance.SaveMergedFixedNumBusCase(tmp_pwb)
-
-    @pytest.mark.order(30150)
-    def test_scale(self, saw_instance):
-        """Scale load by factor of 1.0 (no-op)."""
-        saw_instance.Scale("LOAD", "FACTOR", [1.0], "SYSTEM")
-
-    @pytest.mark.order(30160)
-    def test_write_text_to_file(self, saw_instance, temp_file):
-        """WriteTextToFile creates a file with content."""
-        tmp_txt = temp_file(".txt")
-        saw_instance.WriteTextToFile(tmp_txt, "Test content")
-        assert os.path.exists(tmp_txt)
-
-    @pytest.mark.order(99900)
-    def test_renumber(self, saw_instance):
-        """Renumber operations (run last as they modify keys)."""
-        saw_instance.RenumberAreas()
-        saw_instance.RenumberBuses()
-        saw_instance.RenumberSubs()
-        saw_instance.RenumberZones()
-        saw_instance.RenumberCase()
-
-    # --- Merged from TestCaseActionsExtended ---
-
-    @pytest.mark.order(90000)
-    def test_case_description_append(self, saw_instance):
-        saw_instance.CaseDescriptionSet("Line 1")
-        saw_instance.CaseDescriptionSet("Line 2", append=True)
-        saw_instance.CaseDescriptionClear()
-
-    @pytest.mark.order(90100)
-    def test_case_save_external_with_ties(self, saw_instance, temp_file):
-        tmp_pwb = temp_file(".pwb")
-        saw_instance.SaveExternalSystem(tmp_pwb, with_ties=True)
-
-    @pytest.mark.order(90200)
-    def test_case_scale_gen(self, saw_instance):
-        saw_instance.Scale("GEN", "FACTOR", [1.0], "SYSTEM")
-
-    @pytest.mark.order(90300)
-    def test_case_scale_load_mw(self, saw_instance):
-        saw_instance.Scale("LOAD", "MW", [100.0, 50.0], "SYSTEM")
-
-    @pytest.mark.order(90400)
-    def test_case_load_ems(self, saw_instance, temp_file):
-        tmp = temp_file(".hdb")
-        # Empty .hdb file — PW rejects it with "End of file reached"
-        with pytest.raises(PowerWorldError):
-            saw_instance.LoadEMS(tmp)
-
-    @pytest.mark.order(90500)
-    def test_case_renumber_custom_index(self, saw_instance):
-        saw_instance.RenumberAreas(custom_integer_index=1)
-        saw_instance.RenumberBuses(custom_integer_index=2)
-        saw_instance.RenumberSubs(custom_integer_index=3)
-        saw_instance.RenumberZones(custom_integer_index=4)
-
-
 class TestSubData:
     """Integration tests for GetSubData - retrieving nested SubData from AUX exports."""
 
     @pytest.mark.order(40000)
     def test_gen_ops(self, saw_instance):
         """GetSubData retrieves generator data with various SubData types."""
-        # Basic fields only
         df = saw_instance.GetSubData("Gen", ["BusNum", "GenID", "GenMW"])
         assert df is not None
         assert "BusNum" in df.columns and "GenID" in df.columns and "GenMW" in df.columns
 
-        # With BidCurve SubData
         df = saw_instance.GetSubData("Gen", ["BusNum", "GenID"], ["BidCurve"])
         assert df is not None and "BidCurve" in df.columns
         for bc in df["BidCurve"]:
             assert isinstance(bc, list)
 
-        # With ReactiveCapability SubData
         df = saw_instance.GetSubData("Gen", ["BusNum", "GenID"], ["ReactiveCapability"])
         assert df is not None and "ReactiveCapability" in df.columns
         for rc in df["ReactiveCapability"]:
             assert isinstance(rc, list)
 
-        # Multiple SubData types
         df = saw_instance.GetSubData("Gen", ["BusNum", "GenID", "GenMW"], ["BidCurve", "ReactiveCapability"])
         assert df is not None and "BidCurve" in df.columns and "ReactiveCapability" in df.columns
 
-        # With filter
         df_all = saw_instance.GetSubData("Gen", ["BusNum", "GenID"])
         df_filtered = saw_instance.GetSubData("Gen", ["BusNum", "GenID"], filter_name="GenStatus=Closed")
         assert df_filtered is not None and len(df_filtered) <= len(df_all)
@@ -975,11 +565,9 @@ class TestSubData:
     @pytest.mark.order(40100)
     def test_other_types(self, saw_instance):
         """GetSubData works for Load, Contingency, and Interface object types."""
-        # Load BidCurve
         df = saw_instance.GetSubData("Load", ["BusNum", "LoadID", "LoadMW"], ["BidCurve"])
         assert df is not None and "BidCurve" in df.columns
 
-        # Contingency elements
         df = saw_instance.GetSubData("Contingency", ["TSContingency"], ["CTGElement"])
         assert df is not None
         if not df.empty:
@@ -987,11 +575,9 @@ class TestSubData:
             for ctg in df["CTGElement"]:
                 assert isinstance(ctg, list)
 
-        # Interface elements
         df = saw_instance.GetSubData("Interface", ["InterfaceName"], ["InterfaceElement"])
         assert df is not None
 
-        # SuperArea (may be empty)
         df = saw_instance.GetSubData("SuperArea", ["SuperAreaName"], ["SuperAreaArea"])
         assert df is not None
 

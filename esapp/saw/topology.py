@@ -3,7 +3,7 @@ from pathlib import Path
 import pandas as pd
 
 from ._enums import YesNo, format_filter
-from ._helpers import format_list, get_temp_filepath, pack_args
+from ._helpers import format_list, get_temp_filepath
 
 
 class TopologyMixin:
@@ -51,8 +51,7 @@ class TopologyMixin:
         --------
         >>> saw.DeterminePathDistance('[BUS 1]', 'X', 'CLOSED', 'CustomFloat')
         """
-        args = pack_args(start, BranchDistMeas, BranchFilter, BusField)
-        self.RunScriptCommand(f"DeterminePathDistance({args});")
+        self._run_script("DeterminePathDistance", start, BranchDistMeas, BranchFilter, BusField)
 
     def DetermineBranchesThatCreateIslands(
         self, Filter: str = "ALL", StoreBuses: bool = True, SetSelectedOnLines: bool = False
@@ -95,9 +94,7 @@ class TopologyMixin:
         sb = YesNo.from_bool(StoreBuses)
         ssl = YesNo.from_bool(SetSelectedOnLines)
         try:
-            args = pack_args(Filter, sb, f'"{filename}"', ssl, "CSV")
-            statement = f"DetermineBranchesThatCreateIslands({args});"
-            self.RunScriptCommand(statement)
+            self._run_script("DetermineBranchesThatCreateIslands", Filter, sb, f'"{filename}"', ssl, "CSV")
             return pd.read_csv(filename, header=0)
         finally:
             if os.path.exists(filename):
@@ -147,9 +144,7 @@ class TopologyMixin:
         filename = get_temp_filepath(".txt")
 
         try:
-            args = pack_args(start, end, BranchDistanceMeasure, BranchFilter, f'"{filename}"')
-            statement = f"DetermineShortestPath({args});"
-            self.RunScriptCommand(statement)
+            self._run_script("DetermineShortestPath", start, end, BranchDistanceMeasure, BranchFilter, f'"{filename}"')
             df = pd.read_csv(
                 filename, header=None, sep=r'\s+', names=["BusNum", BranchDistanceMeasure, "BusName"]
             )
@@ -190,8 +185,7 @@ class TopologyMixin:
         >>> saw.DoFacilityAnalysis("cut_results.aux", set_selected=True)
         """
         yn = YesNo.from_bool(set_selected)
-        args = pack_args(f'"{filename}"', yn)
-        return self.RunScriptCommand(f"DoFacilityAnalysis({args});")
+        return self._run_script("DoFacilityAnalysis", f'"{filename}"', yn)
 
     def FindRadialBusPaths(
         self,
@@ -232,8 +226,7 @@ class TopologyMixin:
         """
         ign = YesNo.from_bool(ignore_status)
         treat = YesNo.from_bool(treat_parallel_as_not_radial)
-        args = pack_args(ign, treat, bus_or_superbus)
-        return self.RunScriptCommand(f"FindRadialBusPaths({args});")
+        return self._run_script("FindRadialBusPaths", ign, treat, bus_or_superbus)
 
     def SetBusFieldFromClosest(self, variable_name: str, bus_filter_set_to: str, bus_filter_from_these: str, branch_filter_traverse: str, branch_dist_meas: str):
         """
@@ -273,8 +266,7 @@ class TopologyMixin:
         >>> saw.SetBusFieldFromClosest("SubNumber", "SubNumber IsBlank",
         ...     "SubNumber NotIsBlank", "All", "Z")
         """
-        args = pack_args(f'"{variable_name}"', f'"{bus_filter_set_to}"', f'"{bus_filter_from_these}"', branch_filter_traverse, branch_dist_meas)
-        return self.RunScriptCommand(f"SetBusFieldFromClosest({args});")
+        return self._run_script("SetBusFieldFromClosest", f'"{variable_name}"', f'"{bus_filter_set_to}"', f'"{bus_filter_from_these}"', branch_filter_traverse, branch_dist_meas)
 
     def SetSelectedFromNetworkCut(
         self,
@@ -343,9 +335,7 @@ class TopologyMixin:
         inf = format_filter(interface_filter)
         dcf = format_filter(dc_line_filter)
 
-        args = pack_args(sh, bus_on_cut_side, bf, inf, dcf, en, num_tiers, init, objs, uaz, ukv, min_kv, max_kv, lower_min_kv, lower_max_kv)
-        cmd = f"SetSelectedFromNetworkCut({args});"
-        return self.RunScriptCommand(cmd)
+        return self._run_script("SetSelectedFromNetworkCut", sh, bus_on_cut_side, bf, inf, dcf, en, num_tiers, init, objs, uaz, ukv, min_kv, max_kv, lower_min_kv, lower_max_kv)
 
     def CreateNewAreasFromIslands(self):
         """
@@ -363,7 +353,7 @@ class TopologyMixin:
         str
             The response from the PowerWorld script command.
         """
-        return self.RunScriptCommand("CreateNewAreasFromIslands;")
+        return self._run_script("CreateNewAreasFromIslands")
 
     def ExpandAllBusTopology(self):
         """
@@ -383,7 +373,7 @@ class TopologyMixin:
         --------
         ExpandBusTopology : Expand topology for a specific bus.
         """
-        return self.RunScriptCommand("ExpandAllBusTopology;")
+        return self._run_script("ExpandAllBusTopology")
 
     def ExpandBusTopology(self, bus_identifier: str, topology_type: str):
         """
@@ -414,8 +404,7 @@ class TopologyMixin:
         --------
         >>> saw.ExpandBusTopology("BUS 1", "BREAKERANDAHALF")
         """
-        args = pack_args(bus_identifier, topology_type)
-        return self.RunScriptCommand(f"ExpandBusTopology({args});")
+        return self._run_script("ExpandBusTopology", bus_identifier, topology_type)
 
     def SaveConsolidatedCase(self, filename: str, filetype: str = "PWB", bus_format: str = "Number", truncate_ctg_labels: bool = False, add_comments: bool = False):
         """
@@ -450,8 +439,7 @@ class TopologyMixin:
         """
         tcl = YesNo.from_bool(truncate_ctg_labels)
         ac = YesNo.from_bool(add_comments)
-        args = pack_args(f'"{filename}"', filetype, f'[{bus_format}, {tcl}, {ac}]')
-        return self.RunScriptCommand(f"SaveConsolidatedCase({args});")
+        return self._run_script("SaveConsolidatedCase", f'"{filename}"', filetype, f'[{bus_format}, {tcl}, {ac}]')
 
     def CloseWithBreakers(self, object_type: str, filter_val: str, only_specified: bool = False, switching_types: list = None, close_normally_closed: bool = False):
         """
@@ -508,8 +496,7 @@ class TopologyMixin:
             keys_part = filter_val.strip()[len(prefix_to_check):-1].strip()
             processed_val = f"[{keys_part}]"
 
-        args = pack_args(object_type, processed_val, only, sw_types, cnc)
-        return self.RunScriptCommand(f"CloseWithBreakers({args});")
+        return self._run_script("CloseWithBreakers", object_type, processed_val, only, sw_types, cnc)
 
     def OpenWithBreakers(self, object_type: str, filter_val: str, switching_types: list = None, open_normally_open: bool = False):
         """
@@ -560,5 +547,4 @@ class TopologyMixin:
             keys_part = filter_val.strip()[len(prefix_to_check):-1].strip()
             processed_val = f"[{keys_part}]"
 
-        args = pack_args(object_type, processed_val, sw_types, ono)
-        return self.RunScriptCommand(f"OpenWithBreakers({args});")
+        return self._run_script("OpenWithBreakers", object_type, processed_val, sw_types, ono)

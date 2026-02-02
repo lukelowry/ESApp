@@ -1,5 +1,5 @@
 """
-Integration tests for Power Flow and Sensitivity via the SAW interface.
+Integration tests for Power Flow, Matrices, Sensitivity, and Topology via SAW.
 
 These are **integration tests** that require a live connection to PowerWorld
 Simulator via the SimAuto COM interface. They test power flow solution,
@@ -11,8 +11,18 @@ REQUIREMENTS:
     - A valid PowerWorld case file path set in ``tests/config_test.py``
       (variable ``SAW_TEST_CASE``) or via the ``SAW_TEST_CASE`` env variable
 
+RELATED TEST FILES:
+    - test_integration_saw_core.py          -- base SAW operations, logging, I/O
+    - test_integration_saw_modify.py        -- destructive modify, region, case actions
+    - test_integration_saw_contingency.py   -- contingency and fault analysis
+    - test_integration_saw_gic.py           -- GIC analysis
+    - test_integration_saw_transient.py     -- transient stability
+    - test_integration_saw_operations.py    -- ATC, OPF, PV/QV, time step, weather, scheduled
+    - test_integration_workbench.py         -- GridWorkBench facade and statics
+    - test_integration_network.py           -- Network topology
+
 USAGE:
-    pytest tests/test_integration_powerflow.py -v
+    pytest tests/test_integration_saw_powerflow.py -v
 """
 
 import os
@@ -20,7 +30,6 @@ import pytest
 import pandas as pd
 import numpy as np
 
-# Order markers for integration tests - powerflow tests run early (order 10-29)
 pytestmark = [
     pytest.mark.integration,
     pytest.mark.requires_case,
@@ -113,14 +122,11 @@ class TestPowerFlow:
     def test_powerflow_solve_dc(self, saw_instance):
         """Test DC power flow solution."""
         saw_instance.SolvePowerFlow("DC")
-        # Verify solution was attempted (no exception means success)
-        # Run AC again to restore state for subsequent tests
         saw_instance.SolvePowerFlow()
 
     @pytest.mark.order(2700)
     def test_powerflow_agc(self, saw_instance):
         """Test AGC-related generator participation factors."""
-        # AGC calculation via participation factors
         areas = ensure_areas(saw_instance, 1)
         area_str = create_object_string("Area", areas.iloc[0]["AreaNum"])
         saw_instance.SetParticipationFactors("CONSTANT", 1.0, area_str)
@@ -209,7 +215,6 @@ class TestMatrices:
         try:
             saw_instance.SaveYbusInMatlabFormat(tmp.name, include_voltages=False)
             assert os.path.exists(tmp.name)
-            # Parse the saved file
             ybus = saw_instance.get_ybus(file=tmp.name, full=True)
             assert ybus is not None
             assert ybus.shape[0] > 0
@@ -270,12 +275,10 @@ class TestSensitivity:
     def test_sensitivity_lodf_matrix(self, saw_instance):
         saw_instance.CalculateLODFMatrix("OUTAGES", "ALL", "ALL")
 
-    @pytest.mark.order(3600)
-    def test_sensitivity_lodf_advanced(self, saw_instance, temp_file):
+    @pytest.mark.order(3601)
+    def test_sensitivity_lodf_with_params(self, saw_instance, temp_file):
         """Test CalculateLODFAdvanced with full parameters."""
         tmp_csv = temp_file(".csv")
-        # CalculateLODFAdvanced(include_phase_shifters, file_type, max_columns, min_lodf,
-        #                       number_format, decimal_points, only_increasing, filename)
         saw_instance.CalculateLODFAdvanced(
             include_phase_shifters=False,
             file_type="CSV",
@@ -287,10 +290,9 @@ class TestSensitivity:
             filename=tmp_csv
         )
 
-    @pytest.mark.order(3700)
+    @pytest.mark.order(3701)
     def test_sensitivity_lodf_screening(self, saw_instance):
         """Test CalculateLODFScreening for screening mode."""
-        # CalculateLODFScreening with do_save_file=False to avoid file requirement
         saw_instance.CalculateLODFScreening(
             filter_process="ALL",
             filter_monitor="ALL",
@@ -311,51 +313,16 @@ class TestSensitivity:
         areas = ensure_areas(saw_instance, 1)
         area_str = create_object_string("Area", areas.iloc[0]["AreaNum"])
         saw_instance.SetParticipationFactors("CONSTANT", 1.0, area_str)
-        # CalculateShiftFactorsMultipleElement(type_element, which_element, direction, transactor, method)
-        # which_element must be SELECTED, OVERLOAD, or CTGOVERLOAD
         saw_instance.CalculateShiftFactorsMultipleElement("BRANCH", "SELECTED", "SELLER", area_str)
 
     @pytest.mark.order(3900)
     def test_sensitivity_loss_sense(self, saw_instance):
         """Test CalculateLossSense for loss sensitivity."""
-        # CalculateLossSense(function_type, area_ref, island_ref)
-        # function_type can be AREA, ZONE, BUS, etc.
         saw_instance.CalculateLossSense("AREA", "NO", "EXISTING")
-
-    @pytest.mark.order(72000)
-    def test_sensitivity_lodf_post_closure(self, saw_instance):
-        """Test CalculateLODF with post_closure_lcdf='YES'."""
-        branches = saw_instance.GetParametersMultipleElement("Branch", ["BusNum", "BusNum:1", "LineCircuit"])
-        assert branches is not None and not branches.empty, "Test case must contain branches"
-        b = branches.iloc[0]
-        branch_str = create_object_string("Branch", b["BusNum"], b["BusNum:1"], b["LineCircuit"])
-        saw_instance.CalculateLODF(branch_str, post_closure_lcdf="YES")
-
-    @pytest.mark.order(72100)
-    def test_sensitivity_ptdf_multiple_directions(self, saw_instance):
-        """Test CalculatePTDFMultipleDirections."""
-        saw_instance.CalculatePTDFMultipleDirections()
-
-    @pytest.mark.order(72200)
-    def test_sensitivity_line_loading_replicator(self, saw_instance):
-        """Test LineLoadingReplicatorCalculate."""
-        branches = saw_instance.GetParametersMultipleElement("Branch", ["BusNum", "BusNum:1", "LineCircuit"])
-        assert branches is not None and not branches.empty, "Test case must contain branches"
-        b = branches.iloc[0]
-        branch_str = create_object_string("Branch", b["BusNum"], b["BusNum:1"], b["LineCircuit"])
-        # Create an injection group containing all generators
-        saw_instance.InjectionGroupCreate("TestLLR", "Gen", 1.0, "", append=False)
-        ig_str = '[InjectionGroup "TestLLR"]'
-        saw_instance.LineLoadingReplicatorCalculate(
-            branch_str, ig_str, agc_only=False, desired_flow=100.0, implement=False,
-        )
 
     @pytest.mark.order(4900)
     def test_calculate_volt_to_transfer_sense(self, saw_instance):
         """CalculateVoltToTransferSense completes without error."""
-        # This command requires both selling and buying areas to have online
-        # AGC generators with MW headroom. Cases with all generators in a
-        # single area cannot satisfy this prerequisite.
         areas = ensure_areas(saw_instance, 2)
         area1 = str(areas.iloc[0]["AreaNum"]).strip()
         area2 = str(areas.iloc[1]["AreaNum"]).strip()
@@ -378,10 +345,9 @@ class TestSensitivity:
         b = create_object_string("Area", area2)
         saw_instance.CalculateVoltToTransferSense(s, b, transfer_type="P", turn_off_avr=False)
 
-    @pytest.mark.order(5000)
+    @pytest.mark.order(4950)
     def test_calculate_tap_sense(self, saw_instance):
         """CalculateTapSense completes without error."""
-        # Select a single transformer to avoid stalling on large cases
         branches = saw_instance.GetParametersMultipleElement(
             "Branch", ["BusNum", "BusNum:1", "LineCircuit"]
         )
@@ -395,10 +361,9 @@ class TestSensitivity:
         )
         saw_instance.CalculateTapSense(filter_name="SELECTED")
 
-    @pytest.mark.order(5100)
+    @pytest.mark.order(4960)
     def test_calculate_volt_self_sense(self, saw_instance):
         """CalculateVoltSelfSense completes without error."""
-        # Use SELECTED filter with one bus to avoid stalling on large cases
         buses = saw_instance.GetParametersMultipleElement("Bus", ["BusNum"])
         assert buses is not None and not buses.empty
         saw_instance.SetData(
@@ -407,24 +372,19 @@ class TestSensitivity:
         )
         saw_instance.CalculateVoltSelfSense(filter_name="SELECTED")
 
-    @pytest.mark.order(5200)
-    def test_calculate_volt_sense(self, saw_instance):
+    @pytest.mark.order(4970)
+    def test_calculate_volt_sense_specific(self, saw_instance):
         """CalculateVoltSense for a specific bus."""
         buses = saw_instance.GetParametersMultipleElement("Bus", ["BusNum"])
         assert buses is not None and not buses.empty, "Test case must contain buses"
         saw_instance.CalculateVoltSense(int(buses.iloc[0]["BusNum"]))
 
-    @pytest.mark.order(5300)
+    @pytest.mark.order(4980)
     def test_set_sensitivities_at_oos_to_closest(self, saw_instance):
         """SetSensitivitiesAtOutOfServiceToClosest completes without error."""
         saw_instance.SetSensitivitiesAtOutOfServiceToClosest()
 
-    @pytest.mark.order(72300)
-    def test_line_loading_replicator_implement(self, saw_instance):
-        """LineLoadingReplicatorImplement completes without error."""
-        saw_instance.LineLoadingReplicatorImplement()
-
-    @pytest.mark.order(5600)
+    @pytest.mark.order(4990)
     def test_calculate_lodf_with_enum(self, saw_instance):
         """CalculateLODF using LinearMethod enum."""
         from esapp.saw._enums import LinearMethod
@@ -433,6 +393,38 @@ class TestSensitivity:
         b = branches.iloc[0]
         branch_str = create_object_string("Branch", b["BusNum"], b["BusNum:1"], b["LineCircuit"])
         saw_instance.CalculateLODF(branch_str, method=LinearMethod.DC)
+
+    @pytest.mark.order(72000)
+    def test_sensitivity_lodf_post_closure(self, saw_instance):
+        """Test CalculateLODF with post_closure_lcdf='YES'."""
+        branches = saw_instance.GetParametersMultipleElement("Branch", ["BusNum", "BusNum:1", "LineCircuit"])
+        assert branches is not None and not branches.empty, "Test case must contain branches"
+        b = branches.iloc[0]
+        branch_str = create_object_string("Branch", b["BusNum"], b["BusNum:1"], b["LineCircuit"])
+        saw_instance.CalculateLODF(branch_str, post_closure_lcdf="YES")
+
+    @pytest.mark.order(72100)
+    def test_sensitivity_ptdf_multiple_directions(self, saw_instance):
+        """Test CalculatePTDFMultipleDirections."""
+        saw_instance.CalculatePTDFMultipleDirections()
+
+    @pytest.mark.order(72200)
+    def test_sensitivity_line_loading_replicator(self, saw_instance):
+        """Test LineLoadingReplicatorCalculate."""
+        branches = saw_instance.GetParametersMultipleElement("Branch", ["BusNum", "BusNum:1", "LineCircuit"])
+        assert branches is not None and not branches.empty, "Test case must contain branches"
+        b = branches.iloc[0]
+        branch_str = create_object_string("Branch", b["BusNum"], b["BusNum:1"], b["LineCircuit"])
+        saw_instance.InjectionGroupCreate("TestLLR", "Gen", 1.0, "", append=False)
+        ig_str = '[InjectionGroup "TestLLR"]'
+        saw_instance.LineLoadingReplicatorCalculate(
+            branch_str, ig_str, agc_only=False, desired_flow=100.0, implement=False,
+        )
+
+    @pytest.mark.order(72310)
+    def test_sensitivity_line_loading_replicator_implement(self, saw_instance):
+        """LineLoadingReplicatorImplement completes without error."""
+        saw_instance.LineLoadingReplicatorImplement()
 
 
 class TestTopology:
@@ -453,7 +445,7 @@ class TestTopology:
         df = saw_instance.DetermineShortestPath(start, end)
         assert df is not None
 
-    @pytest.mark.order(72300)
+    @pytest.mark.order(72350)
     def test_topology_path_distance(self, saw_instance):
         """Test DeterminePathDistance."""
         buses = saw_instance.GetParametersMultipleElement("Bus", ["BusNum"])
@@ -474,36 +466,22 @@ class TestTopology:
 
     @pytest.mark.order(75000)
     def test_do_facility_analysis(self, saw_instance, temp_file):
-        """DoFacilityAnalysis writes results."""
-        # DoFacilityAnalysis requires Facility and External bus designations
-        # configured via the GUI — these cannot be set through SimAuto.
+        """DoFacilityAnalysis with and without set_selected."""
         tmp = temp_file(".aux")
         try:
             saw_instance.DoFacilityAnalysis(tmp, set_selected=False)
-        except PowerWorldPrerequisiteError:
-            pytest.skip("No Facility/External buses configured in test case")
-
-    @pytest.mark.order(75100)
-    def test_do_facility_analysis_selected(self, saw_instance, temp_file):
-        """DoFacilityAnalysis with set_selected=True."""
-        tmp = temp_file(".aux")
-        try:
             saw_instance.DoFacilityAnalysis(tmp, set_selected=True)
         except PowerWorldPrerequisiteError:
             pytest.skip("No Facility/External buses configured in test case")
 
     @pytest.mark.order(75200)
     def test_find_radial_bus_paths(self, saw_instance):
-        """FindRadialBusPaths completes without error."""
+        """FindRadialBusPaths with and without ignore_status."""
         saw_instance.FindRadialBusPaths(
             ignore_status=False,
             treat_parallel_as_not_radial=False,
             bus_or_superbus="BUS",
         )
-
-    @pytest.mark.order(75300)
-    def test_find_radial_bus_paths_ignore_status(self, saw_instance):
-        """FindRadialBusPaths with ignore_status=True."""
         saw_instance.FindRadialBusPaths(
             ignore_status=True,
             treat_parallel_as_not_radial=True,
@@ -519,7 +497,6 @@ class TestTopology:
             "Branch", ["BusNum", "BusNum:1", "LineCircuit"]
         )
         assert branches is not None and not branches.empty, "Test case must contain branches"
-        # Select at least one branch so the SELECTED filter has elements
         b = branches.iloc[0]
         saw_instance.SetData(
             "Branch",
@@ -557,16 +534,10 @@ class TestTopology:
 
     @pytest.mark.order(75800)
     def test_close_with_breakers(self, saw_instance):
-        """CloseWithBreakers completes without error."""
+        """CloseWithBreakers with simple and full object string."""
         gens = saw_instance.GetParametersMultipleElement("Gen", ["BusNum", "GenID"])
         assert gens is not None and not gens.empty, "Test case must contain generators"
         saw_instance.CloseWithBreakers("GEN", f"[{gens.iloc[0]['BusNum']} {gens.iloc[0]['GenID']}]")
-
-    @pytest.mark.order(75900)
-    def test_close_with_breakers_full_object_string(self, saw_instance):
-        """CloseWithBreakers strips object type prefix from full object string."""
-        gens = saw_instance.GetParametersMultipleElement("Gen", ["BusNum", "GenID"])
-        assert gens is not None and not gens.empty, "Test case must contain generators"
         full_str = create_object_string("GEN", gens.iloc[0]["BusNum"], gens.iloc[0]["GenID"])
         saw_instance.CloseWithBreakers(
             "GEN", full_str,
@@ -577,21 +548,19 @@ class TestTopology:
 
     @pytest.mark.order(76000)
     def test_open_with_breakers(self, saw_instance):
-        """OpenWithBreakers completes without error."""
+        """OpenWithBreakers with simple and full object string."""
         branches = saw_instance.GetParametersMultipleElement("Branch", ["BusNum", "BusNum:1", "LineCircuit"])
         assert branches is not None and not branches.empty, "Test case must contain branches"
         b = branches.iloc[0]
         saw_instance.OpenWithBreakers("BRANCH", f"[{b['BusNum']} {b['BusNum:1']} {b['LineCircuit']}]")
-
-    @pytest.mark.order(76100)
-    def test_open_with_breakers_full_object_string(self, saw_instance):
-        """OpenWithBreakers strips object type prefix from full object string."""
-        branches = saw_instance.GetParametersMultipleElement("Branch", ["BusNum", "BusNum:1", "LineCircuit"])
-        assert branches is not None and not branches.empty, "Test case must contain branches"
-        b = branches.iloc[0]
         full_str = create_object_string("BRANCH", b["BusNum"], b["BusNum:1"], b["LineCircuit"])
         saw_instance.OpenWithBreakers(
             "BRANCH", full_str,
             switching_types=["Breaker"],
             open_normally_open=True,
         )
+
+
+if __name__ == "__main__":
+    import sys
+    sys.exit(pytest.main(["-v", __file__]))

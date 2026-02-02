@@ -1,7 +1,7 @@
 """Sensitivity analysis specific functions."""
 from typing import Union
 
-from ._helpers import create_object_string, pack_args
+from ._helpers import create_object_string
 from ._enums import YesNo, LinearMethod, IslandReference
 
 
@@ -31,7 +31,7 @@ class SensitivityMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        return self.RunScriptCommand(f'CalculateFlowSense({flow_element}, {flow_type});')
+        return self._run_script("CalculateFlowSense", flow_element, flow_type)
 
     def CalculatePTDF(self, seller: str, buyer: str, method: Union[LinearMethod, str] = LinearMethod.DC):
         """Calculates the PTDF (Power Transfer Distribution Factor) values between a seller and a buyer.
@@ -60,7 +60,7 @@ class SensitivityMixin:
             If the SimAuto call fails.
         """
         m = method.value if isinstance(method, LinearMethod) else method
-        return self.RunScriptCommand(f'CalculatePTDF({seller}, {buyer}, {m});')
+        return self._run_script("CalculatePTDF", seller, buyer, m)
 
     def CalculateLODF(self, branch: str, method: Union[LinearMethod, str] = LinearMethod.DC, post_closure_lcdf: Union[YesNo, str] = ""):
         """Calculates LODF (Line Outage Distribution Factors) for a specified branch outage.
@@ -90,11 +90,10 @@ class SensitivityMixin:
             If the SimAuto call fails.
         """
         m = method.value if isinstance(method, LinearMethod) else method
-        args = f'{branch}, {m}'
         if post_closure_lcdf:
             lcdf = post_closure_lcdf.value if isinstance(post_closure_lcdf, YesNo) else post_closure_lcdf
-            args += f', {lcdf}'
-        return self.RunScriptCommand(f'CalculateLODF({args});')
+            return self._run_script("CalculateLODF", branch, m, lcdf)
+        return self._run_script("CalculateLODF", branch, m)
 
     def CalculateLODFAdvanced(self, include_phase_shifters: bool, file_type: str, max_columns: int, min_lodf: float, number_format: str, decimal_points: int, only_increasing: bool, filename: str, include_islanding: bool = True):
         """Performs an advanced LODF calculation with various output and filtering options.
@@ -138,8 +137,7 @@ class SensitivityMixin:
         ips = YesNo.from_bool(include_phase_shifters)
         inc = YesNo.from_bool(only_increasing)
         isl = YesNo.from_bool(include_islanding)
-        cmd = f'CalculateLODFAdvanced({ips}, {file_type}, {max_columns}, {min_lodf}, {number_format}, {decimal_points}, {inc}, "{filename}", {isl});'
-        return self.RunScriptCommand(cmd)
+        return self._run_script("CalculateLODFAdvanced", ips, file_type, max_columns, min_lodf, number_format, decimal_points, inc, f'"{filename}"', isl)
 
     def CalculateLODFScreening(self, filter_process: str, filter_monitor: str, include_phase_shifters: bool, include_open_lines: bool, use_lodf_threshold: bool, lodf_threshold: float, use_overload_threshold: bool, overload_low: float, overload_high: float, do_save_file: bool, file_location: str, custom_high_lodf: int = 0, custom_high_lodf_line: int = 0, custom_high_overload: int = 0, custom_high_overload_line: int = 0, do_use_ctg_name: bool = False, custom_orig_ctg_name: int = 0):
         """Performs LODF Screening calculation to identify critical outages and overloads.
@@ -194,9 +192,7 @@ class SensitivityMixin:
         uot = YesNo.from_bool(use_overload_threshold)
         dsf = YesNo.from_bool(do_save_file)
         duc = YesNo.from_bool(do_use_ctg_name)
-        args = pack_args(filter_process, filter_monitor, ips, iol, ult, lodf_threshold, uot, overload_low, overload_high, dsf, f'"{file_location}"', custom_high_lodf, custom_high_lodf_line, custom_high_overload, custom_high_overload_line, duc, custom_orig_ctg_name)
-        cmd = f"CalculateLODFScreening({args});"
-        return self.RunScriptCommand(cmd)
+        return self._run_script("CalculateLODFScreening", filter_process, filter_monitor, ips, iol, ult, lodf_threshold, uot, overload_low, overload_high, dsf, f'"{file_location}"', custom_high_lodf, custom_high_lodf_line, custom_high_overload, custom_high_overload_line, duc, custom_orig_ctg_name)
 
     def CalculateShiftFactors(self, flow_element: str, direction: str, transactor: str, method: Union[LinearMethod, str] = LinearMethod.DC):
         """Calculates Shift Factor Sensitivity values (formerly known as TLRs).
@@ -226,9 +222,7 @@ class SensitivityMixin:
             If the SimAuto call fails.
         """
         m = method.value if isinstance(method, LinearMethod) else method
-        return self.RunScriptCommand(
-            f'CalculateShiftFactors({flow_element}, {direction}, {transactor}, {m});'
-        )
+        return self._run_script("CalculateShiftFactors", flow_element, direction, transactor, m)
 
     def CalculateShiftFactorsMultipleElement(self, type_element: str, which_element: str, direction: str, transactor: str, method: Union[LinearMethod, str] = LinearMethod.DC):
         """Calculates Shift Factor Sensitivity values for multiple elements.
@@ -260,7 +254,7 @@ class SensitivityMixin:
             If the SimAuto call fails.
         """
         m = method.value if isinstance(method, LinearMethod) else method
-        return self.RunScriptCommand(f'CalculateShiftFactorsMultipleElement({type_element}, {which_element}, {direction}, {transactor}, {m});')
+        return self._run_script("CalculateShiftFactorsMultipleElement", type_element, which_element, direction, transactor, m)
 
     def CalculateLODFMatrix(
         self,
@@ -307,9 +301,7 @@ class SensitivityMixin:
         mon_closed = YesNo.from_bool(monitor_only_closed)
         post_lcdf = YesNo.from_bool(post_closure_lcdf)
         m = linear_method.value if isinstance(linear_method, LinearMethod) else linear_method
-        args = pack_args(which_ones, filter_process, filter_monitor, mon_closed, m, filter_monitor_interface, post_lcdf)
-        cmd = f"CalculateLODFMatrix({args});"
-        return self.RunScriptCommand(cmd)
+        return self._run_script("CalculateLODFMatrix", which_ones, filter_process, filter_monitor, mon_closed, m, filter_monitor_interface, post_lcdf)
 
     def CalculateVoltToTransferSense(
         self, seller: str, buyer: str, transfer_type: str = "P", turn_off_avr: bool = False
@@ -341,8 +333,7 @@ class SensitivityMixin:
             If the SimAuto call fails.
         """
         avr = YesNo.from_bool(turn_off_avr)
-        args = pack_args(seller, buyer, transfer_type, avr)
-        return self.RunScriptCommand(f"CalculateVoltToTransferSense({args});")
+        return self._run_script("CalculateVoltToTransferSense", seller, buyer, transfer_type, avr)
 
     def CalculateLossSense(self, function_type: str, area_ref: str = "NO", island_ref: Union[IslandReference, str] = IslandReference.EXISTING):
         """Calculates loss sensitivity at each bus.
@@ -368,7 +359,7 @@ class SensitivityMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        return self.RunScriptCommand(f'CalculateLossSense({function_type}, {area_ref}, {island_ref});')
+        return self._run_script("CalculateLossSense", function_type, area_ref, island_ref)
 
     def LineLoadingReplicatorCalculate(self, flow_element: str, injection_group: str, agc_only: bool, desired_flow: float, implement: bool, linear_method: Union[LinearMethod, str] = LinearMethod.DC, use_load_min_max: bool = True, max_mult: float = 1.0, min_mult: float = 1.0):
         """Calculates injection changes required to alter a line flow to a desired value.
@@ -410,9 +401,7 @@ class SensitivityMixin:
         imp = YesNo.from_bool(implement)
         ulmm = YesNo.from_bool(use_load_min_max)
         m = linear_method.value if isinstance(linear_method, LinearMethod) else linear_method
-        args = pack_args(flow_element, injection_group, agc, desired_flow, imp, m, ulmm, max_mult, min_mult)
-        cmd = f"LineLoadingReplicatorCalculate({args});"
-        return self.RunScriptCommand(cmd)
+        return self._run_script("LineLoadingReplicatorCalculate", flow_element, injection_group, agc, desired_flow, imp, m, ulmm, max_mult, min_mult)
 
     def LineLoadingReplicatorImplement(self):
         """Applies the changes calculated by the Line Loading Replicator.
@@ -429,7 +418,7 @@ class SensitivityMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        return self.RunScriptCommand("LineLoadingReplicatorImplement;")
+        return self._run_script("LineLoadingReplicatorImplement")
 
     def CalculateTapSense(self, filter_name: str = ""):
         """Forces voltage to tap sensitivity calculation.
@@ -450,7 +439,7 @@ class SensitivityMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        return self.RunScriptCommand(f'CalculateTapSense("{filter_name}");')
+        return self._run_script("CalculateTapSense", f'"{filter_name}"')
 
     def CalculateVoltSelfSense(self, filter_name: str = ""):
         """Calculates the sensitivity of a bus's voltage to injections at the same bus.
@@ -469,7 +458,7 @@ class SensitivityMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        return self.RunScriptCommand(f'CalculateVoltSelfSense("{filter_name}");')
+        return self._run_script("CalculateVoltSelfSense", f'"{filter_name}"')
 
     def CalculateVoltSense(self, bus_num: int):
         """Calculates the sensitivity of a bus's voltage to injections at all buses.
@@ -489,7 +478,7 @@ class SensitivityMixin:
             If the SimAuto call fails.
         """
         bus_str = create_object_string("Bus", bus_num)
-        return self.RunScriptCommand(f'CalculateVoltSense({bus_str});')
+        return self._run_script("CalculateVoltSense", bus_str)
 
     def SetSensitivitiesAtOutOfServiceToClosest(self, filter_name: str = "", branch_dist_meas: str = ""):
         """Populates sensitivity values at out-of-service buses by interpolating from the closest in-service buses.
@@ -511,7 +500,7 @@ class SensitivityMixin:
             If the SimAuto call fails.
         """
         filt = f'"{filter_name}"' if filter_name else ""
-        return self.RunScriptCommand(f'SetSensitivitiesAtOutOfServiceToClosest({filt}, {branch_dist_meas});')
+        return self._run_script("SetSensitivitiesAtOutOfServiceToClosest", filt, branch_dist_meas)
 
     def CalculatePTDFMultipleDirections(self, store_branches: bool = True, store_interfaces: bool = True, method: Union[LinearMethod, str] = LinearMethod.DC):
         """Calculates PTDF values between all directions specified in the case.
@@ -538,4 +527,4 @@ class SensitivityMixin:
         sb = YesNo.from_bool(store_branches)
         si = YesNo.from_bool(store_interfaces)
         m = method.value if isinstance(method, LinearMethod) else method
-        return self.RunScriptCommand(f'CalculatePTDFMultipleDirections({sb}, {si}, {m});')
+        return self._run_script("CalculatePTDFMultipleDirections", sb, si, m)

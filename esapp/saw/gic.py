@@ -2,13 +2,12 @@
 from typing import List
 
 from ._enums import YesNo
-from ._helpers import pack_args
 
 
 class GICMixin:
     """Mixin for GIC analysis functions."""
 
-    def CalculateGIC(self, max_field: float, direction: float, solve_pf: bool = True):
+    def GICCalculate(self, max_field: float, direction: float, solve_pf: bool = True):
         """Calculates the 'Single Snapshot' GIC solution for a uniform electric field.
 
         This method computes Geomagnetically Induced Currents (GIC) based on a
@@ -34,19 +33,18 @@ class GICMixin:
             If the SimAuto call fails (e.g., GIC not enabled, invalid parameters).
         """
         spf = YesNo.from_bool(solve_pf)
-        args = pack_args(max_field, direction, spf)
-        return self.RunScriptCommand(f"GICCalculate({args});")
+        return self._run_script("GICCalculate", max_field, direction, spf)
 
-    def ClearGIC(self):
+    def GICClear(self):
         """Clears GIC (Geomagnetically Induced Current) values from the case.
 
-        This is a wrapper for the `GICClear` script command.
+        This is a wrapper for the ``GICClear`` script command.
 
         Returns
         -------
         None
         """
-        return self.RunScriptCommand("GICClear;")
+        return self._run_script("GICClear")
 
     def GICLoad3DEfield(self, file_type: str, filename: str, setup_on_load: bool = True):
         """Loads GIC data, including time-varying electric fields, from a specified file.
@@ -71,8 +69,7 @@ class GICMixin:
             If the SimAuto call fails (e.g., file not found, invalid format).
         """
         sol = YesNo.from_bool(setup_on_load)
-        args = pack_args(file_type, f'"{filename}"', sol)
-        return self.RunScriptCommand(f"GICLoad3DEfield({args});")
+        return self._run_script("GICLoad3DEfield", file_type, f'"{filename}"', sol)
 
     def GICReadFilePSLF(self, filename: str):
         """Reads GIC supplemental data from a GMD text file format.
@@ -91,7 +88,7 @@ class GICMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        return self.RunScriptCommand(f'GICReadFilePSLF("{filename}");')
+        return self._run_script("GICReadFilePSLF", f'"{filename}"')
 
     def GICReadFilePTI(self, filename: str):
         """Reads GIC supplemental data from a GIC text file format.
@@ -110,7 +107,7 @@ class GICMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        return self.RunScriptCommand(f'GICReadFilePTI("{filename}");')
+        return self._run_script("GICReadFilePTI", f'"{filename}"')
 
     def GICSaveGMatrix(self, gmatrix_filename: str, gmatrix_id_filename: str):
         """Saves the GMatrix used with the GIC calculations in a file formatted for use with Matlab.
@@ -134,8 +131,7 @@ class GICMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        args = pack_args(f'"{gmatrix_filename}"', f'"{gmatrix_id_filename}"')
-        return self.RunScriptCommand(f"GICSaveGMatrix({args});")
+        return self._run_script("GICSaveGMatrix", f'"{gmatrix_filename}"', f'"{gmatrix_id_filename}"')
 
     def GICSetupTimeVaryingSeries(self, start: float = 0.0, end: float = 0.0, delta: float = 0.0):
         """Creates a set of Branch series DC input voltages for time-varying GIC analysis.
@@ -161,8 +157,7 @@ class GICMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        args = pack_args(start, end, delta)
-        return self.RunScriptCommand(f"GICSetupTimeVaryingSeries({args});")
+        return self._run_script("GICSetupTimeVaryingSeries", start, end, delta)
 
     def GICShiftOrStretchInputPoints(
         self,
@@ -201,8 +196,7 @@ class GICMixin:
             If the SimAuto call fails.
         """
         update = YesNo.from_bool(update_time_varying_series)
-        args = pack_args(lat_shift, lon_shift, mag_scalar, stretch_scalar, update)
-        return self.RunScriptCommand(f"GICShiftOrStretchInputPoints({args});")
+        return self._run_script("GICShiftOrStretchInputPoints", lat_shift, lon_shift, mag_scalar, stretch_scalar, update)
 
     def GICTimeVaryingCalculate(self, the_time: float, solve_pf: bool = True):
         """Calculates GIC values using the 'Time-Varying Series Voltage Inputs' calculation mode.
@@ -228,8 +222,7 @@ class GICMixin:
             If the SimAuto call fails.
         """
         spf = YesNo.from_bool(solve_pf)
-        args = pack_args(the_time, spf)
-        return self.RunScriptCommand(f"GICTimeVaryingCalculate({args});")
+        return self._run_script("GICTimeVaryingCalculate", the_time, spf)
 
     def GICTimeVaryingAddTime(self, new_time: float):
         """Adds a new time point to the time-varying voltage input series.
@@ -248,7 +241,7 @@ class GICMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        return self.RunScriptCommand(f"GICTimeVaryingAddTime({new_time});")
+        return self._run_script("GICTimeVaryingAddTime", new_time)
 
     def GICTimeVaryingDeleteAllTimes(self):
         """Deletes all input time-varying voltage input values.
@@ -262,7 +255,7 @@ class GICMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        return self.RunScriptCommand("GICTimeVaryingDeleteAllTimes;")
+        return self._run_script("GICTimeVaryingDeleteAllTimes")
 
     def GICTimeVaryingEFieldCalculate(self, the_time: float, solve_pf: bool = True):
         """Calculates GIC Values using the 'Time-Varying Electric Field Inputs' calculation mode.
@@ -285,8 +278,7 @@ class GICMixin:
             If the SimAuto call fails.
         """
         spf = YesNo.from_bool(solve_pf)
-        args = pack_args(the_time, spf)
-        return self.RunScriptCommand(f"GICTimeVaryingEFieldCalculate({args});")
+        return self._run_script("GICTimeVaryingEFieldCalculate", the_time, spf)
 
     def GICTimeVaryingElectricFieldsDeleteAllTimes(self):
         """Clears all time-varying electric field input values.
@@ -300,7 +292,7 @@ class GICMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        return self.RunScriptCommand("GICTimeVaryingElectricFieldsDeleteAllTimes;")
+        return self._run_script("GICTimeVaryingElectricFieldsDeleteAllTimes")
 
     def GICWriteFilePSLF(self, filename: str, use_filters: bool = False):
         """Writes GIC supplemental data to a GMD text file format (PSLF).
@@ -322,8 +314,7 @@ class GICMixin:
             If the SimAuto call fails.
         """
         uf = YesNo.from_bool(use_filters)
-        args = pack_args(f'"{filename}"', uf)
-        return self.RunScriptCommand(f"GICWriteFilePSLF({args});")
+        return self._run_script("GICWriteFilePSLF", f'"{filename}"', uf)
 
     def GICWriteFilePTI(self, filename: str, use_filters: bool = False, version: int = 4):
         """Writes GIC supplemental data to a GIC text file format (PTI).
@@ -347,8 +338,7 @@ class GICMixin:
             If the SimAuto call fails.
         """
         uf = YesNo.from_bool(use_filters)
-        args = pack_args(f'"{filename}"', uf, version)
-        return self.RunScriptCommand(f"GICWriteFilePTI({args});")
+        return self._run_script("GICWriteFilePTI", f'"{filename}"', uf, version)
 
     def GICWriteOptions(self, filename: str, key_field: str = "PRIMARY"):
         """Writes the current GIC solution options to an auxiliary file.
@@ -370,5 +360,4 @@ class GICMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        args = pack_args(f'"{filename}"', key_field)
-        return self.RunScriptCommand(f"GICWriteOptions({args});")
+        return self._run_script("GICWriteOptions", f'"{filename}"', key_field)

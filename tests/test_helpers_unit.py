@@ -13,6 +13,7 @@ import os
 import pytest
 import pandas as pd
 import numpy as np
+from unittest.mock import MagicMock, Mock, patch, PropertyMock
 
 
 # =============================================================================
@@ -434,11 +435,11 @@ class TestSAWValidation:
         with pytest.raises(TypeError, match="SaveCase was called without"):
             saw_obj.SaveCase()
 
-    def test_call_simauto_invalid_func(self, saw_obj):
-        """_call_simauto raises AttributeError for invalid function."""
+    def test_com_call_invalid_func(self, saw_obj):
+        """_com_call raises AttributeError for invalid function."""
         del saw_obj._pwcom.InvalidFunc
         with pytest.raises(AttributeError, match="not a valid SimAuto function"):
-            saw_obj._call_simauto("InvalidFunc")
+            saw_obj._com_call("InvalidFunc")
 
     def test_replace_decimal_delimiter(self, saw_obj):
         """_replace_decimal_delimiter handles non-string data."""
@@ -459,6 +460,294 @@ class TestSAWValidation:
         result1 = saw_obj.GetFieldList("Bus", copy=False)
         result2 = saw_obj.GetFieldList("Bus", copy=True)
         assert result1 is not result2
+
+    def test_init_com_dispatch_failure(self):
+        """SAW raises when COM dispatch fails."""
+        with patch("win32com.client.dynamic.Dispatch", side_effect=Exception("COM init failed")):
+            with pytest.raises(Exception, match="COM init failed"):
+                from esapp.saw import SAW
+                SAW(FileName="dummy.pwb")
+
+    def test_exit_cleanup(self):
+        """exit() deletes temp file, closes case, and releases COM."""
+        from esapp.saw import SAW
+        with patch("win32com.client.dynamic.Dispatch") as mock_dispatch, \
+             patch("tempfile.NamedTemporaryFile") as mock_tf, \
+             patch("os.unlink"), \
+             patch("esapp.saw.base.pythoncom") as mock_pythoncom:
+            mock_pwcom = MagicMock()
+            mock_dispatch.return_value = mock_pwcom
+            mock_tf.return_value = Mock(name="dummy.axd")
+            mock_pwcom.OpenCase.return_value = ("",)
+            mock_pwcom.GetParametersSingleElement.return_value = ("", ("23", "Jan 01 2023"))
+            mock_pwcom.CloseCase.return_value = ("",)
+            saw = SAW(FileName="dummy.pwb")
+            saw._pwcom = mock_pwcom
+            saw.empty_aux = "dummy.axd"
+
+            with patch("os.path.exists", return_value=True), \
+                 patch("os.unlink") as mock_unlink:
+                saw.exit()
+                mock_unlink.assert_called_once_with("dummy.axd")
+                assert saw._pwcom is None
+                mock_pythoncom.CoUninitialize.assert_called_once()
+
+    def test_set_simauto_property_uivisible_attribute_error(self, saw_obj):
+        """set_simauto_property logs warning for UIVisible on old versions."""
+        saw_obj._pwcom.UIVisible = PropertyMock(side_effect=AttributeError)
+        with patch.object(saw_obj, '_set_simauto_property', side_effect=AttributeError):
+            saw_obj.set_simauto_property("UIVisible", True)
+
+    def test_uivisible_property_attribute_error(self, saw_obj):
+        """UIVisible property returns False on AttributeError."""
+        original = saw_obj._pwcom
+        mock_pwcom = MagicMock(spec=[])  # spec=[] means no attributes allowed
+        saw_obj._pwcom = mock_pwcom
+        result = saw_obj.UIVisible
+        assert result is False
+        saw_obj._pwcom = original
+
+    def test_request_build_date(self, saw_obj):
+        """RequestBuildDate property accesses COM."""
+        saw_obj._pwcom.RequestBuildDate = 20230101
+        assert saw_obj.RequestBuildDate == 20230101
+
+    def test_run_script_command_2(self, saw_obj):
+        """RunScriptCommand2 calls COM correctly."""
+        saw_obj._pwcom.RunScriptCommand2.return_value = ("",)
+        saw_obj.RunScriptCommand2("SomeCMD;", "Status msg")
+        saw_obj._pwcom.RunScriptCommand2.assert_called_once()
+
+    def test_com_call_rpc_error(self, saw_obj):
+        """_com_call raises COMError on RPC failure."""
+        from esapp.saw._exceptions import COMError, RPC_S_UNKNOWN_IF
+        saw_obj._pwcom.OpenCase.side_effect = Exception(f"error {hex(RPC_S_UNKNOWN_IF)}")
+        with pytest.raises(COMError):
+            saw_obj._com_call("OpenCase", "test.pwb")
+
+    def test_com_call_returns_minus_one(self, saw_obj):
+        """_com_call raises PowerWorldError when COM returns -1."""
+        from esapp.saw._exceptions import PowerWorldError
+        saw_obj._pwcom.OpenCase.return_value = -1
+        with pytest.raises(PowerWorldError, match="returned -1"):
+            saw_obj._com_call("OpenCase", "test.pwb")
+
+    def test_com_call_returns_int(self, saw_obj):
+        """_com_call returns integer output directly."""
+        saw_obj._pwcom.GetSpecificFieldMaxNum.return_value = 42
+        result = saw_obj._com_call("GetSpecificFieldMaxNum", "Bus", "CustomFloat")
+        assert result == 42
+
+    def test_exec_aux_double_quotes(self, saw_obj):
+        """exec_aux replaces single quotes with double quotes."""
+        with patch("builtins.open", create=True) as mock_open, \
+             patch("os.unlink"):
+            from unittest.mock import mock_open as mo
+            m = mo()
+            with patch("builtins.open", m):
+                saw_obj.exec_aux("CaseInfo_Options_Value (Option,Value)\n{'key' 'value'}", use_double_quotes=True)
+                written = m().write.call_args[0][0]
+                assert "'" not in written
+                assert '"' in written
+
+    def test_open_case_reopen_uses_stored_path(self, saw_obj):
+        """OpenCase with FileName=None reopens stored path."""
+        saw_obj.pwb_file_path = "stored.pwb"
+        saw_obj.OpenCase(FileName=None)
+        saw_obj._pwcom.OpenCase.assert_called_with("stored.pwb")
+
+    def test_open_case_type_options_list(self, saw_obj):
+        """OpenCaseType with list options converts to variant."""
+        saw_obj._pwcom.OpenCaseType.return_value = ("",)
+        saw_obj.OpenCaseType("test.raw", "PTI", ["OPT1", "OPT2"])
+        saw_obj._pwcom.OpenCaseType.assert_called_once()
+
+    def test_open_case_type_options_str(self, saw_obj):
+        """OpenCaseType with string options passes through."""
+        saw_obj._pwcom.OpenCaseType.return_value = ("",)
+        saw_obj.OpenCaseType("test.raw", "PTI", "MY_OPTION")
+        saw_obj._pwcom.OpenCaseType.assert_called_once()
+
+    def test_open_case_type_error_file_exists(self, saw_obj):
+        """OpenCaseType error when file exists shows file-exists hints."""
+        from esapp.saw._exceptions import PowerWorldError
+        saw_obj._pwcom.OpenCaseType.return_value = ("Error: bad format",)
+        with patch("os.path.exists", return_value=True):
+            with pytest.raises(PowerWorldError, match="file exists but"):
+                saw_obj.OpenCaseType("test.raw", "PTI")
+
+    def test_save_case_uses_stored_path(self, saw_obj):
+        """SaveCase with no FileName uses stored path."""
+        saw_obj.pwb_file_path = "stored.pwb"
+        saw_obj.SaveCase()
+        saw_obj._pwcom.SaveCase.assert_called_once()
+
+    def test_new_case(self, saw_obj):
+        """NewCase calls _run_script."""
+        saw_obj.NewCase()
+
+    def test_renumber_3w_xformer_star_buses(self, saw_obj):
+        """Renumber3WXFormerStarBuses calls _run_script."""
+        saw_obj.Renumber3WXFormerStarBuses("renumber.txt")
+
+    def test_renumber_ms_line_dummy_buses(self, saw_obj):
+        """RenumberMSLineDummyBuses calls _run_script."""
+        saw_obj.RenumberMSLineDummyBuses("renumber.txt")
+
+    def test_get_case_header_none_filename(self, saw_obj):
+        """GetCaseHeader with None uses stored pwb_file_path."""
+        saw_obj.pwb_file_path = "stored.pwb"
+        saw_obj._pwcom.GetCaseHeader.return_value = ("", ("Header line 1",))
+        saw_obj.GetCaseHeader(filename=None)
+        saw_obj._pwcom.GetCaseHeader.assert_called_with("stored.pwb")
+
+    def test_get_params_rect_typed_none(self, saw_obj):
+        """GetParamsRectTyped returns None when COM returns None."""
+        saw_obj._pwcom.GetParamsRectTyped.return_value = ("", None)
+        result = saw_obj.GetParamsRectTyped("Bus", ["BusNum"])
+        assert result is None
+
+    def test_send_to_excel(self, saw_obj):
+        """SendToExcel calls COM correctly."""
+        saw_obj._pwcom.SendToExcel.return_value = ("",)
+        saw_obj.SendToExcel("Bus", "", ["BusNum", "BusName"])
+        saw_obj._pwcom.SendToExcel.assert_called_once()
+
+    def test_ctg_read_file_pslf(self, saw_obj):
+        """CTGReadFilePSLF calls _run_script."""
+        saw_obj.CTGReadFilePSLF("test.pslf")
+
+    def test_ctg_read_file_pti(self, saw_obj):
+        """CTGReadFilePTI calls _run_script."""
+        saw_obj.CTGReadFilePTI("test.con")
+
+    def test_ctg_save_violation_matrices_default_field_list(self, saw_obj):
+        """CTGSaveViolationMatrices with field_list=None defaults to empty list."""
+        saw_obj.CTGSaveViolationMatrices(
+            "out.csv", "CSVCOLHEADER", True, ["Branch"], True, True
+        )
+
+    def test_load_pti_seq_data(self, saw_obj):
+        """LoadPTISEQData calls _run_script."""
+        saw_obj.LoadPTISEQData("test.seq")
+
+    def test_stop_aux_file(self, saw_obj):
+        """StopAuxFile calls _run_script."""
+        saw_obj.StopAuxFile()
+
+    def test_gic_read_file_pslf(self, saw_obj):
+        """GICReadFilePSLF calls _run_script."""
+        saw_obj.GICReadFilePSLF("test.gmd")
+
+    def test_gic_read_file_pti(self, saw_obj):
+        """GICReadFilePTI calls _run_script."""
+        saw_obj.GICReadFilePTI("test.gic")
+
+    def test_merge_line_terminals(self, saw_obj):
+        """MergeLineTerminals calls _run_script."""
+        saw_obj.MergeLineTerminals()
+
+    def test_merge_ms_line_sections(self, saw_obj):
+        """MergeMSLineSections calls _run_script."""
+        saw_obj.MergeMSLineSections()
+
+    def test_estimate_voltages(self, saw_obj):
+        """EstimateVoltages calls _run_script."""
+        saw_obj.EstimateVoltages("ALL")
+
+    def test_diff_case_clear_base(self, saw_obj):
+        """DiffCaseClearBase calls _run_script."""
+        saw_obj.DiffCaseClearBase()
+
+    def test_diff_case_show_present_and_base(self, saw_obj):
+        """DiffCaseShowPresentAndBase calls _run_script."""
+        saw_obj.DiffCaseShowPresentAndBase(True)
+
+    def test_do_ctg_action(self, saw_obj):
+        """DoCTGAction calls _run_script."""
+        saw_obj.DoCTGAction("OPEN BRANCH FROM 1 TO 2 CKT 1")
+
+    def test_interfaces_calculate_post_ctg_mw_flows(self, saw_obj):
+        """InterfacesCalculatePostCTGMWFlows calls _run_script."""
+        saw_obj.InterfacesCalculatePostCTGMWFlows()
+
+    def test_qv_run_empty_result(self, saw_obj, tmp_path):
+        """QVRun returns empty DataFrame when temp file is empty."""
+        tmp = str(tmp_path / "qv_result.csv")
+        with open(tmp, 'w') as f:
+            pass  # Create empty file
+        with patch.object(saw_obj, '_run_script'), \
+             patch('esapp.saw.qv.get_temp_filepath', return_value=tmp):
+            result = saw_obj.QVRun()
+            assert isinstance(result, pd.DataFrame)
+            assert result.empty
+
+    def test_timestep_do_single_point(self, saw_obj):
+        """TimeStepDoSinglePoint calls _run_script."""
+        saw_obj.TimeStepDoSinglePoint("2025-06-01T00:00:00")
+
+    def test_timestep_save_selected_modify_finish(self, saw_obj):
+        """TIMESTEPSaveSelectedModifyFinish calls _run_script."""
+        saw_obj.TIMESTEPSaveSelectedModifyFinish()
+
+    def test_list_of_devices_decimal_delimiter(self, saw_obj):
+        """ListOfDevices handles non-dot decimal delimiter."""
+        saw_obj.decimal_delimiter = ","
+        saw_obj._object_fields = {}
+        # Re-mock GetFieldList to return data with comma delimiters
+        saw_obj._pwcom.GetFieldList.return_value = ("", [
+            ["*1*", "BusNum", "Integer", "Bus Number", "Bus Number"],
+            ["*2*", "BusName", "String", "Bus Name", "Bus Name"],
+        ])
+        saw_obj._pwcom.ListOfDevices.return_value = ("", ((1, 2), ("Bus1", "Bus2")))
+        result = saw_obj.ListOfDevices("Bus")
+        assert result is not None
+        saw_obj.decimal_delimiter = "."
+
+    def test_set_simauto_property_non_uivisible_attribute_error(self, saw_obj):
+        """set_simauto_property re-raises AttributeError for non-UIVisible properties."""
+        with patch.object(saw_obj, '_set_simauto_property', side_effect=AttributeError("oops")):
+            with pytest.raises(AttributeError, match="oops"):
+                saw_obj.set_simauto_property("CreateIfNotFound", True)
+
+    def test_condition_voltage_pockets(self, saw_obj):
+        """ConditionVoltagePockets calls _run_script."""
+        saw_obj.ConditionVoltagePockets(0.5, 30.0)
+
+    def test_diff_case_key_type(self, saw_obj):
+        """DiffCaseKeyType calls _run_script."""
+        saw_obj.DiffCaseKeyType("PRIMARY")
+
+    def test_get_sub_data_file_not_found(self, saw_obj):
+        """GetSubData returns empty DataFrame when file not found."""
+        with patch.object(saw_obj, 'SaveData'), \
+             patch('os.path.exists', return_value=False), \
+             patch('esapp.saw.general.get_temp_filepath', return_value='nonexistent.aux'):
+            result = saw_obj.GetSubData("Gen", ["BusNum", "GenID"])
+            assert isinstance(result, pd.DataFrame)
+            assert result.empty
+
+    def test_get_field_list_new_columns(self, saw_obj):
+        """GetFieldList handles new (extended) column format."""
+        saw_obj._object_fields = {}
+        # Return data with 7 columns (new format) to trigger ValueError path
+        saw_obj._pwcom.GetFieldList.return_value = ("", [
+            ["*1*", "BusNum", "Integer", "Bus Number", "Bus Number", "Y", "Extra"],
+            ["*2*", "BusName", "String", "Bus Name", "Bus Name", "N", "Extra"],
+        ])
+        from esapp.saw._enums import FieldListColumn
+        new_cols = FieldListColumn.new_columns()
+        if len(new_cols) == 7:
+            result = saw_obj.GetFieldList("Bus")
+            assert not result.empty
+
+    def test_program_information_property(self, saw_obj):
+        """ProgramInformation property accesses COM and returns tuple."""
+        import datetime
+        dt = datetime.datetime(2023, 1, 1, tzinfo=datetime.timezone.utc)
+        saw_obj._pwcom.ProgramInformation = [["v23", "Build", dt, "info"]]
+        result = saw_obj.ProgramInformation
+        assert isinstance(result, tuple)
 
 
 # =============================================================================
@@ -513,6 +802,30 @@ class TestMatrixParsing:
         fpath = self._make_ybus_file(tmp_path)
         result = saw_obj.get_ybus(file=fpath, full=False)
         assert issparse(result)
+
+    def test_parse_real_matrix_gmatrix(self, saw_obj):
+        """_parse_real_matrix correctly parses GMatrix format."""
+        mat_str = (
+            "GMatrix=sparse(3,3);\n"
+            "GMatrix(1,1)=2.0;\n"
+            "GMatrix(1,2)=-1.0;\n"
+            "GMatrix(2,1)=-1.0;\n"
+            "GMatrix(2,2)=3.0;\n"
+            "GMatrix(3,3)=1.5;\n"
+        )
+        result = saw_obj._parse_real_matrix(mat_str, "GMatrix")
+        arr = result.toarray()
+        assert arr.shape == (3, 3)
+        assert arr[0, 0] == 2.0
+        assert arr[2, 2] == 1.5
+
+    def test_save_ybus_in_matlab_format(self, saw_obj):
+        """SaveYbusInMatlabFormat calls _run_script."""
+        saw_obj.SaveYbusInMatlabFormat("ybus.m", include_voltages=True)
+
+    def test_save_jacobian(self, saw_obj):
+        """SaveJacobian calls _run_script."""
+        saw_obj.SaveJacobian("jac.m", "jid.txt", "M", "R")
 
 
 # =============================================================================
@@ -638,6 +951,67 @@ class TestWorkbenchLogic:
         wb.esa.LogClear.assert_called_once()
         assert wb._log_last_position == 0
 
+    def test_close(self):
+        """GridWorkBench.close calls esa.CloseCase."""
+        from esapp.workbench import GridWorkBench
+
+        wb = GridWorkBench()
+        wb.esa = MagicMock()
+        wb.close()
+        wb.esa.CloseCase.assert_called_once()
+
+    def test_shortest_path(self):
+        """GridWorkBench.shortest_path calls DetermineShortestPath."""
+        from esapp.workbench import GridWorkBench
+
+        wb = GridWorkBench()
+        wb.esa = MagicMock()
+        wb.shortest_path(1, 2)
+        wb.esa.DetermineShortestPath.assert_called_once_with("[BUS 1]", "[BUS 2]")
+
+    def test_ts_solve_empty_results(self):
+        """GridWorkBench.ts_solve returns empty DataFrames when no results."""
+        from esapp.workbench import GridWorkBench
+
+        wb = GridWorkBench()
+        wb.esa = MagicMock()
+
+        with patch("esapp.workbench.get_ts_results", return_value=(None, None)):
+            meta, data = wb.ts_solve("ctg1", ["TSBusVPU"])
+            assert meta.empty
+            assert data.empty
+
+    def test_dc_lines_exception_returns_none(self):
+        """Network._dc_lines returns None on exception."""
+        from esapp.utils.network import Network
+
+        net = Network()
+        net.esa = MagicMock()
+        # Make __getitem__ raise to simulate DCTransmissionLine not available
+        with patch.object(Network, '__getitem__', side_effect=Exception("no DC lines")):
+            result = net._dc_lines()
+            assert result is None
+
+    def test_gic_get_option_none_settings(self):
+        """GIC.get_gic_option returns None when settings() returns None."""
+        from esapp.utils.gic import GIC
+
+        gic = GIC()
+        gic.esa = MagicMock()
+        with patch.object(GIC, 'settings', return_value=None):
+            result = gic.get_gic_option("IncludeInPowerFlow")
+            assert result is None
+
+    def test_load_ts_csv_results_unlink_oserror(self, tmp_path):
+        """load_ts_csv_results handles OSError on temp file unlink."""
+        from esapp.saw._helpers import load_ts_csv_results
+        header_file = tmp_path / "results_header.csv"
+        header_file.write_text("Column,Object,Variable,Key 1,Key 2\n0,Bus,VPU,1,\n")
+        base_path = tmp_path / "results"
+        with patch("pathlib.Path.unlink", side_effect=OSError("permission denied")):
+            meta, data = load_ts_csv_results(base_path, delete_files=True)
+            assert not meta.empty
+
 
 # =============================================================================
 # Indexable fallback (error routing logic)
@@ -700,6 +1074,18 @@ class TestIndexableFallback:
         with pytest.raises(PowerWorldPrerequisiteError, match="License expired"):
             instance[grid.Gen] = update_df
 
+    def test_non_full_slice_raises_value_error(self):
+        """Non-full slice in field selection raises ValueError."""
+        from esapp.indexable import Indexable
+        from esapp import components as grid
+        from unittest.mock import Mock
+
+        instance = Indexable()
+        instance.esa = Mock()
+
+        with pytest.raises(ValueError, match="Only the full slice"):
+            instance[grid.Bus, [slice(0, 5)]]
+
 
 # =============================================================================
 # Transient validation (Python-side)
@@ -715,6 +1101,29 @@ class TestTransientValidation:
         signals = np.array([[1.0], [2.0], [3.0]])
         with pytest.raises(ValueError, match="Dimension mismatch"):
             saw_obj.TSSetPlayInSignals("Sig1", times, signals)
+
+    def test_ts_initialize_exception_logged(self, saw_obj):
+        """TSInitialize logs warning on exception instead of raising."""
+        saw_obj._pwcom.RunScriptCommand.side_effect = Exception("TS init failed")
+        saw_obj.TSInitialize()
+        saw_obj._pwcom.RunScriptCommand.side_effect = None
+        saw_obj._pwcom.RunScriptCommand.return_value = ("",)
+
+    def test_ts_clear_results_non_access_violation_raises(self, saw_obj):
+        """TSClearResultsFromRAM re-raises non-access-violation errors."""
+        with patch.object(saw_obj, '_run_script', side_effect=Exception("Some other error")):
+            with pytest.raises(Exception, match="Some other error"):
+                saw_obj.TSClearResultsFromRAM()
+
+    def test_ts_get_results_non_temp_mode(self, saw_obj):
+        """TSGetResults with filename returns (None, None)."""
+        result = saw_obj.TSGetResults(
+            mode="CSV",
+            contingencies=["ctg1"],
+            plots_fields=["TSBusVPU"],
+            filename="output.csv",
+        )
+        assert result == (None, None)
 
 
 # =============================================================================

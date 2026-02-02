@@ -3,7 +3,6 @@ import pandas as pd
 
 from ._exceptions import PowerWorldError
 from ._enums import YesNo, SolverMethod, format_filter
-from ._helpers import pack_args
 
 
 class PowerflowMixin:
@@ -38,8 +37,7 @@ class PowerflowMixin:
             If the SimAuto call fails or the power flow does not converge.
         """
         method = SolMethod.value if isinstance(SolMethod, SolverMethod) else SolMethod.upper()
-        script_command = f"SolvePowerFlow({method})"
-        return self.RunScriptCommand(script_command)
+        return self._run_script("SolvePowerFlow", method)
 
     def ClearPowerFlowSolutionAidValues(self):
         """Clears internal power flow solution aid values.
@@ -57,18 +55,18 @@ class PowerflowMixin:
         a solution is attempted. Call this command to clear all internally stored
         information so PowerWorld does not perform these pre-processing steps.
         """
-        self.RunScriptCommand("ClearPowerFlowSolutionAidValues;")
+        self._run_script("ClearPowerFlowSolutionAidValues")
 
     def ResetToFlatStart(self):
         """Resets all bus voltages to 1.0 per unit and angles to 0.
 
         This is a wrapper for the ``ResetToFlatStart`` script command.
         """
-        self.RunScriptCommand("ResetToFlatStart();")
+        self._run_script("ResetToFlatStart")
 
     def SetMVATolerance(self, tol: float = 0.1) -> None:
         """Sets the MVA Tolerance for Newton-Raphson convergence.
-        
+
         Parameters
         ----------
         tol : float, optional
@@ -78,7 +76,7 @@ class PowerflowMixin:
 
     def SetDoOneIteration(self, enable: bool = True) -> None:
         """Sets the 'Do One Iteration' power flow option.
-        
+
         Parameters
         ----------
         enable : bool, optional
@@ -89,7 +87,7 @@ class PowerflowMixin:
 
     def SetInnerLoopCheckMVars(self, enable: bool = True) -> None:
         """Sets the 'Check Mvar Limits Immediately' power flow option.
-        
+
         Parameters
         ----------
         enable : bool, optional
@@ -101,7 +99,7 @@ class PowerflowMixin:
 
     def GetMinPUVoltage(self) -> float:
         """Gets the minimum per-unit voltage magnitude in the case.
-        
+
         Returns
         -------
         float
@@ -119,7 +117,7 @@ class PowerflowMixin:
         it convenient to update this information without requiring a power flow
         solution.
         """
-        return self.RunScriptCommand("UpdateIslandsAndBusStatus;")
+        return self._run_script("UpdateIslandsAndBusStatus")
 
     def ZeroOutMismatches(self, object_type: str = "BUSSHUNT"):
         """Forces mismatches to zero by changing bus shunts or loads.
@@ -136,7 +134,7 @@ class PowerflowMixin:
             - ``BUSSHUNT``: Adjust Bus Shunt fields at each bus (default)
             - ``LOAD``: Add a new load at each bus with mismatch (ID starting with Q1)
         """
-        return self.RunScriptCommand(f"ZeroOutMismatches({object_type});")
+        return self._run_script("ZeroOutMismatches", object_type)
 
     def ConditionVoltagePockets(self, voltage_threshold: float, angle_threshold: float, filter_name: str = "ALL"):
         """Finds pockets of buses with bad initial voltage estimates and conditions them.
@@ -159,8 +157,7 @@ class PowerflowMixin:
             Filter specifying which branches to check. Defaults to "ALL".
         """
         filt = format_filter(filter_name)
-        args = pack_args(voltage_threshold, angle_threshold, filt)
-        return self.RunScriptCommand(f"ConditionVoltagePockets({args});")
+        return self._run_script("ConditionVoltagePockets", voltage_threshold, angle_threshold, filt)
 
     def EstimateVoltages(self, filter_name: str):
         """Estimates voltages and angles at buses meeting the filter.
@@ -171,7 +168,7 @@ class PowerflowMixin:
             Filter specifying which buses should have their voltages estimated.
         """
         filt = format_filter(filter_name)
-        return self.RunScriptCommand(f'EstimateVoltages({filt});')
+        return self._run_script("EstimateVoltages", filt)
 
     def GenForceLDC_RCC(self, filter_name: str = ""):
         """Forces generators onto line drop / reactive current compensation.
@@ -181,7 +178,7 @@ class PowerflowMixin:
         filter_name : str, optional
             Filter specifying which generators to force. Defaults to all generators.
         """
-        return self.RunScriptCommand(f'GenForceLDC_RCC("{filter_name}");')
+        return self._run_script("GenForceLDC_RCC", f'"{filter_name}"')
 
     def SaveGenLimitStatusAction(self, filename: str):
         """Saves Mvar information about generators to a text file.
@@ -191,15 +188,15 @@ class PowerflowMixin:
         filename : str
             Path to the output text file.
         """
-        return self.RunScriptCommand(f'SaveGenLimitStatusAction("{filename}");')
+        return self._run_script("SaveGenLimitStatusAction", f'"{filename}"')
 
     def DiffCaseClearBase(self):
         """Clears the base case for the difference case comparison abilities of Simulator."""
-        return self.RunScriptCommand("DiffCaseClearBase;")
+        return self._run_script("DiffCaseClearBase")
 
     def DiffCaseSetAsBase(self):
         """Sets the present case as the base case for difference case comparison."""
-        return self.RunScriptCommand("DiffCaseSetAsBase;")
+        return self._run_script("DiffCaseSetAsBase")
 
     def DiffCaseKeyType(self, key_type: str):
         """Changes the key type used when comparing fields in difference case mode.
@@ -209,12 +206,12 @@ class PowerflowMixin:
         key_type : str
             Key type to use: ``PRIMARY``, ``SECONDARY``, or ``LABEL``.
         """
-        return self.RunScriptCommand(f"DiffCaseKeyType({key_type});")
+        return self._run_script("DiffCaseKeyType", key_type)
 
     def DiffCaseShowPresentAndBase(self, show: bool):
         """Toggles 'Show Present|Base in Difference and Change Mode'."""
         yn = YesNo.from_bool(show)
-        return self.RunScriptCommand(f"DiffCaseShowPresentAndBase({yn});")
+        return self._run_script("DiffCaseShowPresentAndBase", yn)
 
     def DiffCaseMode(self, mode: str):
         """Changes the mode for difference case comparison.
@@ -224,7 +221,7 @@ class PowerflowMixin:
         mode : str
             Display mode: ``PRESENT``, ``BASE``, ``DIFFERENCE``, or ``CHANGE``.
         """
-        return self.RunScriptCommand(f"DiffCaseMode({mode});")
+        return self._run_script("DiffCaseMode", mode)
 
     def DiffCaseRefresh(self):
         """Refreshes the linking between the base case and the present case.
@@ -233,7 +230,7 @@ class PowerflowMixin:
         removed, especially if any topological differences have been made that
         affect the comparison.
         """
-        return self.RunScriptCommand("DiffCaseRefresh;")
+        return self._run_script("DiffCaseRefresh")
 
     def DiffCaseWriteCompleteModel(self, filename: str, append: bool = False, save_added: bool = True, save_removed: bool = True, save_both: bool = True, key_fields: str = "PRIMARY", export_format: str = "", use_area_zone: bool = False, use_data_maintainer: bool = False, assume_base_meet: bool = True, include_clear_pf_aids: bool = True, delete_branches_flip: bool = False):
         """Creates an auxiliary file with difference case comparison information.
@@ -280,8 +277,7 @@ class PowerflowMixin:
         icp = YesNo.from_bool(include_clear_pf_aids)
         dbf = YesNo.from_bool(delete_branches_flip)
 
-        args = pack_args(f'"{filename}"', app, sa, sr, sb, key_fields, f'"{export_format}"', uaz, udm, abm, icp, dbf)
-        return self.RunScriptCommand(f"DiffCaseWriteCompleteModel({args});")
+        return self._run_script("DiffCaseWriteCompleteModel", f'"{filename}"', app, sa, sr, sb, key_fields, f'"{export_format}"', uaz, udm, abm, icp, dbf)
 
     def DiffCaseWriteBothEPC(self, filename: str, ge_file_type: str = "GE19", use_area_zone: bool = False, base_area_zone_meet: bool = True, append: bool = False, export_format: str = "", use_data_maintainer: bool = False):
         """Saves elements that exist in both base and present cases in GE EPC format.
@@ -307,8 +303,7 @@ class PowerflowMixin:
         baz = YesNo.from_bool(base_area_zone_meet)
         app = YesNo.from_bool(append)
         udm = YesNo.from_bool(use_data_maintainer)
-        args = pack_args(f'"{filename}"', ge_file_type, uaz, baz, app, f'"{export_format}"', udm)
-        return self.RunScriptCommand(f"DiffCaseWriteBothEPC({args});")
+        return self._run_script("DiffCaseWriteBothEPC", f'"{filename}"', ge_file_type, uaz, baz, app, f'"{export_format}"', udm)
 
     def DiffCaseWriteNewEPC(self, filename: str, ge_file_type: str = "GE19", use_area_zone: bool = False, base_area_zone_meet: bool = True, append: bool = False, use_data_maintainer: bool = False):
         """Saves elements that are new (added) in GE EPC format.
@@ -332,8 +327,7 @@ class PowerflowMixin:
         baz = YesNo.from_bool(base_area_zone_meet)
         app = YesNo.from_bool(append)
         udm = YesNo.from_bool(use_data_maintainer)
-        args = pack_args(f'"{filename}"', ge_file_type, uaz, baz, app, udm)
-        return self.RunScriptCommand(f"DiffCaseWriteNewEPC({args});")
+        return self._run_script("DiffCaseWriteNewEPC", f'"{filename}"', ge_file_type, uaz, baz, app, udm)
 
     def DiffCaseWriteRemovedEPC(self, filename: str, ge_file_type: str = "GE19", use_area_zone: bool = False, base_area_zone_meet: bool = True, append: bool = False, use_data_maintainer: bool = False):
         """Saves elements that were removed in GE EPC format.
@@ -357,8 +351,7 @@ class PowerflowMixin:
         baz = YesNo.from_bool(base_area_zone_meet)
         app = YesNo.from_bool(append)
         udm = YesNo.from_bool(use_data_maintainer)
-        args = pack_args(f'"{filename}"', ge_file_type, uaz, baz, app, udm)
-        return self.RunScriptCommand(f"DiffCaseWriteRemovedEPC({args});")
+        return self._run_script("DiffCaseWriteRemovedEPC", f'"{filename}"', ge_file_type, uaz, baz, app, udm)
 
     def DoCTGAction(self, action: str):
         """Applies a contingency action without the full contingency analysis framework.
@@ -368,7 +361,7 @@ class PowerflowMixin:
         action : str
             The contingency action string to execute.
         """
-        return self.RunScriptCommand(f'DoCTGAction({action});')
+        return self._run_script("DoCTGAction", action)
 
     def InterfacesCalculatePostCTGMWFlows(self):
         """Updates Interface MW Flow fields on Contingent Interfaces.
@@ -376,7 +369,7 @@ class PowerflowMixin:
         Calculates the post-contingency MW flows for interfaces that have
         contingent elements defined.
         """
-        return self.RunScriptCommand("InterfacesCalculatePostCTGMWFlows;")
+        return self._run_script("InterfacesCalculatePostCTGMWFlows")
 
     def VoltageConditioning(self):
         """Performs voltage conditioning based on the Voltage Conditioning tool options.
@@ -384,4 +377,16 @@ class PowerflowMixin:
         Uses the configured Voltage Conditioning options to improve initial voltage
         estimates throughout the network, which can help power flow convergence.
         """
-        return self.RunScriptCommand("VoltageConditioning;")
+        return self._run_script("VoltageConditioning")
+
+    def SaveState(self) -> None:
+        """Saves the current state of the PowerWorld case.
+
+        This creates an unnamed snapshot of the case that can be restored later
+        using `LoadState`.
+        """
+        return self._com_call("SaveState")
+
+    def LoadState(self) -> None:
+        """Loads the last saved state of the PowerWorld case."""
+        return self._com_call("LoadState")

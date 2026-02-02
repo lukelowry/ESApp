@@ -7,11 +7,11 @@ import numpy as np
 from scipy.sparse import csr_matrix
 
 from ._enums import YesNo
-from ._helpers import get_temp_filepath, pack_args
+from ._helpers import get_temp_filepath
 
 
 class MatrixMixin:
-    
+
     def get_ybus(self, full: bool = False, file: Union[str, None] = None) -> Union[np.ndarray, csr_matrix]:
         """Obtain the YBus matrix from PowerWorld.
 
@@ -43,8 +43,7 @@ class MatrixMixin:
             _tempfile_path = file
         else:
             _tempfile_path = get_temp_filepath(".mat")
-            cmd = f'SaveYbusInMatlabFormat("{_tempfile_path}", NO)'
-            self.RunScriptCommand(cmd)
+            self._run_script("SaveYbusInMatlabFormat", f'"{_tempfile_path}"', "NO")
         with open(_tempfile_path, "r") as f:
             f.readline()
             mat_str = f.read()
@@ -101,9 +100,8 @@ class MatrixMixin:
         """
         g_matrix_path, id_file_path = self._make_temp_matrix_files()
         try:
-            cmd = f'GICSaveGMatrix("{g_matrix_path}","{id_file_path}");'
-            self.RunScriptCommand(cmd)
-            self.RunScriptCommand(cmd)
+            self._run_script("GICSaveGMatrix", f'"{g_matrix_path}"', f'"{id_file_path}"')
+            self._run_script("GICSaveGMatrix", f'"{g_matrix_path}"', f'"{id_file_path}"')
             with open(g_matrix_path, "r") as f:
                 mat_str = f.read()
             sparse_matrix = self._parse_real_matrix(mat_str, "GMatrix")
@@ -133,9 +131,8 @@ class MatrixMixin:
         """
         g_matrix_path, id_file_path = self._make_temp_matrix_files()
         try:
-            cmd = f'GICSaveGMatrix("{g_matrix_path}","{id_file_path}");'
-            self.RunScriptCommand(cmd)
-            self.RunScriptCommand(cmd)
+            self._run_script("GICSaveGMatrix", f'"{g_matrix_path}"', f'"{id_file_path}"')
+            self._run_script("GICSaveGMatrix", f'"{g_matrix_path}"', f'"{id_file_path}"')
 
             with open(g_matrix_path, "r") as f:
                 mat_str = f.read()
@@ -201,8 +198,7 @@ class MatrixMixin:
         """
         jac_file_path, id_file_path = self._make_temp_matrix_files()
         try:
-            cmd = f'SaveJacobian("{jac_file_path}","{id_file_path}",M,{form});'
-            self.RunScriptCommand(cmd)
+            self._run_script("SaveJacobian", f'"{jac_file_path}"', f'"{id_file_path}"', "M", form)
             with open(jac_file_path, "r") as f:
                 mat_str = f.read()
             sparse_matrix = self._parse_real_matrix(mat_str, "Jac")
@@ -236,8 +232,7 @@ class MatrixMixin:
         """
         jac_file_path, id_file_path = self._make_temp_matrix_files()
         try:
-            cmd = f'SaveJacobian("{jac_file_path}","{id_file_path}",M,{form});'
-            self.RunScriptCommand(cmd)
+            self._run_script("SaveJacobian", f'"{jac_file_path}"', f'"{id_file_path}"', "M", form)
 
             with open(jac_file_path, "r") as f:
                 mat_str = f.read()
@@ -328,11 +323,9 @@ class MatrixMixin:
         jac_form : str, optional
             "R" for AC Jacobian in Rectangular coordinates, "P" for Polar, "DC" for B' matrix. Defaults to "R".
         """
-        args = pack_args(f'"{jac_filename}"', f'"{jid_filename}"', file_type, jac_form)
-        return self.RunScriptCommand(f"SaveJacobian({args});")
+        return self._run_script("SaveJacobian", f'"{jac_filename}"', f'"{jid_filename}"', file_type, jac_form)
 
     def SaveYbusInMatlabFormat(self, filename: str, include_voltages: bool = False):
         """Saves the YBus to a file formatted for use with Matlab."""
         iv = YesNo.from_bool(include_voltages)
-        args = pack_args(f'"{filename}"', iv)
-        return self.RunScriptCommand(f"SaveYbusInMatlabFormat({args});")
+        return self._run_script("SaveYbusInMatlabFormat", f'"{filename}"', iv)

@@ -9,7 +9,7 @@ from ._helpers import format_list, pack_args
 class ATCMixin:
     """Mixin for ATC analysis functions."""
 
-    def DetermineATC(
+    def ATCDetermine(
         self,
         seller: str,
         buyer: str,
@@ -43,10 +43,9 @@ class ATCMixin:
         """
         dist = YesNo.from_bool(distributed)
         mult = YesNo.from_bool(multiple_scenarios)
-        args = pack_args(seller, buyer, dist, mult)
-        return self.RunScriptCommand(f"ATCDetermine({args});")
+        return self._run_script("ATCDetermine", seller, buyer, dist, mult)
 
-    def DetermineATCMultipleDirections(
+    def ATCDetermineMultipleDirections(
         self, distributed: bool = False, multiple_scenarios: bool = False
     ):
         """Calculates ATC for all directions defined within the PowerWorld case.
@@ -73,8 +72,7 @@ class ATCMixin:
         """
         dist = YesNo.from_bool(distributed)
         mult = YesNo.from_bool(multiple_scenarios)
-        args = pack_args(dist, mult)
-        return self.RunScriptCommand(f"ATCDetermineMultipleDirections({args});")
+        return self._run_script("ATCDetermineMultipleDirections", dist, mult)
 
     def GetATCResults(self, fields: list = None) -> pd.DataFrame:
         """Retrieves Transfer Limiter results from the case after an ATC calculation.
@@ -127,11 +125,11 @@ class ATCMixin:
 
         """
         filt = f'"{filter_name}"' if filter_name else ""
-        return self.RunScriptCommand(f"ATCCreateContingentInterfaces({filt});")
+        return self._run_script("ATCCreateContingentInterfaces", filt)
 
     def ATCDeleteAllResults(self):
         """Deletes all ATC results including TransferLimiter, ATCExtraMonitor, and ATCFlowValue object types."""
-        return self.RunScriptCommand("ATCDeleteAllResults;")
+        return self._run_script("ATCDeleteAllResults")
 
     def ATCDeleteScenarioChangeIndexRange(self, scenario_change_type: str, index_range: List[str]):
         """Deletes entries within an ATC scenario change type by index.
@@ -149,7 +147,7 @@ class ATCMixin:
 
         """
         ir = format_list(index_range)
-        return self.RunScriptCommand(f"ATCDeleteScenarioChangeIndexRange({scenario_change_type}, {ir});")
+        return self._run_script("ATCDeleteScenarioChangeIndexRange", scenario_change_type, ir)
 
     def ATCDetermineATCFor(self, rl: int, g: int, i: int, apply_transfer: bool = False):
         """Determines the ATC for a specific Scenario RL, G, I.
@@ -168,15 +166,15 @@ class ATCMixin:
 
         """
         at = YesNo.from_bool(apply_transfer)
-        return self.RunScriptCommand(f"ATCDetermineATCFor({rl}, {g}, {i}, {at});")
+        return self._run_script("ATCDetermineATCFor", rl, g, i, at)
 
     def ATCDetermineMultipleDirectionsATCFor(self, rl: int, g: int, i: int):
         """Determines the ATC for Scenario RL, G, I for all defined directions."""
-        return self.RunScriptCommand(f"ATCDetermineMultipleDirectionsATCFor({rl}, {g}, {i});")
+        return self._run_script("ATCDetermineMultipleDirectionsATCFor", rl, g, i)
 
     def ATCIncreaseTransferBy(self, amount: float):
         """Increases the transfer between the seller and buyer by a specified amount."""
-        return self.RunScriptCommand(f"ATCIncreaseTransferBy({amount});")
+        return self._run_script("ATCIncreaseTransferBy", amount)
 
     def ATCRestoreInitialState(self):
         """Restores the initial state for the ATC tool.
@@ -193,7 +191,7 @@ class ATCMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        return self.RunScriptCommand("ATCRestoreInitialState;")
+        return self._run_script("ATCRestoreInitialState")
 
     def ATCSetAsReference(self):
         """Sets the present system state as the reference state for ATC analysis.
@@ -209,7 +207,7 @@ class ATCMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        return self.RunScriptCommand("ATCSetAsReference;")
+        return self._run_script("ATCSetAsReference")
 
     def ATCTakeMeToScenario(self, rl: int, g: int, i: int):
         """Sets the present case according to the scenarios along the RL, G, and I axes.
@@ -235,7 +233,7 @@ class ATCMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        return self.RunScriptCommand(f"ATCTakeMeToScenario({rl}, {g}, {i});")
+        return self._run_script("ATCTakeMeToScenario", rl, g, i)
 
     def ATCDataWriteOptionsAndResults(self, filename: str, append: bool = True, key_field: str = "PRIMARY"):
         """Writes out all information related to ATC analysis to an auxiliary file.
@@ -267,7 +265,7 @@ class ATCMixin:
             If the SimAuto call fails.
         """
         app = YesNo.from_bool(append)
-        return self.RunScriptCommand(f'ATCDataWriteOptionsAndResults("{filename}", {app}, {key_field});')
+        return self._run_script("ATCDataWriteOptionsAndResults", f'"{filename}"', app, key_field)
 
     def ATCWriteAllOptions(self, filename: str, append: bool = True, key_field: str = "PRIMARY"):
         """Writes out all information related to ATC analysis (deprecated name).
@@ -316,7 +314,7 @@ class ATCMixin:
             If the SimAuto call fails.
         """
         app = YesNo.from_bool(append)
-        return self.RunScriptCommand(f'ATCWriteResultsAndOptions("{filename}", {app});')
+        return self._run_script("ATCWriteResultsAndOptions", f'"{filename}"', app)
 
     def ATCWriteScenarioLog(self, filename: str, append: bool = False, filter_name: str = ""):
         """Writes out detailed log information for ATC Multiple Scenarios to a text file.
@@ -345,7 +343,7 @@ class ATCMixin:
         """
         app = YesNo.from_bool(append)
         filt = f'"{filter_name}"' if filter_name else ""
-        return self.RunScriptCommand(f'ATCWriteScenarioLog("{filename}", {app}, {filt});')
+        return self._run_script("ATCWriteScenarioLog", f'"{filename}"', app, filt)
 
     def ATCWriteScenarioMinMax(
         self,

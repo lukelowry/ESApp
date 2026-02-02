@@ -2,17 +2,16 @@
 from typing import List, Union
 
 from ._enums import YesNo, LinearMethod
-from ._helpers import format_list, pack_args
+from ._helpers import format_list
 
 
 class ContingencyMixin:
     """Mixin for contingency analysis functions."""
 
-    def RunContingency(self, ctg_name: str):
+    def CTGSolve(self, ctg_name: str):
         """Runs a single defined contingency.
 
-        This method is a wrapper for the `CTGSolve` script command, which
-        executes the actions defined in a specific contingency and solves
+        Executes the actions defined in a specific contingency and solves
         the power flow.
 
         Parameters
@@ -29,14 +28,22 @@ class ContingencyMixin:
         PowerWorldError
             If the SimAuto call fails (e.g., contingency not found, power flow divergence).
         """
-        return self.RunScriptCommand(f'CTGSolve("{ctg_name}");')
+        return self._run_script("CTGSolve", f'"{ctg_name}"')
 
-    def SolveContingencies(self):
+    def CTGSolveAll(self, distributed: bool = False, clear_results: bool = True):
         """Solves all contingencies that are not marked to be skipped.
 
         Iterates through all active contingencies, applies their actions, and
-        solves the power flow for each. All existing contingency results will
-        be cleared before solving. Distributed methods are not used.
+        solves the power flow for each.
+
+        Parameters
+        ----------
+        distributed : bool, optional
+            If True, uses distributed computing for contingency analysis.
+            Defaults to False.
+        clear_results : bool, optional
+            If True, clears all existing contingency results before solving.
+            Defaults to True.
 
         Returns
         -------
@@ -47,7 +54,9 @@ class ContingencyMixin:
         PowerWorldError
             If the SimAuto call fails or any contingency solution diverges.
         """
-        return self.RunScriptCommand("CTGSolveAll(NO, YES);")
+        dist = YesNo.from_bool(distributed)
+        clear = YesNo.from_bool(clear_results)
+        return self._run_script("CTGSolveAll", dist, clear)
 
     def CTGAutoInsert(self):
         """Auto-inserts contingencies based on the Ctg_AutoInsert_Options configured in PowerWorld.
@@ -65,7 +74,7 @@ class ContingencyMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        return self.RunScriptCommand("CTGAutoInsert;")
+        return self._run_script("CTGAutoInsert")
 
     def CTGWriteResultsAndOptions(
         self,
@@ -122,8 +131,7 @@ class ContingencyMixin:
         sd = YesNo.from_bool(save_dependencies)
         uazf = YesNo.from_bool(use_area_zone_filters)
 
-        args = pack_args(f'"{filename}"', opts_str, key_field, uds, uc, use_object_ids, usdm, sd, uazf)
-        return self.RunScriptCommand(f"CTGWriteResultsAndOptions({args});")
+        return self._run_script("CTGWriteResultsAndOptions", f'"{filename}"', opts_str, key_field, uds, uc, use_object_ids, usdm, sd, uazf)
 
     def CTGApply(self, contingency_name: str):
         """Applies the actions defined in a contingency without solving the power flow.
@@ -145,7 +153,7 @@ class ContingencyMixin:
         PowerWorldError
             If the SimAuto call fails (e.g., contingency not found).
         """
-        return self.RunScriptCommand(f'CTGApply("{contingency_name}");')
+        return self._run_script("CTGApply", f'"{contingency_name}"')
 
     def CTGCalculateOTDF(self, seller: str, buyer: str, linear_method: Union[LinearMethod, str] = LinearMethod.DC):
         """Computes OTDFs (Outage Transfer Distribution Factors) for contingency violations.
@@ -174,7 +182,7 @@ class ContingencyMixin:
             If the SimAuto call fails.
         """
         method = linear_method.value if isinstance(linear_method, LinearMethod) else str(linear_method)
-        return self.RunScriptCommand(f'CTGCalculateOTDF({seller}, {buyer}, {method});')
+        return self._run_script("CTGCalculateOTDF", seller, buyer, method)
 
     def CTGClearAllResults(self):
         """Deletes all contingency violations and any contingency comparison results from memory.
@@ -188,7 +196,7 @@ class ContingencyMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        return self.RunScriptCommand("CTGClearAllResults;")
+        return self._run_script("CTGClearAllResults")
 
     def CTGSetAsReference(self):
         """Sets the present system state as the reference for contingency analysis.
@@ -199,7 +207,7 @@ class ContingencyMixin:
         -------
         None
         """
-        return self.RunScriptCommand("CTGSetAsReference;")
+        return self._run_script("CTGSetAsReference")
 
     def CTGProduceReport(self, filename: str):
         """Produces a text-based contingency analysis report.
@@ -218,7 +226,7 @@ class ContingencyMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        return self.RunScriptCommand(f'CTGProduceReport("{filename}");')
+        return self._run_script("CTGProduceReport", f'"{filename}"')
 
     def CTGWriteFilePTI(self, filename: str, bus_format: str = "Name12", truncate_labels: bool = True, filter_name: str = "", append: bool = False):
         """Writes contingencies to a file in the PTI CON format.
@@ -247,7 +255,7 @@ class ContingencyMixin:
         """
         trunc = YesNo.from_bool(truncate_labels)
         app = YesNo.from_bool(append)
-        return self.RunScriptCommand(f'CTGWriteFilePTI("{filename}", {bus_format}, {trunc}, "{filter_name}", {app});')
+        return self._run_script("CTGWriteFilePTI", f'"{filename}"', bus_format, trunc, f'"{filter_name}"', app)
 
     def CTGCloneMany(self, filter_name: str = "", prefix: str = "", suffix: str = "", set_selected: bool = False):
         """Creates copies of multiple contingencies based on a filter.
@@ -273,7 +281,7 @@ class ContingencyMixin:
             If the SimAuto call fails.
         """
         sel = YesNo.from_bool(set_selected)
-        return self.RunScriptCommand(f'CTGCloneMany("{filter_name}", "{prefix}", "{suffix}", {sel});')
+        return self._run_script("CTGCloneMany", f'"{filter_name}"', f'"{prefix}"', f'"{suffix}"', sel)
 
     def CTGCloneOne(
         self, ctg_name: str, new_ctg_name: str = "", prefix: str = "", suffix: str = "", set_selected: bool = False
@@ -304,7 +312,7 @@ class ContingencyMixin:
             If the SimAuto call fails.
         """
         sel = YesNo.from_bool(set_selected)
-        return self.RunScriptCommand(f'CTGCloneOne("{ctg_name}", "{new_ctg_name}", "{prefix}", "{suffix}", {sel});')
+        return self._run_script("CTGCloneOne", f'"{ctg_name}"', f'"{new_ctg_name}"', f'"{prefix}"', f'"{suffix}"', sel)
 
     def CTGComboDeleteAllResults(self):
         """Deletes all results associated with contingency combination analysis.
@@ -318,7 +326,7 @@ class ContingencyMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        return self.RunScriptCommand("CTGComboDeleteAllResults;")
+        return self._run_script("CTGComboDeleteAllResults")
 
     def CTGComboSolveAll(self, do_distributed: bool = False, clear_all_results: bool = True):
         """Runs contingency combination analysis for all primary and regular/secondary contingencies.
@@ -343,7 +351,7 @@ class ContingencyMixin:
         """
         dist = YesNo.from_bool(do_distributed)
         clear = YesNo.from_bool(clear_all_results)
-        return self.RunScriptCommand(f"CTGComboSolveAll({dist}, {clear});")
+        return self._run_script("CTGComboSolveAll", dist, clear)
 
     def CTGCompareTwoListsofContingencyResults(self, controlling: str, comparison: str):
         """Compares two different contingency result lists.
@@ -364,7 +372,7 @@ class ContingencyMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        return self.RunScriptCommand(f'CTGCompareTwoListsofContingencyResults("{controlling}", "{comparison}");')
+        return self._run_script("CTGCompareTwoListsofContingencyResults", f'"{controlling}"', f'"{comparison}"')
 
     def CTGConvertAllToDeviceCTG(self, keep_original_if_empty: bool = False):
         """Converts breaker/disconnect contingencies to device outages.
@@ -385,7 +393,7 @@ class ContingencyMixin:
             If the SimAuto call fails.
         """
         keep = YesNo.from_bool(keep_original_if_empty)
-        return self.RunScriptCommand(f"CTGConvertAllToDeviceCTG({keep});")
+        return self._run_script("CTGConvertAllToDeviceCTG", keep)
 
     def CTGConvertToPrimaryCTG(
         self, filter_name: str = "", keep_original: bool = True, prefix: str = "", suffix: str = "-Primary"
@@ -416,7 +424,7 @@ class ContingencyMixin:
             If the SimAuto call fails.
         """
         keep = YesNo.from_bool(keep_original)
-        return self.RunScriptCommand(f'CTGConvertToPrimaryCTG("{filter_name}", {keep}, "{prefix}", "{suffix}");')
+        return self._run_script("CTGConvertToPrimaryCTG", f'"{filter_name}"', keep, f'"{prefix}"', f'"{suffix}"')
 
     def CTGCreateContingentInterfaces(self, filter_name: str, max_option: str = ""):
         """Creates an interface based on contingency violations.
@@ -442,7 +450,7 @@ class ContingencyMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        return self.RunScriptCommand(f'CTGCreateContingentInterfaces("{filter_name}", {max_option});')
+        return self._run_script("CTGCreateContingentInterfaces", f'"{filter_name}"', max_option)
 
     def CTGCreateExpandedBreakerCTGs(self):
         """Converts 'Open/Close with Breakers' actions in contingencies into explicit OPEN/CLOSE actions on individual breakers.
@@ -458,7 +466,7 @@ class ContingencyMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        return self.RunScriptCommand("CTGCreateExpandedBreakerCTGs;")
+        return self._run_script("CTGCreateExpandedBreakerCTGs")
 
     def CTGCreateStuckBreakerCTGs(
         self,
@@ -509,8 +517,7 @@ class ContingencyMixin:
         """
         dup = YesNo.from_bool(allow_duplicates)
         inc = YesNo.from_bool(include_ctg_label)
-        args = pack_args(f'"{filter_name}"', dup, f'"{prefix_name}"', inc, f'"{branch_field_name}"', f'"{suffix_name}"', f'"{prefix_comment}"', f'"{branch_field_comment}"', f'"{suffix_comment}"')
-        return self.RunScriptCommand(f"CTGCreateStuckBreakerCTGs({args});")
+        return self._run_script("CTGCreateStuckBreakerCTGs", f'"{filter_name}"', dup, f'"{prefix_name}"', inc, f'"{branch_field_name}"', f'"{suffix_name}"', f'"{prefix_comment}"', f'"{branch_field_comment}"', f'"{suffix_comment}"')
 
     def CTGDeleteWithIdenticalActions(self):
         """Deletes contingencies that have identical actions.
@@ -526,7 +533,7 @@ class ContingencyMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        return self.RunScriptCommand("CTGDeleteWithIdenticalActions;")
+        return self._run_script("CTGDeleteWithIdenticalActions")
 
     def CTGJoinActiveCTGs(
         self, insert_solve_pf: bool, delete_existing: bool, join_with_self: bool, filename: str = ""
@@ -558,7 +565,7 @@ class ContingencyMixin:
         ispf = YesNo.from_bool(insert_solve_pf)
         de = YesNo.from_bool(delete_existing)
         jws = YesNo.from_bool(join_with_self)
-        return self.RunScriptCommand(f'CTGJoinActiveCTGs({ispf}, {de}, {jws}, "{filename}");')
+        return self._run_script("CTGJoinActiveCTGs", ispf, de, jws, f'"{filename}"')
 
     def CTGPrimaryAutoInsert(self):
         """Auto-inserts Primary Contingencies.
@@ -575,7 +582,7 @@ class ContingencyMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        return self.RunScriptCommand("CTGPrimaryAutoInsert;")
+        return self._run_script("CTGPrimaryAutoInsert")
 
     def CTGProcessRemedialActionsAndDependencies(self, do_delete: bool, filter_name: str = ""):
         """Processes Remedial Actions and their dependencies.
@@ -599,7 +606,7 @@ class ContingencyMixin:
             If the SimAuto call fails.
         """
         delete = YesNo.from_bool(do_delete)
-        return self.RunScriptCommand(f'CTGProcessRemedialActionsAndDependencies({delete}, "{filter_name}");')
+        return self._run_script("CTGProcessRemedialActionsAndDependencies", delete, f'"{filter_name}"')
 
     def CTGReadFilePSLF(self, filename: str):
         """Loads a file in the PSLF OTG format and creates contingencies from it.
@@ -618,7 +625,7 @@ class ContingencyMixin:
         PowerWorldError
             If the SimAuto call fails (e.g., file not found, invalid format).
         """
-        return self.RunScriptCommand(f'CTGReadFilePSLF("{filename}");')
+        return self._run_script("CTGReadFilePSLF", f'"{filename}"')
 
     def CTGReadFilePTI(self, filename: str):
         """Loads a file in the PTI CON format and creates contingencies from it.
@@ -637,7 +644,7 @@ class ContingencyMixin:
         PowerWorldError
             If the SimAuto call fails (e.g., file not found, invalid format).
         """
-        return self.RunScriptCommand(f'CTGReadFilePTI("{filename}");')
+        return self._run_script("CTGReadFilePTI", f'"{filename}"')
 
     def CTGRelinkUnlinkedElements(self):
         """Attempts to relink unlinked elements in the contingency records.
@@ -654,7 +661,7 @@ class ContingencyMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        return self.RunScriptCommand("CTGRelinkUnlinkedElements;")
+        return self._run_script("CTGRelinkUnlinkedElements")
 
     def CTGSaveViolationMatrices(
         self,
@@ -716,8 +723,7 @@ class ContingencyMixin:
         fields = format_list(field_list)
         unsolv = YesNo.from_bool(include_unsolvable_ctgs)
 
-        args = pack_args(f'"{filename}"', filetype, perc, objs, sc, so, field_list_object_type, fields, unsolv)
-        return self.RunScriptCommand(f"CTGSaveViolationMatrices({args});")
+        return self._run_script("CTGSaveViolationMatrices", f'"{filename}"', filetype, perc, objs, sc, so, field_list_object_type, fields, unsolv)
 
     def CTGSort(self, sort_field_list: List[str] = None):
         """Sorts the contingencies stored in Simulator's internal data structure.
@@ -750,7 +756,7 @@ class ContingencyMixin:
         if sort_field_list is None:
             sort_field_list = []
         sort = format_list(sort_field_list)
-        return self.RunScriptCommand(f"CTGSort({sort});")
+        return self._run_script("CTGSort", sort)
 
     def CTGVerifyIteratedLinearActions(self, filename: str):
         """Creates a text file that contains validation information for iterated linear actions.
@@ -760,7 +766,7 @@ class ContingencyMixin:
         filename : str
             The path to the output text file.
         """
-        return self.RunScriptCommand(f'CTGVerifyIteratedLinearActions("{filename}");')
+        return self._run_script("CTGVerifyIteratedLinearActions", f'"{filename}"')
 
     def CTGWriteAllOptions(
         self,
@@ -821,7 +827,7 @@ class ContingencyMixin:
             If the SimAuto call fails.
         """
         app = YesNo.from_bool(append)
-        return self.RunScriptCommand(f'CTGWriteAuxUsingOptions("{filename}", {app});')
+        return self._run_script("CTGWriteAuxUsingOptions", f'"{filename}"', app)
 
     def CTGRestoreReference(self):
         """Resets the system state to the reference state for contingency analysis.
@@ -846,4 +852,4 @@ class ContingencyMixin:
         CTGSetAsReference : Sets the current state as the reference.
         CTGApply : Applies contingency actions without solving.
         """
-        return self.RunScriptCommand("CTGRestoreReference;")
+        return self._run_script("CTGRestoreReference")
