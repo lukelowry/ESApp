@@ -26,7 +26,7 @@ Test Coverage
    * - ``test_dynamics.py``
      - Dynamics module: ContingencyBuilder, SimAction enum
    * - ``test_utils.py``
-     - Utility modules: GIC, Network, math helpers
+     - Utility modules: timing decorator, B3D file format
 
 **Integration Tests** — Require PowerWorld
 

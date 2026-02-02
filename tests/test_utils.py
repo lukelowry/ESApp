@@ -2,8 +2,8 @@
 Unit tests for the esapp.utils module.
 
 These are **unit tests** that do NOT require PowerWorld Simulator. They test
-the pure-Python utility classes and functions: InjectionVector, timing
-decorator (esapp.utils.misc), and B3D file format I/O (esapp.utils.b3d).
+the timing decorator (esapp.utils.misc) and B3D file format I/O
+(esapp.utils.b3d).
 
 USAGE:
     pytest tests/test_utils.py -v
@@ -15,64 +15,9 @@ import struct
 import numpy as np
 import pytest
 from numpy.testing import assert_allclose
-from pandas import DataFrame
 
-from esapp.utils.misc import InjectionVector, timing
+from esapp.utils.misc import timing
 from esapp.utils.b3d import B3D
-
-
-# =============================================================================
-# InjectionVector
-# =============================================================================
-
-
-class TestInjectionVector:
-
-    @pytest.fixture
-    def bus_df(self):
-        return DataFrame({'BusNum': [1, 2, 3, 4, 5]})
-
-    def test_initial_vector_zero(self, bus_df):
-        inj = InjectionVector(bus_df)
-        assert_allclose(inj.vec, 0.0)
-
-    def test_supply_and_demand(self, bus_df):
-        inj = InjectionVector(bus_df, losscomp=0.0)
-        inj.supply(1, 2)
-        inj.demand(4, 5)
-        v = inj.vec
-        assert np.all(v[inj.loaddf.index.isin([1, 2])] > 0)
-        assert np.all(v[inj.loaddf.index.isin([4, 5])] < 0)
-
-    def test_normalization_with_loss_comp(self, bus_df):
-        inj = InjectionVector(bus_df, losscomp=0.05)
-        inj.supply(1)
-        inj.demand(3)
-        v = inj.vec
-        supply_total = v[v > 0].sum()
-        demand_total = -v[v < 0].sum()
-        assert abs(supply_total - 1.05 * demand_total) < 1e-12
-
-    def test_zero_loss_comp(self, bus_df):
-        inj = InjectionVector(bus_df, losscomp=0.0)
-        inj.supply(1)
-        inj.demand(5)
-        v = inj.vec
-        assert abs(v[v > 0].sum() + v[v < 0].sum()) < 1e-12
-
-    def test_demand_only(self, bus_df):
-        """Calling demand without supply exercises the supply_sum <= 0 branch."""
-        inj = InjectionVector(bus_df, losscomp=0.05)
-        inj.demand(3)
-        v = inj.vec
-        assert v[inj.loaddf.index.get_loc(3)] < 0
-
-    def test_supply_only(self, bus_df):
-        """Calling supply without demand exercises the demand_sum <= 0 branch."""
-        inj = InjectionVector(bus_df, losscomp=0.05)
-        inj.supply(1)
-        v = inj.vec
-        assert v[inj.loaddf.index.get_loc(1)] > 0
 
 
 # =============================================================================

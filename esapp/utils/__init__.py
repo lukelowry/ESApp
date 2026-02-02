@@ -2,15 +2,12 @@
 ESAplus utilities module.
 
 Provides tools for:
-- Power system utilities (injection vectors, Y-bus modifications)
 - Binary data formats (B3D electric field data)
 - Analysis modules (GIC, network topology, dynamics, contingency)
+- Function decorators for debugging and profiling
 """
 
-from .misc import (
-    InjectionVector,
-    timing,
-)
+from .misc import timing
 
 from .b3d import B3D
 
@@ -21,7 +18,6 @@ from .dynamics import TSWatch, process_ts_results, get_ts_results
 
 __all__ = [
     # misc
-    'InjectionVector',
     'timing',
     # b3d
     'B3D',

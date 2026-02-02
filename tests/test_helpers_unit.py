@@ -960,15 +960,6 @@ class TestWorkbenchLogic:
         wb.close()
         wb.esa.CloseCase.assert_called_once()
 
-    def test_shortest_path(self):
-        """GridWorkBench.shortest_path calls DetermineShortestPath."""
-        from esapp.workbench import GridWorkBench
-
-        wb = GridWorkBench()
-        wb.esa = MagicMock()
-        wb.shortest_path(1, 2)
-        wb.esa.DetermineShortestPath.assert_called_once_with("[BUS 1]", "[BUS 2]")
-
     def test_ts_solve_empty_results(self):
         """GridWorkBench.ts_solve returns empty DataFrames when no results."""
         from esapp.workbench import GridWorkBench

@@ -11,7 +11,7 @@ from .utils.network import Network
 from .utils.dynamics import get_ts_results, process_ts_results
 from .indexable import Indexable
 from .components import Bus, Branch, Gen, Load, Shunt, Area, Zone, Substation, Contingency, Sim_Solution_Options
-from .saw import SAW, create_object_string
+from .saw import SAW
 
 import tempfile
 import os
@@ -451,7 +451,7 @@ class GridWorkBench(Indexable):
 
     # --- Data Retrieval ---
 
-    def generations(self):
+    def gens(self):
         """Returns a DataFrame of generator outputs (MW, Mvar) and status."""
         return self[Gen, ["GenMW", "GenMVR", "GenStatus"]]
 
@@ -499,22 +499,3 @@ class GridWorkBench(Indexable):
             [bus1, bus2, ckt, "Closed"],
         )
 
-    def path_distance(self, start_element_str):
-        """Calculates distance from a starting element to all buses."""
-        return self.esa.DeterminePathDistance(start_element_str)
-
-    # --- Difference Flows ---
-
-    def set_as_base_case(self):
-        """Sets the current case as the base case for difference flows."""
-        self.esa.DiffCaseSetAsBase()
-
-    def diff_mode(self, mode="DIFFERENCE"):
-        """Sets the difference mode (PRESENT, BASE, DIFFERENCE, CHANGE)."""
-        self.esa.DiffCaseMode(mode)
-
-    def shortest_path(self, start_bus, end_bus):
-        """Determines the shortest path between two buses."""
-        start_str = create_object_string("Bus", start_bus)
-        end_str = create_object_string("Bus", end_bus)
-        return self.esa.DetermineShortestPath(start_str, end_str)

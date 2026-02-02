@@ -102,7 +102,7 @@ class TestGridWorkBenchFunctions:
 
     def test_component_retrieval(self, wb):
         """Tests generations, loads, shunts, lines, transformers, areas, zones."""
-        assert not wb.generations().empty
+        assert not wb.gens().empty
         assert not wb.loads().empty
         shunts = wb.shunts()
         assert isinstance(shunts, pd.DataFrame)
@@ -141,9 +141,6 @@ class TestGridWorkBenchFunctions:
         assert not mp.empty
         assert not mq.empty
 
-        wb.set_as_base_case()
-        wb.diff_mode("DIFFERENCE")
-        wb.diff_mode("PRESENT")
 
     # -------------------------------------------------------------------------
     # Sensitivity, Faults
@@ -178,12 +175,6 @@ class TestGridWorkBenchFunctions:
         S = wb.netinj(asComplex=True)
         assert np.iscomplexobj(S)
         assert len(S) > 0
-
-    def test_path_distance(self, wb):
-        """Tests path_distance()."""
-        buses = wb[Bus]
-        assert not buses.empty, "Test case must contain buses"
-        wb.path_distance(create_object_string("Bus", buses.iloc[0]['BusNum']))
 
     def test_branch_admittance(self, wb):
         """Tests branch_admittance() delegation."""
@@ -414,3 +405,4 @@ def test_component_access(wb, component_class):
 
 if __name__ == "__main__":
     sys.exit(pytest.main(["-v", __file__]))
+
