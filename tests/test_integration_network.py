@@ -21,6 +21,7 @@ from scipy.sparse import issparse
 
 from esapp.utils import Network, BranchType
 from esapp.components import Branch, Bus
+from esapp.saw import PowerWorldError, PowerWorldPrerequisiteError
 
 pytestmark = [
     pytest.mark.integration,
@@ -235,15 +236,16 @@ class TestDelay:
     def test_returns_array(self, net):
         try:
             beta = net.delay()
-        except Exception:
+        except (PowerWorldError, PowerWorldPrerequisiteError):
             pytest.skip("delay() requires Ybus which may not be available")
         assert isinstance(beta, np.ndarray)
+        assert len(beta) > 0
 
     @pytest.mark.order(6610)
     def test_min_delay_floor(self, net):
         try:
             beta = net.delay(min_delay=0.5)
-        except Exception:
+        except (PowerWorldError, PowerWorldPrerequisiteError):
             pytest.skip("delay() requires Ybus which may not be available")
         assert np.all(beta >= 0.5)
 
@@ -251,7 +253,7 @@ class TestDelay:
     def test_delay_laplacian(self, net):
         try:
             L = net.laplacian(BranchType.DELAY)
-        except Exception:
+        except (PowerWorldError, PowerWorldPrerequisiteError):
             pytest.skip("DELAY laplacian requires Ybus")
         nbus = len(net[Bus])
         assert L.shape == (nbus, nbus)

@@ -28,7 +28,7 @@ try:
     from esapp.components import Bus, Gen, Load, Branch, Contingency, Area, Zone, Shunt, GICXFormer, GObject
     from esapp import components as grid
     from esapp.workbench import GridWorkBench
-    from esapp.saw import PowerWorldError, COMError, SimAutoFeatureError, create_object_string
+    from esapp.saw import PowerWorldError, PowerWorldPrerequisiteError, COMError, SimAutoFeatureError, create_object_string
 except ImportError:
     raise
 
@@ -53,12 +53,9 @@ class TestGridWorkBenchFunctions:
         """Tests flatstart, pflow, save, log, command, mode."""
         wb.flatstart()
 
-        try:
-            res = wb.pflow(getvolts=True)
-            assert res is not None
-            wb.pflow(getvolts=False)
-        except PowerWorldError:
-            pass
+        res = wb.pflow(getvolts=True)
+        assert res is not None
+        wb.pflow(getvolts=False)
 
         tmp_pwb = temp_file(".pwb")
         wb.save(tmp_pwb)
@@ -97,8 +94,10 @@ class TestGridWorkBenchFunctions:
         """Tests generations, loads, shunts, lines, transformers, areas, zones."""
         assert not wb.generations().empty
         assert not wb.loads().empty
-        wb.shunts()
-        wb.transformers()
+        shunts = wb.shunts()
+        assert isinstance(shunts, pd.DataFrame)
+        xfmrs = wb.transformers()
+        assert isinstance(xfmrs, pd.DataFrame)
         assert not wb.lines().empty
         assert not wb.areas().empty
         assert not wb.zones().empty
@@ -113,10 +112,10 @@ class TestGridWorkBenchFunctions:
         wb.set_voltages(v)
 
         lines = wb.lines()
-        if not lines.empty:
-            l = lines.iloc[0]
-            wb.open_branch(l['BusNum'], l['BusNum:1'], l['LineCircuit'])
-            wb.close_branch(l['BusNum'], l['BusNum:1'], l['LineCircuit'])
+        assert not lines.empty, "Test case must contain lines"
+        l = lines.iloc[0]
+        wb.open_branch(l['BusNum'], l['BusNum:1'], l['LineCircuit'])
+        wb.close_branch(l['BusNum'], l['BusNum:1'], l['LineCircuit'])
 
     # -------------------------------------------------------------------------
     # Analysis & Difference Flows
@@ -173,11 +172,11 @@ class TestGridWorkBenchFunctions:
     def test_path_distance(self, wb):
         """Tests path_distance()."""
         buses = wb[Bus]
-        if not buses.empty:
-            try:
-                wb.path_distance(create_object_string("Bus", buses.iloc[0]['BusNum']))
-            except Exception:
-                pytest.skip("path_distance not available for this case")
+        assert not buses.empty, "Test case must contain buses"
+        try:
+            wb.path_distance(create_object_string("Bus", buses.iloc[0]['BusNum']))
+        except (PowerWorldPrerequisiteError, PowerWorldError):
+            pytest.skip("path_distance not available for this case")
 
     def test_branch_admittance(self, wb):
         """Tests branch_admittance() delegation."""
@@ -197,7 +196,7 @@ class TestGridWorkBenchFunctions:
         try:
             df = wb.buscoords(astuple=False)
             assert isinstance(df, pd.DataFrame)
-        except Exception:
+        except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("buscoords not available (no substation data)")
 
     def test_location(self, wb):
@@ -207,8 +206,8 @@ class TestGridWorkBenchFunctions:
 
         try:
             wb.buscoords()
-        except Exception:
-            pass
+        except (PowerWorldPrerequisiteError, PowerWorldError):
+            pytest.skip("buscoords not available (no substation data)")
 
 
 # -------------------------------------------------------------------------
@@ -235,13 +234,15 @@ def test_component_access(wb, component_class):
     except SimAutoFeatureError as e:
         pytest.skip(f"Object type {component_class.TYPE} cannot be retrieved via SimAuto: {e.message}")
     except (PowerWorldError, COMError) as e:
+        err_msg = str(e)
+        # Access violations and memory errors are PowerWorld internal crashes
+        if "Access violation" in err_msg or "memory resources" in err_msg:
+            pytest.skip(f"Object type {component_class.TYPE} causes PW crash: {e}")
         with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as tmp:
             tmp_path = tmp.name
         try:
             fields = component_class.keys if component_class.keys else ["ALL"]
             wb.esa.SaveObjectFields(tmp_path, component_class.TYPE, fields)
-            if "memory resources" in str(e):
-                pytest.skip(f"Object type {component_class.TYPE} has too many fields/objects.")
             pytest.fail(f"Object type {component_class.TYPE} is supported but failed to read: {e}")
         except PowerWorldError:
             pytest.skip(f"Object type {component_class.TYPE} not supported by this PW version.")

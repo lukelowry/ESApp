@@ -3,6 +3,7 @@
 import json
 import logging
 import os
+import re
 import tempfile
 import uuid
 from pathlib import Path, PureWindowsPath
@@ -341,3 +342,170 @@ def pack_args(*args) -> str:
         args_list.pop()
     
     return ", ".join("" if a is None else str(a) for a in args_list)
+
+
+# =============================================================================
+# AUX Parsing / Building Helpers
+# =============================================================================
+
+_SPLITTER = re.compile(r'(?:[^\s"]|"(?:\\.|[^"])*")+')
+
+
+def parse_aux_line(line: str) -> List[str]:
+    """Parse one AUX data line, detecting bracket or space-delimited format.
+
+    Bracket format example: ``[1, 100.0], [2, 200.0]``
+    Space-delimited example: ``101 "Gen 1" 50.0``
+
+    Only treats the line as bracket format when it consists entirely of
+    ``[...]`` groups (ignoring whitespace/commas between them).
+
+    Parameters
+    ----------
+    line : str
+        A single data line from inside a DATA or SUBDATA block.
+
+    Returns
+    -------
+    List[str]
+        Parsed field values.
+    """
+    line = line.strip()
+    if not line:
+        return []
+    # Bracket format: entire line is bracket groups separated by commas/spaces
+    stripped = re.sub(r'\[.*?\]', '', line).replace(',', '').strip()
+    if '[' in line and not stripped:
+        return [m.group(1).strip() for m in re.finditer(r'\[(.*?)\]', line)]
+    # Space-delimited (respecting quoted strings)
+    return [x.replace('"', '') for x in _SPLITTER.findall(line)]
+
+
+def parse_aux_content(content: str, fieldlist: List[str],
+                      subdatalist: Optional[List[str]] = None) -> List[dict]:
+    """Parse AUX file content into a list of record dicts.
+
+    Supports both header formats produced by PowerWorld:
+
+    * **Legacy**: ``DATA (ObjectType, [field1, field2]) { ... }``
+    * **Concise**: ``ObjectType (field1, field2) { ... }``
+
+    Parameters
+    ----------
+    content : str
+        Full text of the AUX file.
+    fieldlist : List[str]
+        Expected field names for the parent object.
+    subdatalist : List[str], optional
+        SubData section names to look for. Defaults to ``[]``.
+
+    Returns
+    -------
+    List[dict]
+        Each dict has keys from *fieldlist* (scalar strings) and from
+        *subdatalist* (lists of lists).
+
+    Raises
+    ------
+    ValueError
+        If a ``<SUBDATA>`` tag is malformed (missing name).
+    """
+    subdatalist = subdatalist or []
+
+    # Try Legacy format first, then Concise
+    match = re.search(
+        r'DATA\s*\(\s*\w+\s*,\s*\[.*?\]\s*\)\s*\{(.*)\}',
+        content, re.DOTALL | re.IGNORECASE,
+    )
+    if not match:
+        match = re.search(
+            r'\w+\s*\(.*?\)\s*\{(.*)\}',
+            content, re.DOTALL,
+        )
+    if not match:
+        return []
+
+    records: List[dict] = []
+    curr: dict = {}
+    sub_key: Optional[str] = None
+
+    for line in match.group(1).strip().split('\n'):
+        line = line.strip()
+        if not line or line.startswith('//'):
+            continue
+
+        if line.upper().startswith('<SUBDATA'):
+            m = re.search(r'<SUBDATA\s+(\w+)>', line, re.IGNORECASE)
+            if not m:
+                raise ValueError(f"Malformed SUBDATA tag: {line!r}")
+            sub_key = m.group(1)
+        elif line.upper().startswith('</SUBDATA>'):
+            sub_key = None
+        elif sub_key:
+            curr.setdefault(sub_key, []).append(parse_aux_line(line))
+        else:
+            if curr:
+                records.append(curr)
+            tokens = _SPLITTER.findall(line)
+            curr = {
+                k: v.replace('"', '')
+                for k, v in zip(fieldlist, tokens)
+            }
+            for s in subdatalist:
+                curr[s] = []
+
+    if curr:
+        records.append(curr)
+    return records
+
+
+def _fmt_aux_value(val) -> str:
+    """Format a single value for AUX output (quote strings, stringify numbers)."""
+    if isinstance(val, str):
+        return f'"{val}"'
+    return str(val)
+
+
+def build_aux_string(objecttype: str, fieldlist: List[str],
+                     records: List[dict],
+                     subdatatypes: Optional[Union[str, List[str]]] = None) -> str:
+    """Build an AUX DATA block string from records.
+
+    Parameters
+    ----------
+    objecttype : str
+        PowerWorld object type (e.g. ``"Gen"``, ``"Contingency"``).
+    fieldlist : List[str]
+        Field names for the parent object.
+    records : List[dict]
+        Each dict must have keys from *fieldlist*. If *subdatatypes* is
+        provided, the dict may also have a key for each subdata type
+        whose value is a list of lists.
+    subdatatypes : str or List[str] or None
+        SubData section names to write. A single string is normalised
+        to a one-element list.
+
+    Returns
+    -------
+    str
+        Complete AUX DATA block ready for ``exec_aux``.
+    """
+    if subdatatypes is None:
+        subdatatypes = []
+    elif isinstance(subdatatypes, str):
+        subdatatypes = [subdatatypes]
+
+    header = f'DATA ({objecttype}, [{", ".join(fieldlist)}])\n{{\n'
+    body_lines: List[str] = []
+
+    for rec in records:
+        vals = [_fmt_aux_value(rec[f]) for f in fieldlist]
+        body_lines.append(" ".join(vals))
+        for sdt in subdatatypes:
+            if sdt in rec and rec[sdt]:
+                body_lines.append(f"  <SUBDATA {sdt}>")
+                for row in rec[sdt]:
+                    body_lines.append("  " + " ".join(_fmt_aux_value(v) for v in row))
+                body_lines.append("  </SUBDATA>")
+
+    return header + "\n".join(body_lines) + "\n}\n"

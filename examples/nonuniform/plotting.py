@@ -8,7 +8,8 @@ and transformer GIC results on geographic maps.
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import Normalize
-from scipy.interpolate import griddata
+from scipy.interpolate import NearestNDInterpolator
+from scipy.ndimage import gaussian_filter
 
 from examples.map import format_plot, border, plot_lines
 
@@ -177,12 +178,12 @@ def plot_gic_map(ax, lons, lats, Ex, Ey, xf_lons, xf_lats, gic,
 
 
 def plot_gic_heatmap(ax, lons, lats, bus_df, shape=None, lines=None,
-                     cmap='YlOrRd', method='cubic', title=None, **fmt_kw):
+                     cmap='YlOrRd', title=None, **fmt_kw):
     """Plot bus-level |GIC| as a heatmap interpolated onto the grid.
 
     Interpolates sparse bus GIC values onto the regular (lons, lats)
-    grid using ``scipy.interpolate.griddata``, producing a continuous
-    heatmap of GIC magnitude across the geographic domain.
+    grid using radial basis function interpolation, producing a
+    continuous heatmap of GIC magnitude across the geographic domain.
 
     Parameters
     ----------
@@ -199,9 +200,6 @@ def plot_gic_heatmap(ax, lons, lats, bus_df, shape=None, lines=None,
         Branch coordinate DataFrame for ``plot_lines()``.
     cmap : str
         Colormap for the GIC heatmap.
-    method : str
-        Interpolation method for ``griddata``
-        (``'nearest'``, ``'linear'``, or ``'cubic'``).
     title : str or None
         Axes title.
     **fmt_kw
@@ -219,13 +217,9 @@ def plot_gic_heatmap(ax, lons, lats, bus_df, shape=None, lines=None,
     values = bus_df['GIC'].to_numpy()
     gic_max = max(float(values.max()), 1e-6)
 
-    gic_grid = griddata(points, values, (LON, LAT), method=method)
-    # Fill NaN regions (outside convex hull) with nearest-neighbour
-    mask = np.isnan(gic_grid)
-    if mask.any():
-        fill = griddata(points, values, (LON[mask], LAT[mask]),
-                        method='nearest')
-        gic_grid[mask] = fill
+    interp = NearestNDInterpolator(points, values)
+    gic_grid = interp(LON, LAT)
+    gic_grid = gaussian_filter(gic_grid, sigma=2)
 
     im = ax.pcolormesh(LON, LAT, gic_grid, cmap=cmap, shading='auto',
                        vmin=0, vmax=gic_max)

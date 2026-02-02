@@ -40,24 +40,61 @@ def saw_instance(saw_session):
 def _configure_limited_ctg_auto_insert(saw_instance):
     """Configure CTG_AutoInsert_Options to limit contingency count for faster tests.
 
-    This sets options to only insert contingencies for lines (not generators, buses, etc.)
-    and uses a high minimum kV to further limit the count.
+    Deletes existing contingencies and configures auto-insert. Uses all kV levels
+    to ensure contingencies are created regardless of the test case's voltage range.
     """
     # Delete existing contingencies to start fresh
     saw_instance.SetData("Contingency", ["Skip"], ["NO"], "ALL")
     try:
         saw_instance.RunScriptCommand("Delete(Contingency);")
-    except Exception:
-        pass  # May fail if no contingencies exist
+    except (PowerWorldPrerequisiteError, PowerWorldError):
+        pass  # Expected if no contingencies exist yet
 
-    # Configure auto-insert to only create line contingencies with limited kV range
-    # CtgAutoInsElementType controls which element types are included
-    # We'll limit to lines only and use a high min kV to reduce count
+    # Configure auto-insert: delete existing, use all kV levels
     saw_instance.SetData(
         "CTG_AutoInsert_Options",
-        ["CtgAutoInsDeleteExistCtgs", "DOCUseAllkV", "DOCMinkV"],
-        ["YES", "NO", "230"],  # Delete existing, don't use all kV, min 230kV
+        ["CtgAutoInsDeleteExistCtgs", "DOCUseAllkV"],
+        ["YES", "YES"],
     )
+
+
+def _trim_contingencies(saw_instance, max_active=5, delete_excess=False):
+    """Skip all contingencies then un-skip only *max_active* to limit runtime.
+
+    Parameters
+    ----------
+    saw_instance : SAW
+        The SAW instance.
+    max_active : int
+        Number of contingencies to leave active (un-skipped).
+    delete_excess : bool
+        If True, delete excess contingencies so that only *max_active*
+        contingencies remain. Uses the SELECTED filter to bulk-delete.
+        Useful for functions like CTGSkipWithIdenticalActions that process
+        all contingencies regardless of skip status.
+    """
+    saw_instance.SetData("Contingency", ["Skip"], ["YES"], "ALL")
+    ctgs = saw_instance.ListOfDevices("Contingency")
+    if ctgs is None or ctgs.empty:
+        return
+    name_col = "CTGLabel" if "CTGLabel" in ctgs.columns else ctgs.columns[0]
+    keep_names = set(ctgs.head(max_active)[name_col])
+    for name in keep_names:
+        saw_instance.ChangeParametersSingleElement(
+            "Contingency", [name_col, "Skip"], [name, "NO"]
+        )
+    if delete_excess and len(ctgs) > max_active:
+        # Select ALL contingencies, then un-select the ones we want to keep,
+        # then delete the still-selected (excess) contingencies.
+        saw_instance.SelectAll("Contingency")
+        for name in keep_names:
+            saw_instance.ChangeParametersSingleElement(
+                "Contingency", [name_col, "Selected"], [name, "NO"]
+            )
+        try:
+            saw_instance.Delete("Contingency", "SELECTED")
+        except (PowerWorldPrerequisiteError, PowerWorldError):
+            pass
 
 
 class TestContingency:
@@ -73,44 +110,62 @@ class TestContingency:
         # Skip most contingencies to reduce runtime - only solve 1-2
         saw_instance.SetData("Contingency", ["Skip"], ["YES"], "ALL")
         ctgs = saw_instance.ListOfDevices("Contingency")
-        if ctgs is not None and not ctgs.empty:
-            name_col = "CTGLabel" if "CTGLabel" in ctgs.columns else ctgs.columns[0]
-            for name in ctgs.head(2)[name_col]:
-                try:
-                    saw_instance.ChangeParametersSingleElement(
-                        "Contingency", [name_col, "Skip"], [name, "NO"]
-                    )
-                except PowerWorldError:
-                    pass
+        assert ctgs is not None and not ctgs.empty, "No contingencies found after auto-insert"
+        name_col = "CTGLabel" if "CTGLabel" in ctgs.columns else ctgs.columns[0]
+        for name in ctgs.head(2)[name_col]:
+            saw_instance.ChangeParametersSingleElement(
+                "Contingency", [name_col, "Skip"], [name, "NO"]
+            )
         saw_instance.SolveContingencies()
 
     @pytest.mark.order(5200)
     def test_contingency_run_single(self, saw_instance):
         ctgs = saw_instance.ListOfDevices("Contingency")
-        if ctgs is not None and not ctgs.empty:
-            ctg_name = ctgs.iloc[0]["CTGLabel"]
-            saw_instance.RunContingency(ctg_name)
-            saw_instance.CTGApply(ctg_name)
+        assert ctgs is not None and not ctgs.empty, "No contingencies found"
+        ctg_name = ctgs.iloc[0]["CTGLabel"]
+        saw_instance.RunContingency(ctg_name)
+        saw_instance.CTGApply(ctg_name)
 
     @pytest.mark.order(5300)
     def test_contingency_otdf(self, saw_instance):
         areas = saw_instance.GetParametersMultipleElement("Area", ["AreaNum"])
-        if areas is not None and len(areas) >= 2:
-            seller = f'[AREA {areas.iloc[0]["AreaNum"]}]'
-            buyer = f'[AREA {areas.iloc[1]["AreaNum"]}]'
-            saw_instance.CTGCalculateOTDF(seller, buyer)
+        if areas is None or len(areas) < 2:
+            # Create a second area with a bus for OTDF testing
+            buses = saw_instance.GetParametersMultipleElement("Bus", ["BusNum", "AreaNum"])
+            assert buses is not None and not buses.empty, "Test case must contain buses"
+            existing_areas = set(int(a) for a in areas["AreaNum"]) if areas is not None else set()
+            next_area = max(existing_areas, default=0) + 1
+            saw_instance.CreateData("Area", ["AreaNum", "AreaName"], [next_area, f"TestArea{next_area}"])
+            # Move a bus into the new area
+            area_counts = buses["AreaNum"].value_counts()
+            largest_area = area_counts.index[0]
+            donor = buses[buses["AreaNum"] == largest_area]
+            if len(donor) > 1:
+                saw_instance.ChangeParametersSingleElement(
+                    "Bus", ["BusNum", "AreaNum"], [int(donor.iloc[-1]["BusNum"]), next_area]
+                )
+            areas = saw_instance.GetParametersMultipleElement("Area", ["AreaNum"])
+        seller = f'[AREA {areas.iloc[0]["AreaNum"]}]'
+        buyer = f'[AREA {areas.iloc[1]["AreaNum"]}]'
+        saw_instance.CTGCalculateOTDF(seller, buyer)
 
     @pytest.mark.order(5400)
-    def test_contingency_results_ops(self, saw_instance):
-        """Test contingency result operations - skip slow comparison ops."""
+    def test_contingency_clear_and_reference(self, saw_instance):
+        """Test CTGClearAllResults and CTGSetAsReference."""
         saw_instance.CTGClearAllResults()
         saw_instance.CTGSetAsReference()
+
+    @pytest.mark.order(5410)
+    def test_contingency_relink(self, saw_instance):
+        """Test CTGRelinkUnlinkedElements."""
         try:
             saw_instance.CTGRelinkUnlinkedElements()
-        except PowerWorldError:
-            pass
-        # Skip CTGSkipWithIdenticalActions and CTGDeleteWithIdenticalActions
-        # as they can be very slow on large cases (O(n^2) comparison)
+        except (PowerWorldPrerequisiteError, PowerWorldError):
+            pytest.skip("CTGRelinkUnlinkedElements not available")
+
+    @pytest.mark.order(5420)
+    def test_contingency_sort(self, saw_instance):
+        """Test CTGSort."""
         saw_instance.CTGSort()
 
     @pytest.mark.order(5500)
@@ -125,19 +180,15 @@ class TestContingency:
         saw_instance.SetData("Contingency", ["Skip"], ["YES"], "ALL")
 
         ctgs = saw_instance.ListOfDevices("Contingency")
-        if ctgs is not None and not ctgs.empty:
-            name_col = "CTGLabel" if "CTGLabel" in ctgs.columns else ctgs.columns[0]
-            primary_ctgs = ctgs[ctgs[name_col].astype(str).str.endswith("-Primary")]
-            target_ctgs = primary_ctgs.head(2) if not primary_ctgs.empty else ctgs.head(2)
+        assert ctgs is not None and not ctgs.empty, "No contingencies found after auto-insert"
+        name_col = "CTGLabel" if "CTGLabel" in ctgs.columns else ctgs.columns[0]
+        primary_ctgs = ctgs[ctgs[name_col].astype(str).str.endswith("-Primary")]
+        target_ctgs = primary_ctgs.head(2) if not primary_ctgs.empty else ctgs.head(2)
 
-            for name in target_ctgs[name_col]:
-                # Use ChangeParametersSingleElement to handle names with special chars
-                try:
-                    saw_instance.ChangeParametersSingleElement(
-                        "Contingency", [name_col, "Skip"], [name, "NO"]
-                    )
-                except PowerWorldError:
-                    pass  # May fail if contingency doesn't exist
+        for name in target_ctgs[name_col]:
+            saw_instance.ChangeParametersSingleElement(
+                "Contingency", [name_col, "Skip"], [name, "NO"]
+            )
 
         try:
             saw_instance.CTGComboSolveAll()
@@ -148,10 +199,16 @@ class TestContingency:
     def test_contingency_clone(self, saw_instance):
         """Clone contingencies AFTER combo solve to avoid bloating solve operations."""
         ctgs = saw_instance.ListOfDevices("Contingency")
-        if ctgs is not None and not ctgs.empty:
-            ctg_name = ctgs.iloc[0]["CTGLabel"]
-            saw_instance.CTGCloneOne(ctg_name, "ClonedCTG")
-            saw_instance.CTGCloneMany("", "Many_", "_Suffix")
+        if ctgs is None or ctgs.empty:
+            # Re-create contingencies if the combo test cleared them
+            _configure_limited_ctg_auto_insert(saw_instance)
+            saw_instance.CTGAutoInsert()
+            _trim_contingencies(saw_instance, max_active=3)
+            ctgs = saw_instance.ListOfDevices("Contingency")
+        assert ctgs is not None and not ctgs.empty, "No contingencies found for cloning"
+        ctg_name = ctgs.iloc[0]["CTGLabel"]
+        saw_instance.CTGCloneOne(ctg_name, "ClonedCTG")
+        saw_instance.CTGCloneMany("", "Many_", "_Suffix")
 
     @pytest.mark.order(5700)
     def test_contingency_convert(self, saw_instance):
@@ -209,12 +266,10 @@ class TestFault:
     @pytest.mark.order(5300)
     def test_fault_run(self, saw_instance):
         buses = saw_instance.GetParametersMultipleElement("Bus", ["BusNum"])
-        if buses is not None and not buses.empty:
-            bus_str = create_object_string("Bus", buses.iloc[0]["BusNum"])
-            saw_instance.RunFault(bus_str, "SLG")
-            saw_instance.FaultClear()
-        else:
-            pytest.skip("No buses found")
+        assert buses is not None and not buses.empty, "No buses found"
+        bus_str = create_object_string("Bus", buses.iloc[0]["BusNum"])
+        saw_instance.RunFault(bus_str, "SLG")
+        saw_instance.FaultClear()
 
     @pytest.mark.order(5400)
     def test_fault_auto(self, saw_instance):
@@ -245,31 +300,28 @@ class TestContingencyAdvanced:
         # Skip most to avoid long runtime
         saw_instance.SetData("Contingency", ["Skip"], ["YES"], "ALL")
         ctgs = saw_instance.ListOfDevices("Contingency")
-        if ctgs is not None and not ctgs.empty:
-            name_col = "CTGLabel" if "CTGLabel" in ctgs.columns else ctgs.columns[0]
-            saw_instance.SetData("Contingency", [name_col, "Skip"], [ctgs.iloc[0][name_col], "NO"])
-        
-        try:
-            saw_instance.SolveContingencies()
-        except PowerWorldPrerequisiteError:
-            pytest.skip("No contingencies to solve")
+        assert ctgs is not None and not ctgs.empty, "No contingencies found after auto-insert"
+        name_col = "CTGLabel" if "CTGLabel" in ctgs.columns else ctgs.columns[0]
+        saw_instance.SetData("Contingency", [name_col, "Skip"], [ctgs.iloc[0][name_col], "NO"])
+
+        saw_instance.SolveContingencies()
 
     @pytest.mark.order(6500)
     def test_contingency_results_dataframe(self, saw_instance):
         """Test that contingency results can be retrieved as DataFrame."""
         ctgs = saw_instance.ListOfDevices("Contingency")
-        if ctgs is not None and not ctgs.empty:
-            assert isinstance(ctgs, pd.DataFrame)
-            assert len(ctgs) > 0
-            # Verify expected columns exist
-            assert "CTGLabel" in ctgs.columns or len(ctgs.columns) > 0
+        assert ctgs is not None and not ctgs.empty, "No contingencies found for results check"
+        assert isinstance(ctgs, pd.DataFrame)
+        assert len(ctgs) > 0
+        # Verify expected columns exist
+        assert "CTGLabel" in ctgs.columns or len(ctgs.columns) > 0
 
     @pytest.mark.order(6600)
     def test_contingency_skip_behavior(self, saw_instance):
         """Test that skipped contingencies are not solved."""
         # Skip all contingencies
         saw_instance.SetData("Contingency", ["Skip"], ["YES"], "ALL")
-        
+
         # Solving should be quick since all are skipped
         saw_instance.SolveContingencies()
 
@@ -278,15 +330,16 @@ class TestContingencyAdvanced:
         """Test CTGRestoreReference restores case state."""
         # Store original state
         original_buses = saw_instance.GetParametersMultipleElement("Bus", ["BusNum", "BusPUVolt"])
-        
+        assert original_buses is not None, "Failed to retrieve original bus data"
+
         # Restore reference
         saw_instance.CTGRestoreReference()
-        
+
         # Get state after restore
         restored_buses = saw_instance.GetParametersMultipleElement("Bus", ["BusNum", "BusPUVolt"])
-        
-        if original_buses is not None and restored_buses is not None:
-            assert len(original_buses) == len(restored_buses)
+        assert restored_buses is not None, "Failed to retrieve restored bus data"
+
+        assert len(original_buses) == len(restored_buses)
 
 
 class TestFaultAdvanced:
@@ -296,33 +349,36 @@ class TestFaultAdvanced:
     def test_fault_types(self, saw_instance):
         """Test different fault types."""
         buses = saw_instance.GetParametersMultipleElement("Bus", ["BusNum"])
-        if buses is not None and not buses.empty:
-            bus_str = create_object_string("Bus", buses.iloc[0]["BusNum"])
-            
-            # PowerWorld fault types: SLG (Single Line to Ground), LL (Line to Line),
-            # DLG (Double Line to Ground), 3PB (Three Phase Balanced)
-            fault_types = ["SLG", "LL", "DLG", "3PB"]
-            for ftype in fault_types:
-                try:
-                    saw_instance.RunFault(bus_str, ftype)
-                    saw_instance.FaultClear()
-                except (PowerWorldPrerequisiteError, PowerWorldError):
-                    # Some fault types may not be configured or may fail
-                    continue
+        assert buses is not None and not buses.empty, "No buses found for fault type testing"
+        bus_str = create_object_string("Bus", buses.iloc[0]["BusNum"])
+
+        # PowerWorld fault types: SLG (Single Line to Ground), LL (Line to Line),
+        # DLG (Double Line to Ground), 3PB (Three Phase Balanced)
+        fault_types = ["SLG", "LL", "DLG", "3PB"]
+        succeeded = 0
+        for ftype in fault_types:
+            try:
+                saw_instance.RunFault(bus_str, ftype)
+                saw_instance.FaultClear()
+                succeeded += 1
+            except (PowerWorldPrerequisiteError, PowerWorldError):
+                # Some fault types may not be configured or may fail
+                continue
+        assert succeeded > 0, f"None of {fault_types} succeeded"
 
     @pytest.mark.order(5700)
     def test_fault_at_branch(self, saw_instance):
         """Test fault on branch midpoint."""
         branches = saw_instance.GetParametersMultipleElement("Branch", ["BusNum", "BusNum:1", "LineCircuit"])
-        if branches is not None and not branches.empty:
-            b = branches.iloc[0]
-            branch_str = create_object_string("Branch", b["BusNum"], b["BusNum:1"], b["LineCircuit"])
-            try:
-                # 3PB = Three Phase Balanced fault, location = percentage along branch (0-100)
-                saw_instance.RunFault(branch_str, "3PB", location=50.0)
-                saw_instance.FaultClear()
-            except (PowerWorldPrerequisiteError, PowerWorldError):
-                pytest.skip("Branch fault not supported or failed")
+        assert branches is not None and not branches.empty, "No branches found for branch fault testing"
+        b = branches.iloc[0]
+        branch_str = create_object_string("Branch", b["BusNum"], b["BusNum:1"], b["LineCircuit"])
+        try:
+            # 3PB = Three Phase Balanced fault, location = percentage along branch (0-100)
+            saw_instance.RunFault(branch_str, "3PB", location=50.0)
+            saw_instance.FaultClear()
+        except (PowerWorldPrerequisiteError, PowerWorldError):
+            pytest.skip("Branch fault not supported or failed")
 
 
 class TestContingencyExport:
@@ -379,3 +435,69 @@ class TestContingencyExport:
         except (PowerWorldPrerequisiteError, PowerWorldError):
             pytest.skip("No violations to save")
 
+
+class TestContingencyGaps:
+    """Tests for remaining Contingency analysis functions."""
+
+    @pytest.mark.order(86000)
+    def test_ctg_sort(self, saw_instance):
+        """CTGSort completes without error."""
+        try:
+            saw_instance.CTGSort()
+        except (PowerWorldPrerequisiteError, PowerWorldError):
+            pytest.skip("CTGSort not available")
+
+    @pytest.mark.order(86100)
+    def test_ctg_sort_with_fields(self, saw_instance):
+        """CTGSort with sort field list."""
+        try:
+            saw_instance.CTGSort(sort_field_list=["Name:+:0"])
+        except (PowerWorldPrerequisiteError, PowerWorldError):
+            pytest.skip("CTGSort with fields not available")
+
+    @pytest.mark.order(86300)
+    def test_ctg_delete_identical(self, saw_instance):
+        """CTGDeleteWithIdenticalActions completes without error."""
+        _configure_limited_ctg_auto_insert(saw_instance)
+        saw_instance.CTGAutoInsert()
+        # Trim and delete excess to avoid long runtimes
+        _trim_contingencies(saw_instance, max_active=5, delete_excess=True)
+        try:
+            saw_instance.CTGDeleteWithIdenticalActions()
+        except (PowerWorldPrerequisiteError, PowerWorldError):
+            pytest.skip("CTGDeleteWithIdenticalActions not available")
+
+    @pytest.mark.order(86400)
+    def test_ctg_relink_unlinked(self, saw_instance):
+        """CTGRelinkUnlinkedElements completes without error."""
+        try:
+            saw_instance.CTGRelinkUnlinkedElements()
+        except (PowerWorldPrerequisiteError, PowerWorldError):
+            pytest.skip("CTGRelinkUnlinkedElements not available")
+
+    @pytest.mark.order(86500)
+    def test_ctg_restore_reference(self, saw_instance):
+        """CTGRestoreReference restores reference state."""
+        try:
+            saw_instance.CTGSetAsReference()
+            saw_instance.CTGRestoreReference()
+        except (PowerWorldPrerequisiteError, PowerWorldError):
+            pytest.skip("CTGRestoreReference not available")
+
+    @pytest.mark.order(86600)
+    def test_ctg_write_aux_using_options(self, saw_instance, temp_file):
+        """CTGWriteAuxUsingOptions writes to file."""
+        tmp = temp_file(".aux")
+        try:
+            saw_instance.CTGWriteAuxUsingOptions(tmp, append=False)
+        except (PowerWorldPrerequisiteError, PowerWorldError):
+            pytest.skip("CTGWriteAuxUsingOptions not available")
+
+    @pytest.mark.order(86700)
+    def test_ctg_write_all_options(self, saw_instance, temp_file):
+        """CTGWriteAllOptions writes to file."""
+        tmp = temp_file(".aux")
+        try:
+            saw_instance.CTGWriteAllOptions(tmp)
+        except (PowerWorldPrerequisiteError, PowerWorldError):
+            pytest.skip("CTGWriteAllOptions not available")

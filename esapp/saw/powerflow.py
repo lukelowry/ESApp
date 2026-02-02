@@ -66,24 +66,6 @@ class PowerflowMixin:
         """
         self.RunScriptCommand("ResetToFlatStart();")
 
-    def SolvePowerFlowWithRetry(self, SolMethod: Union[SolverMethod, str] = SolverMethod.RECTNEWT) -> None:
-        """Run the SolvePowerFlow command, with a retry mechanism.
-
-        If the first attempt to solve the power flow fails, this method
-        will reset the case to a flat start and try one additional time.
-
-        Parameters
-        ----------
-        SolMethod : Union[SolverMethod, str], optional
-            The solution method to use. Defaults to SolverMethod.RECTNEWT.
-        """
-        try:
-            self.SolvePowerFlow(SolMethod)
-        except PowerWorldError:
-            self.log.warning("Power flow failed, resetting to flat start and retrying.")
-            self.ResetToFlatStart()
-            self.SolvePowerFlow(SolMethod)
-
     def SetMVATolerance(self, tol: float = 0.1) -> None:
         """Sets the MVA Tolerance for Newton-Raphson convergence.
         

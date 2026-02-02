@@ -173,7 +173,8 @@ class ContingencyMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        return self.RunScriptCommand(f'CTGCalculateOTDF({seller}, {buyer}, {linear_method});')
+        method = linear_method.value if isinstance(linear_method, LinearMethod) else str(linear_method)
+        return self.RunScriptCommand(f'CTGCalculateOTDF({seller}, {buyer}, {method});')
 
     def CTGClearAllResults(self):
         """Deletes all contingency violations and any contingency comparison results from memory.
@@ -717,22 +718,6 @@ class ContingencyMixin:
 
         args = pack_args(f'"{filename}"', filetype, perc, objs, sc, so, field_list_object_type, fields, unsolv)
         return self.RunScriptCommand(f"CTGSaveViolationMatrices({args});")
-
-    def CTGSkipWithIdenticalActions(self):
-        """Sets the 'Skip' field to YES for contingencies that have identical actions.
-
-        This helps in avoiding redundant calculations during contingency analysis.
-
-        Returns
-        -------
-        None
-
-        Raises
-        ------
-        PowerWorldError
-            If the SimAuto call fails.
-        """
-        return self.RunScriptCommand("CTGSkipWithIdenticalActions;")
 
     def CTGSort(self, sort_field_list: List[str] = None):
         """Sorts the contingencies stored in Simulator's internal data structure.

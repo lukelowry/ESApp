@@ -155,4 +155,3 @@ dmypy.json
 .vscode/settings.json
 tests/test_indextool.py
 docs/examples/system_health_report.csv
-.claude/settings.local.json

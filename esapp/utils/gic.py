@@ -284,9 +284,7 @@ class GIC(Indexable):
         solvepf : bool, default True
             Whether to include GIC results in power flow solution.
         """
-        self.esa.RunScriptCommand(
-            f"GICCalculate({maxfield}, {direction}, {'YES' if solvepf else 'NO'})"
-        )
+        self.esa.CalculateGIC(maxfield, direction, solvepf)
 
     def cleargic(self) -> None:
         """Clear all GIC calculation results from the case."""
@@ -305,8 +303,7 @@ class GIC(Indexable):
         setuponload : bool, default True
             Whether to set up time-varying series on load.
         """
-        b = "YES" if setuponload else "NO"
-        self.esa.RunScriptCommand(f"GICLoad3DEfield({ftype},{fname},{b})")
+        self.esa.GICLoad3DEfield(ftype, fname, setuponload)
 
     def settings(self, value: Optional[DataFrame] = None) -> Optional[DataFrame]:
         """
@@ -322,13 +319,10 @@ class GIC(Indexable):
         DataFrame or None
             Current settings if value is None.
         """
-        if value is None:
-            return self.esa.GetParametersMultipleElement(
+        return self.esa.GetParametersMultipleElement(
                 GIC_Options_Value.TYPE,
                 GIC_Options_Value.fields
-            )[['VariableName', 'ValueField']]
-        else:
-            self.upload({GIC_Options_Value: value})
+        )[['VariableName', 'ValueField']]
 
     def timevary_csv(self, fpath: str) -> None:
         """
@@ -348,7 +342,10 @@ class GIC(Indexable):
         fields = ['WhoAmI'] + [f'GICObjectInputDCVolt:{i+1}' for i in range(csv.columns.size - 1)]
 
         for row in csv.to_records(False):
-            self.esa.SetData(obj, fields, list(row))
+            values = list(row)
+            # Quote the WhoAmI identifier (contains spaces) for PowerWorld
+            values[0] = f'"{values[0]}"'
+            self.esa.SetData(obj, fields, values)
 
     # --- Model ---
 

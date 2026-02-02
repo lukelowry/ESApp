@@ -354,3 +354,50 @@ def assert_dataframe_valid(df, expected_columns=None, min_rows=1, name="DataFram
     if expected_columns:
         for col in expected_columns:
             assert col in df.columns, f"{name} missing column: {col}"
+
+
+def ensure_areas(saw, min_count=2):
+    """Ensure at least *min_count* areas exist with buses, creating if needed.
+
+    If the case has fewer areas than *min_count*, new areas are created
+    and buses are reassigned from the largest area so each area has
+    network elements (required for ATC, directions, etc.).
+
+    Returns the area DataFrame (guaranteed to have >= min_count rows).
+    """
+    areas = saw.GetParametersMultipleElement("Area", ["AreaNum"])
+    if areas is not None and len(areas) >= min_count:
+        return areas
+    existing = set(int(a) for a in areas["AreaNum"]) if areas is not None and not areas.empty else set()
+    next_num = max(existing, default=0) + 1
+    buses = saw.GetParametersMultipleElement("Bus", ["BusNum", "AreaNum"])
+    assert buses is not None and not buses.empty, "Test case must contain buses"
+    buses["BusNum"] = buses["BusNum"].astype(str)
+    buses["AreaNum"] = buses["AreaNum"].astype(str)
+    while len(existing) < min_count:
+        saw.CreateData("Area", ["AreaNum", "AreaName"], [next_num, f"TestArea{next_num}"])
+        area_counts = buses["AreaNum"].value_counts()
+        largest_area = area_counts.index[0]
+        donor_buses = buses[buses["AreaNum"] == largest_area]
+        if len(donor_buses) > 1:
+            bus_to_move = str(donor_buses.iloc[-1]["BusNum"])
+            saw.ChangeParametersSingleElement(
+                "Bus", ["BusNum", "AreaNum"], [bus_to_move, next_num]
+            )
+            buses.loc[buses["BusNum"] == bus_to_move, "AreaNum"] = str(next_num)
+        existing.add(next_num)
+        next_num += 1
+    return saw.GetParametersMultipleElement("Area", ["AreaNum"])
+
+
+@pytest.fixture(scope="class")
+def save_restore_state(saw_session):
+    """Saves case state before destructive tests and restores it after."""
+    state_name = "__test_save_restore_state__"
+    saw_session.StoreState(state_name)
+    yield saw_session
+    try:
+        saw_session.RestoreState(state_name)
+        saw_session.DeleteState(state_name)
+    except Exception:
+        pass

@@ -220,21 +220,24 @@ class GridWorkBench(Indexable):
         bus_df = self[Bus, ["BusNum"]]
         branch_df = self[Branch, [
             "BusNum", "BusNum:1", "LineCircuit",
-            "LineR", "LineX", "LineC", "LineTap", "LinePhase",
+            "LineR", "LineX", "LineC",
         ]]
 
         nb = len(bus_df)
         nl = len(branch_df)
 
-        Ys = 1 / (branch_df["LineR"].to_numpy()
-                   + 1j * branch_df["LineX"].to_numpy())
-        Bc = branch_df["LineC"].to_numpy()
-        tap = (branch_df["LineTap"].to_numpy()
-               * np.exp(1j * np.pi / 180 * branch_df["LinePhase"].to_numpy()))
+        R = pd.to_numeric(branch_df["LineR"], errors="coerce").fillna(0).to_numpy(dtype=float)
+        X = pd.to_numeric(branch_df["LineX"], errors="coerce").fillna(0).to_numpy(dtype=float)
+        Z = R + 1j * X
+        # Replace zero impedance with a small value (short circuit approximation)
+        zero_mask = np.abs(Z) < 1e-20
+        Z = np.where(zero_mask, 1e-12, Z)
+        Ys = 1 / Z
+        Bc = pd.to_numeric(branch_df["LineC"], errors="coerce").fillna(0).to_numpy(dtype=float)
         Ytt = Ys + 1j * Bc / 2
-        Yff = Ytt / (tap * np.conj(tap))
-        Yft = -Ys / np.conj(tap)
-        Ytf = -Ys / tap
+        Yff = Ytt
+        Yft = -Ys
+        Ytf = -Ys
 
         bus_to_idx = {bus: idx for idx, bus in enumerate(bus_df["BusNum"])}
         f = np.array([bus_to_idx[b] for b in branch_df["BusNum"]])

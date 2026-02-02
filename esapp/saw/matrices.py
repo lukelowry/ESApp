@@ -215,7 +215,8 @@ class MatrixMixin:
         """Get the power flow Jacobian matrix along with row/column ID mapping.
 
         Returns both the Jacobian matrix and a list of identifiers describing
-        what each row/column represents (bus numbers and equation types).
+        what each row/column represents (equation type and bus number,
+        e.g. ``'dP 101'``, ``'dQ 102'``).
 
         Parameters
         ----------
@@ -245,21 +246,14 @@ class MatrixMixin:
             with open(id_file_path, "r") as f:
                 id_content = f.read()
 
+            # Jacobian ID file: one label per line, no header.
+            # Each line is an equation label like "dP 101" or "'dP 101'".
             row_ids = []
-            lines = id_content.strip().split('\n')
-            for line in lines[1:]:
+            for line in id_content.strip().split('\n'):
                 line = line.strip()
                 if not line:
                     continue
-                parts = [p.strip() for p in line.split(',')]
-                if len(parts) >= 4:
-                    row_ids.append(parts[3])
-                elif len(parts) >= 3:
-                    row_ids.append(parts[2])
-                elif len(parts) >= 2:
-                    row_ids.append(parts[1])
-                else:
-                    row_ids.append(line)
+                row_ids.append(line)
 
             matrix = sparse_matrix.toarray() if full else sparse_matrix
             return matrix, row_ids

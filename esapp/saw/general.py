@@ -1,10 +1,11 @@
 """General script commands and data interaction functions."""
-from typing import List
+from typing import List, Union
 import os, re
 import pandas as pd
 
 from ._enums import YesNo, format_filter, format_filter_areazone
-from ._helpers import format_list, get_temp_filepath, pack_args
+from ._helpers import (format_list, get_temp_filepath, pack_args,
+                       parse_aux_content, build_aux_string)
 
 
 class GeneralMixin:
@@ -570,49 +571,26 @@ class GeneralMixin:
         subdatalist = subdatalist or []
         tmp_path = get_temp_filepath(".aux")
 
-        def parse_line(line: str) -> List[str]:
-            """Parse a line detecting bracket [x,y] or space-delimited format."""
-            line = line.strip()
-            if '[' in line:  # Bracket format: [x, y], [a, b] or [x, y] [a, b]
-                return [m.group(1).strip() for m in re.finditer(r'\[(.*?)\]', line)]
-            else:  # Space-delimited: val1 val2 "val 3"
-                return [x.replace('"', '') for x in re.findall(r'(?:[^\s"]|"(?:\\.|[^"])*")+', line)]
-
         try:
             self.SaveData(tmp_path, "AUX", objecttype, fieldlist, subdatalist, filter_name, append=False)
 
-            if not os.path.exists(tmp_path): return pd.DataFrame(columns=fieldlist + subdatalist)
-            with open(tmp_path, 'r') as f: content = f.read()
+            if not os.path.exists(tmp_path):
+                return pd.DataFrame(columns=fieldlist + subdatalist)
+            with open(tmp_path, 'r') as f:
+                content = f.read()
 
-            match = re.search(r'DATA\s*\(\w+,\s*\[(.*?)\]\)\s*\{(.*)\}', content, re.DOTALL | re.IGNORECASE)
-            if not match: return pd.DataFrame(columns=fieldlist + subdatalist)
-
-            records, curr, sub_key = [], {}, None
-            splitter = re.compile(r'(?:[^\s"]|"(?:\\.|[^"])*")+')
-
-            for line in match.group(2).strip().split('\n'):
-                line = line.strip()
-                if not line or line.startswith('//'): continue
-
-                if line.upper().startswith('<SUBDATA'):
-                    sub_key = re.search(r'<SUBDATA\s+(\w+)>', line, re.IGNORECASE).group(1)
-                elif line.upper().startswith('</SUBDATA>'):
-                    sub_key = None
-                elif sub_key:
-                    curr.setdefault(sub_key, []).append(parse_line(line))
-                else:
-                    if curr: records.append(curr)
-                    curr = {k: v.replace('"', '') for k, v in zip(fieldlist, splitter.findall(line))}
-                    for s in subdatalist: curr[s] = []
-
-            if curr: records.append(curr)
+            records = parse_aux_content(content, fieldlist, subdatalist)
+            if not records:
+                return pd.DataFrame(columns=fieldlist + subdatalist)
             return pd.DataFrame(records)
 
         finally:
-            if os.path.exists(tmp_path): os.remove(tmp_path)
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
 
     def SetSubData(self, objecttype: str, fieldlist: List[str],
-                   records: List[dict], subdatatype: str = None) -> None:
+                   records: List[dict],
+                   subdatatype: Union[str, List[str], None] = None) -> None:
         """Write object data with optional SubData sections to PowerWorld via AUX.
 
         This is the write counterpart to ``GetSubData``. It constructs an AUX
@@ -628,11 +606,12 @@ class GeneralMixin:
         records : List[dict]
             Each dict must have keys matching ``fieldlist`` for scalar values.
             If ``subdatatype`` is specified, the dict may also contain a key
-            matching ``subdatatype`` whose value is a list of lists (each inner
-            list is one row of subdata values).
-        subdatatype : str, optional
-            Name of the SubData section (e.g., "TSContingencyElement",
-            "CTGElement", "BidCurve"). If None, no subdata is written.
+            matching each subdata type whose value is a list of lists (each
+            inner list is one row of subdata values).
+        subdatatype : str, List[str], or None
+            Name(s) of the SubData section(s) (e.g., "CTGElement",
+            "BidCurve", or ["BidCurve", "ReactiveCapability"]).
+            If None, no subdata is written.
 
         Examples
         --------
@@ -652,28 +631,7 @@ class GeneralMixin:
         ...     subdatatype="TSContingencyElement"
         ... )
         """
-        def _fmt(val):
-            """Format a value for AUX output."""
-            if isinstance(val, str):
-                return f'"{val}"'
-            return str(val)
-
-        header = f'DATA ({objecttype}, [{", ".join(fieldlist)}])\n{{\n'
-        body_lines = []
-
-        for rec in records:
-            # Scalar fields for this record
-            vals = [_fmt(rec[f]) for f in fieldlist]
-            body_lines.append(" ".join(vals))
-
-            # SubData section
-            if subdatatype and subdatatype in rec:
-                body_lines.append(f"  <SUBDATA {subdatatype}>")
-                for row in rec[subdatatype]:
-                    body_lines.append("  " + " ".join(_fmt(v) for v in row))
-                body_lines.append("  </SUBDATA>")
-
-        aux = header + "\n".join(body_lines) + "\n}\n"
+        aux = build_aux_string(objecttype, fieldlist, records, subdatatype)
         self.exec_aux(aux)
 
     def SaveObjectFields(self, filename: str, objecttype: str, fieldlist: List[str]):
