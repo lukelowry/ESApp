@@ -167,7 +167,7 @@ class WeatherMixin:
         ...     "2024-03-01T00:00Z", "2024-03-01T23:59Z")
         """
         fields = format_list(field_list)
-        args = pack_args(f'"{filename}"', fields, start_time, end_time)
+        args = pack_args(f'"{filename}"', fields, start_time or None, end_time or None)
         return self.RunScriptCommand(f"WeatherPWWFileAllMeasValid({args});")
 
     def WeatherPFWModelsRestoreDesignValues(self):

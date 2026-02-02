@@ -392,7 +392,171 @@ class TestGeneral:
         assert len(match) == 1
         assert len(match.iloc[0]["CTGElement"]) > 0
 
+    # --- Merged from TestGeneralExtended ---
 
+    @pytest.mark.order(67000)
+    def test_general_log_clear(self, saw_instance):
+        saw_instance.LogClear()
+
+    @pytest.mark.order(67100)
+    def test_general_log_show(self, saw_instance):
+        saw_instance.LogShow(show=True)
+        saw_instance.LogShow(show=False)
+
+    @pytest.mark.order(67200)
+    def test_general_log_add_datetime(self, saw_instance):
+        saw_instance.LogAddDateTime("TestLabel", include_date=True, include_time=True, include_milliseconds=False)
+
+    @pytest.mark.order(67300)
+    def test_general_log_add_datetime_all(self, saw_instance):
+        saw_instance.LogAddDateTime("TestLabel2", include_date=True, include_time=True, include_milliseconds=True)
+
+    @pytest.mark.order(67400)
+    def test_general_log_add_datetime_minimal(self, saw_instance):
+        saw_instance.LogAddDateTime("TestLabel3", include_date=False, include_time=False, include_milliseconds=False)
+
+    @pytest.mark.order(67500)
+    def test_general_log_save_append(self, saw_instance, temp_file):
+        tmp = temp_file(".txt")
+        saw_instance.LogAdd("Test1")
+        saw_instance.LogSave(tmp, append=False)
+        saw_instance.LogAdd("Test2")
+        saw_instance.LogSave(tmp, append=True)
+        assert os.path.exists(tmp)
+
+    @pytest.mark.order(67600)
+    def test_general_set_current_directory(self, saw_instance, temp_dir):
+        saw_instance.SetCurrentDirectory(str(temp_dir))
+
+    @pytest.mark.order(67700)
+    def test_general_set_current_directory_create(self, saw_instance, temp_dir):
+        new_dir = os.path.join(str(temp_dir), "test_subdir")
+        saw_instance.SetCurrentDirectory(new_dir, create_if_not_found=True)
+
+    @pytest.mark.order(67900)
+    def test_general_import_data(self, saw_instance, temp_file):
+        # PW's ImportData CSV format requires specific device-type metadata
+        # not present in simple CSVs. Use PTI format which works reliably.
+        tmp = temp_file(".raw")
+        saw_instance.SaveData(tmp, "PTI", "Bus", ["BusNum", "BusName"])
+        saw_instance.ImportData(tmp, "PTI", header_line=1, create_if_not_found=True)
+
+    @pytest.mark.order(68000)
+    def test_general_load_csv(self, saw_instance, temp_file):
+        tmp_csv = temp_file(".csv")
+        with open(tmp_csv, "w") as f:
+            f.write("ObjectType,Bus\nBusNum,BusName\n1,TestBus\n")
+        saw_instance.LoadCSV(tmp_csv, create_if_not_found=True)
+
+    @pytest.mark.order(68100)
+    def test_general_save_data_with_extra(self, saw_instance, temp_file):
+        tmp_csv = temp_file(".csv")
+        saw_instance.SaveDataWithExtra(
+            tmp_csv, "CSV", "Bus", ["BusNum", "BusName"],
+            header_list=["CaseName"], header_value_list=["TestCase"],
+        )
+        assert os.path.exists(tmp_csv)
+
+    @pytest.mark.order(68200)
+    def test_general_save_data_no_sort(self, saw_instance, temp_file):
+        tmp_aux = temp_file(".aux")
+        saw_instance.SaveData(
+            tmp_aux, "AUX", "Bus", ["BusNum", "BusName"],
+            transpose=False, append=False,
+        )
+        assert os.path.exists(tmp_aux)
+
+    @pytest.mark.order(68300)
+    def test_general_save_data_transposed(self, saw_instance, temp_file):
+        tmp_csv = temp_file(".csv")
+        saw_instance.SaveData(
+            tmp_csv, "CSV", "Bus", ["BusNum", "BusName"],
+            transpose=True, append=False,
+        )
+
+    @pytest.mark.order(68400)
+    def test_general_load_aux_create(self, saw_instance, temp_file):
+        tmp_aux = temp_file(".aux")
+        with open(tmp_aux, "w") as f:
+            f.write('DATA (Bus, [BusNum, BusName]) {\n99998 "TestNewBus"\n}\n')
+        saw_instance.LoadAux(tmp_aux, create_if_not_found=True)
+        # Clean up
+        try:
+            saw_instance.Delete("Bus", "BusNum = 99998")
+        except PowerWorldError:
+            pass
+
+    @pytest.mark.order(68500)
+    def test_general_load_aux_directory(self, saw_instance, temp_dir):
+        saw_instance.LoadAuxDirectory(str(temp_dir), filter_string="*.aux")
+
+    @pytest.mark.order(68600)
+    def test_general_load_aux_directory_no_filter(self, saw_instance, temp_dir):
+        saw_instance.LoadAuxDirectory(str(temp_dir))
+
+    @pytest.mark.order(68700)
+    def test_general_load_data(self, saw_instance, temp_file):
+        tmp_aux = temp_file(".aux")
+        with open(tmp_aux, "w") as f:
+            f.write('DATA (Bus, [BusNum, BusName]) {\n1 "TestBus"\n}\n')
+        saw_instance.LoadData(tmp_aux, "Bus")
+
+    @pytest.mark.order(68800)
+    def test_general_stop_aux_file(self, saw_instance):
+        saw_instance.StopAuxFile()
+
+    @pytest.mark.order(68900)
+    def test_general_select_all_no_filter(self, saw_instance):
+        saw_instance.SelectAll("Bus")
+        saw_instance.UnSelectAll("Bus")
+
+    # --- Merged from TestGeneralGaps ---
+
+    @pytest.mark.order(85100)
+    def test_save_object_fields(self, saw_instance, temp_file):
+        """SaveObjectFields writes field metadata to file."""
+        tmp = temp_file(".csv")
+        saw_instance.SaveObjectFields(tmp, "Bus", ["BusNum", "BusName"])
+
+    @pytest.mark.order(85200)
+    def test_load_script(self, saw_instance, temp_file):
+        """LoadScript processes script from aux file."""
+        tmp = temp_file(".aux")
+        with open(tmp, "w") as f:
+            f.write('SCRIPT TestScript\n{\n    LogAdd("Script test");\n}\n')
+        saw_instance.LoadScript(tmp, "TestScript")
+
+    @pytest.mark.order(85300)
+    def test_delete_with_filter(self, saw_instance):
+        """Delete with specific area zone filter."""
+        saw_instance.CreateData("Bus", ["BusNum", "BusName"], [99995, "DeleteTestBus"])
+        saw_instance.Delete("Bus", "BusNum = 99995")
+
+    @pytest.mark.order(85400)
+    def test_create_data(self, saw_instance):
+        """CreateData creates an object then cleans up."""
+        saw_instance.CreateData("Bus", ["BusNum", "BusName"], [99994, "CreateTestBus"])
+        saw_instance.Delete("Bus", "BusNum = 99994")
+
+    @pytest.mark.order(85500)
+    def test_send_to_excel_advanced(self, saw_instance):
+        """SendToExcelAdvanced completes without error (requires Excel)."""
+        try:
+            saw_instance.SendToExcelAdvanced(
+                "Bus", ["BusNum", "BusName"],
+                workbook="TestWorkbook",
+                worksheet="Sheet1",
+                use_column_headers=True,
+                clear_existing=True,
+            )
+        except PowerWorldError as e:
+            msg = str(e).lower()
+            if "excel" in msg or "workbook" in msg or "saveas" in msg:
+                pytest.skip("Excel not available or workbook error")
+            raise
+
+
+@pytest.mark.usefixtures("save_restore_state")
 class TestModify:
     """Tests for modify operations (destructive - run late)."""
 
@@ -400,7 +564,11 @@ class TestModify:
     def test_create_delete(self, saw_instance):
         """CreateData and Delete cycle for a bus."""
         dummy_bus = 99999
-        saw_instance.CreateData("Bus", ["BusNum", "BusName"], [dummy_bus, "SAW_TEST"])
+        saw_instance.CreateData(
+            "Bus",
+            ["BusNum", "BusName", "BusNomVolt"],
+            [dummy_bus, "SAW_TEST", 115]
+        )
         saw_instance.Delete("Bus", f"BusNum = {dummy_bus}")
 
     @pytest.mark.order(13400)
@@ -425,6 +593,245 @@ class TestModify:
         saw_instance.CreateData("Contingency", ["Name"], ["TestCtg"])
         saw_instance.InterfaceAddElementsFromContingency("TestInt", "TestCtg")
 
+    # --- Merged from TestModifyExtended ---
+
+    @pytest.mark.order(80000)
+    def test_modify_auto_insert_tieline(self, saw_instance):
+        saw_instance.AutoInsertTieLineTransactions()
+
+    @pytest.mark.order(80100)
+    def test_modify_branch_mva_limit_reorder(self, saw_instance):
+        saw_instance.BranchMVALimitReorder()
+
+    @pytest.mark.order(80200)
+    def test_modify_branch_mva_limit_reorder_with_filter(self, saw_instance):
+        saw_instance.BranchMVALimitReorder(filter_name="ALL")
+
+    @pytest.mark.order(80300)
+    def test_modify_calculate_rxbg(self, saw_instance):
+        try:
+            saw_instance.CalculateRXBGFromLengthConfigCondType()
+        except PowerWorldAddonError:
+            pytest.skip("TransLineCalc add-on not registered")
+
+    @pytest.mark.order(80400)
+    def test_modify_calculate_rxbg_selected(self, saw_instance):
+        try:
+            saw_instance.CalculateRXBGFromLengthConfigCondType(filter_name="SELECTED")
+        except PowerWorldAddonError:
+            pytest.skip("TransLineCalc add-on not registered")
+
+    @pytest.mark.order(80500)
+    def test_modify_clear_small_islands(self, saw_instance):
+        saw_instance.ClearSmallIslands()
+
+    @pytest.mark.order(80600)
+    def test_modify_init_gen_mvar_limits(self, saw_instance):
+        saw_instance.InitializeGenMvarLimits()
+
+    @pytest.mark.order(80700)
+    def test_modify_injection_groups_auto_insert(self, saw_instance):
+        saw_instance.InjectionGroupsAutoInsert()
+
+    @pytest.mark.order(80800)
+    def test_modify_injection_group_create(self, saw_instance):
+        saw_instance.InjectionGroupCreate("TestIG", "Gen", 1.0, "", append=True)
+
+    @pytest.mark.order(80900)
+    def test_modify_injection_group_create_no_append(self, saw_instance):
+        saw_instance.InjectionGroupCreate("TestIG2", "Gen", 1.0, "", append=False)
+
+    @pytest.mark.order(81000)
+    def test_modify_interfaces_auto_insert(self, saw_instance):
+        saw_instance.InterfacesAutoInsert("AREA", delete_existing=True, use_filters=False)
+
+    @pytest.mark.order(81100)
+    def test_modify_interfaces_auto_insert_with_filters(self, saw_instance):
+        saw_instance.InterfacesAutoInsert("AREA", delete_existing=False, use_filters=True, prefix="TEST_")
+
+    @pytest.mark.order(81200)
+    def test_modify_set_participation_factors(self, saw_instance):
+        saw_instance.SetParticipationFactors("CONSTANT", 1.0, "SYSTEM")
+
+    @pytest.mark.order(81300)
+    def test_modify_set_scheduled_voltage(self, saw_instance):
+        buses = saw_instance.GetParametersMultipleElement("Bus", ["BusNum"])
+        assert buses is not None and not buses.empty, "Test case must contain buses"
+        bus_key = create_object_string("Bus", buses.iloc[0]["BusNum"])
+        saw_instance.SetScheduledVoltageForABus(bus_key, 1.0)
+
+    @pytest.mark.order(81400)
+    def test_modify_set_interface_limit_sum(self, saw_instance):
+        saw_instance.SetInterfaceLimitToMonitoredElementLimitSum("ALL")
+
+    @pytest.mark.order(81500)
+    def test_modify_rotate_bus_angles(self, saw_instance):
+        buses = saw_instance.GetParametersMultipleElement("Bus", ["BusNum"])
+        assert buses is not None and not buses.empty, "Test case must contain buses"
+        bus_key = create_object_string("Bus", buses.iloc[0]["BusNum"])
+        saw_instance.RotateBusAnglesInIsland(bus_key, 0.0)
+
+    @pytest.mark.order(81600)
+    def test_modify_set_gen_pmax(self, saw_instance):
+        saw_instance.SetGenPMaxFromReactiveCapabilityCurve()
+
+    @pytest.mark.order(81700)
+    def test_modify_remove_3w_xformer(self, saw_instance):
+        saw_instance.Remove3WXformerContainer()
+
+    @pytest.mark.order(81800)
+    def test_modify_rename_injection_group(self, saw_instance):
+        saw_instance.InjectionGroupCreate("RenameTestIG", "Gen", 1.0, "")
+        saw_instance.RenameInjectionGroup("RenameTestIG", "RenamedIG")
+
+    @pytest.mark.order(81900)
+    def test_modify_reassign_ids(self, saw_instance):
+        saw_instance.ReassignIDs("Load", "BusName", filter_name="", use_right=False)
+
+    @pytest.mark.order(82000)
+    def test_modify_reassign_ids_right(self, saw_instance):
+        saw_instance.ReassignIDs("Load", "BusName", filter_name="ALL", use_right=True)
+
+    @pytest.mark.order(82100)
+    def test_modify_merge_line_terminals(self, saw_instance):
+        saw_instance.MergeLineTerminals("SELECTED")
+
+    @pytest.mark.order(82200)
+    def test_modify_merge_ms_line_sections(self, saw_instance):
+        saw_instance.MergeMSLineSections("SELECTED")
+
+    @pytest.mark.order(82300)
+    def test_modify_directions_auto_insert(self, saw_instance):
+        areas = saw_instance.GetParametersMultipleElement("Area", ["AreaNum"])
+        if areas is None or len(areas) < 2:
+            pytest.skip("DirectionsAutoInsert requires a case with at least 2 areas")
+        s = create_object_string("Area", areas.iloc[0]["AreaNum"])
+        b = create_object_string("Area", areas.iloc[1]["AreaNum"])
+        saw_instance.DirectionsAutoInsert(s, b, delete_existing=True, use_area_zone_filters=False)
+
+    @pytest.mark.order(82400)
+    def test_modify_directions_auto_insert_with_filters(self, saw_instance):
+        areas = saw_instance.GetParametersMultipleElement("Area", ["AreaNum"])
+        if areas is None or len(areas) < 2:
+            pytest.skip("DirectionsAutoInsert requires a case with at least 2 areas")
+        s = create_object_string("Area", areas.iloc[0]["AreaNum"])
+        b = create_object_string("Area", areas.iloc[1]["AreaNum"])
+        saw_instance.DirectionsAutoInsert(s, b, delete_existing=False, use_area_zone_filters=True)
+
+    @pytest.mark.order(82500)
+    def test_modify_directions_auto_insert_ref_opposite(self, saw_instance):
+        saw_instance.DirectionsAutoInsertReference("Bus", "Slack", delete_existing=True, opposite_direction=True)
+
+    @pytest.mark.order(82600)
+    def test_modify_change_system_mva_base(self, saw_instance):
+        saw_instance.ChangeSystemMVABase(100.0)
+
+    # --- Merged from TestModifyGaps ---
+    # These tests modify case topology, so each one saves/restores PW state
+    # to prevent corruption of tests in other classes that interleave via
+    # pytest-order between this class's early (14xxx) and late (80xxx) tests.
+
+    @pytest.mark.order(14000)
+    def test_create_line_derive_existing(self, saw_instance):
+        """CreateLineDeriveExisting creates a line from existing parameters."""
+        branches = saw_instance.GetParametersMultipleElement(
+            "Branch", ["BusNum", "BusNum:1", "LineCircuit", "BranchDeviceType"]
+        )
+        assert branches is not None and not branches.empty, "Test case must contain branches"
+        lines = branches[branches["BranchDeviceType"] == "Line"]
+        if lines.empty:
+            pytest.skip("No line branches available for CreateLineDeriveExisting test")
+        b = lines.iloc[0]
+        branch_id = create_object_string("Branch", b["BusNum"], b["BusNum:1"], b["LineCircuit"])
+        saw_instance.SaveState()
+        try:
+            saw_instance.CreateLineDeriveExisting(
+                int(b["BusNum"]), int(b["BusNum:1"]), "99",
+                10.0, branch_id, existing_length=5.0, zero_g=True,
+            )
+        finally:
+            saw_instance.LoadState()
+
+    @pytest.mark.order(14100)
+    def test_merge_buses(self, saw_instance):
+        """MergeBuses completes without error."""
+        buses = saw_instance.GetParametersMultipleElement("Bus", ["BusNum"])
+        assert buses is not None and not buses.empty, "Test case must contain buses"
+        bus_num = str(buses.iloc[0]["BusNum"]).strip()
+        bus_str = create_object_string("Bus", bus_num)
+        saw_instance.SaveState()
+        try:
+            saw_instance.SetData("Bus", ["BusNum", "Selected"], [bus_num, "YES"])
+            saw_instance.MergeBuses(bus_str, filter_name="SELECTED")
+        finally:
+            saw_instance.LoadState()
+
+    @pytest.mark.order(14200)
+    def test_move(self, saw_instance):
+        """Move a switched shunt (0% -- no-op)."""
+        shunts = saw_instance.GetParametersMultipleElement("Shunt", ["BusNum", "ShuntID"])
+        if shunts is None or shunts.empty:
+            pytest.skip("No switched shunts found for Move test")
+        shunt_key = create_object_string("Shunt", shunts.iloc[0]["BusNum"], shunts.iloc[0]["ShuntID"])
+        bus_key = create_object_string("Bus", shunts.iloc[0]["BusNum"])
+        saw_instance.SaveState()
+        try:
+            saw_instance.Move(shunt_key, bus_key, how_much=0.0, abort_on_error=True)
+        except PowerWorldError as e:
+            if "Unknown object" in str(e) or "not supported" in str(e).lower():
+                pytest.skip(f"Move not supported for this object type on this case: {e}")
+            raise
+        finally:
+            saw_instance.LoadState()
+
+    @pytest.mark.order(14300)
+    def test_split_bus(self, saw_instance):
+        """SplitBus creates a new bus from an existing one."""
+        buses = saw_instance.GetParametersMultipleElement("Bus", ["BusNum"])
+        assert buses is not None and not buses.empty, "Test case must contain buses"
+        bus_key = create_object_string("Bus", buses.iloc[0]["BusNum"])
+        saw_instance.SaveState()
+        try:
+            saw_instance.SplitBus(bus_key, 99997, insert_tie=True, line_open=False)
+        finally:
+            saw_instance.LoadState()
+
+    @pytest.mark.order(14400)
+    def test_tap_transmission_line(self, saw_instance):
+        """TapTransmissionLine taps a line at midpoint (lines only)."""
+        branches = saw_instance.GetParametersMultipleElement(
+            "Branch", ["BusNum", "BusNum:1", "LineCircuit", "BranchDeviceType"]
+        )
+        assert branches is not None and not branches.empty, "Test case must contain branches"
+        lines = branches[branches["BranchDeviceType"] == "Line"]
+        if lines.empty:
+            pytest.skip("No line branches available for TapTransmissionLine test")
+        b = lines.iloc[0]
+        branch_key = create_object_string("Branch", b["BusNum"], b["BusNum:1"], b["LineCircuit"])
+        saw_instance.SaveState()
+        try:
+            saw_instance.TapTransmissionLine(
+                branch_key, 50.0, 99996,
+                shunt_model="CAPACITANCE",
+                treat_as_ms_line=False,
+                update_onelines=False,
+                new_bus_name="TapBus",
+            )
+        finally:
+            saw_instance.LoadState()
+
+    @pytest.mark.order(14500)
+    def test_branch_mva_limit_with_limits(self, saw_instance):
+        """BranchMVALimitReorder with explicit limits list."""
+        saw_instance.SaveState()
+        try:
+            saw_instance.BranchMVALimitReorder(
+                filter_name="ALL",
+                limits=["A", "B", "C"],
+            )
+        finally:
+            saw_instance.LoadState()
+
 
 class TestRegions:
     """Tests for region operations."""
@@ -443,6 +850,19 @@ class TestRegions:
         saw_instance.RegionRenameProper2("OldP2", "NewP2")
         saw_instance.RegionRenameProper3("OldP3", "NewP3")
         saw_instance.RegionRenameProper12Flip()
+
+    # --- Merged from TestRegionsGaps ---
+
+    @pytest.mark.order(85000)
+    def test_region_load_shapefile(self, saw_instance, temp_file):
+        """RegionLoadShapefile completes without error."""
+        tmp = temp_file(".shp")
+        saw_instance.RegionLoadShapefile(
+            tmp, "TestClass", ["Name"],
+            add_to_open_onelines=False,
+            display_style_name="",
+            delete_existing=True,
+        )
 
 
 class TestCaseActions:
@@ -483,6 +903,41 @@ class TestCaseActions:
         saw_instance.RenumberSubs()
         saw_instance.RenumberZones()
         saw_instance.RenumberCase()
+
+    # --- Merged from TestCaseActionsExtended ---
+
+    @pytest.mark.order(90000)
+    def test_case_description_append(self, saw_instance):
+        saw_instance.CaseDescriptionSet("Line 1")
+        saw_instance.CaseDescriptionSet("Line 2", append=True)
+        saw_instance.CaseDescriptionClear()
+
+    @pytest.mark.order(90100)
+    def test_case_save_external_with_ties(self, saw_instance, temp_file):
+        tmp_pwb = temp_file(".pwb")
+        saw_instance.SaveExternalSystem(tmp_pwb, with_ties=True)
+
+    @pytest.mark.order(90200)
+    def test_case_scale_gen(self, saw_instance):
+        saw_instance.Scale("GEN", "FACTOR", [1.0], "SYSTEM")
+
+    @pytest.mark.order(90300)
+    def test_case_scale_load_mw(self, saw_instance):
+        saw_instance.Scale("LOAD", "MW", [100.0, 50.0], "SYSTEM")
+
+    @pytest.mark.order(90400)
+    def test_case_load_ems(self, saw_instance, temp_file):
+        tmp = temp_file(".hdb")
+        # Empty .hdb file — PW rejects it with "End of file reached"
+        with pytest.raises(PowerWorldError):
+            saw_instance.LoadEMS(tmp)
+
+    @pytest.mark.order(90500)
+    def test_case_renumber_custom_index(self, saw_instance):
+        saw_instance.RenumberAreas(custom_integer_index=1)
+        saw_instance.RenumberBuses(custom_integer_index=2)
+        saw_instance.RenumberSubs(custom_integer_index=3)
+        saw_instance.RenumberZones(custom_integer_index=4)
 
 
 class TestSubData:
@@ -583,572 +1038,6 @@ class TestDataAccess:
 
         with pytest.raises(PowerWorldError):
             saw_instance.RunScriptCommand("InvalidCommand_XYZ_123;")
-
-
-# =============================================================================
-# Extended classes merged from test_integration_extended.py
-# =============================================================================
-
-
-@pytest.mark.usefixtures("save_restore_state")
-class TestModifyExtended:
-    """Extended tests for Modify operations -- covering uncovered boolean paths.
-
-    Uses save_restore_state fixture to preserve case integrity.
-    All modifications are reverted after the class completes.
-    """
-
-    @pytest.mark.order(80000)
-    def test_modify_auto_insert_tieline(self, saw_instance):
-        try:
-            saw_instance.AutoInsertTieLineTransactions()
-        except (PowerWorldPrerequisiteError, PowerWorldError):
-            pytest.skip("Tie line transactions not available")
-
-    @pytest.mark.order(80100)
-    def test_modify_branch_mva_limit_reorder(self, saw_instance):
-        try:
-            saw_instance.BranchMVALimitReorder()
-        except (PowerWorldPrerequisiteError, PowerWorldError):
-            pytest.skip("Branch MVA limit reorder not available")
-
-    @pytest.mark.order(80200)
-    def test_modify_branch_mva_limit_reorder_with_filter(self, saw_instance):
-        try:
-            saw_instance.BranchMVALimitReorder(filter_name="ALL")
-        except (PowerWorldPrerequisiteError, PowerWorldError):
-            pytest.skip("Branch MVA limit reorder not available")
-
-    @pytest.mark.order(80300)
-    def test_modify_calculate_rxbg(self, saw_instance):
-        try:
-            saw_instance.CalculateRXBGFromLengthConfigCondType()
-        except (PowerWorldPrerequisiteError, PowerWorldError):
-            pytest.skip("TransLineCalc not available")
-
-    @pytest.mark.order(80400)
-    def test_modify_calculate_rxbg_selected(self, saw_instance):
-        try:
-            saw_instance.CalculateRXBGFromLengthConfigCondType(filter_name="SELECTED")
-        except (PowerWorldPrerequisiteError, PowerWorldError):
-            pytest.skip("TransLineCalc not available")
-
-    @pytest.mark.order(80500)
-    def test_modify_clear_small_islands(self, saw_instance):
-        saw_instance.ClearSmallIslands()
-
-    @pytest.mark.order(80600)
-    def test_modify_init_gen_mvar_limits(self, saw_instance):
-        saw_instance.InitializeGenMvarLimits()
-
-    @pytest.mark.order(80700)
-    def test_modify_injection_groups_auto_insert(self, saw_instance):
-        try:
-            saw_instance.InjectionGroupsAutoInsert()
-        except (PowerWorldPrerequisiteError, PowerWorldError):
-            pytest.skip("Injection group auto-insert not available")
-
-    @pytest.mark.order(80800)
-    def test_modify_injection_group_create(self, saw_instance):
-        try:
-            saw_instance.InjectionGroupCreate("TestIG", "Gen", 1.0, "ALL", append=True)
-        except (PowerWorldPrerequisiteError, PowerWorldError):
-            pytest.skip("Injection group create not available")
-
-    @pytest.mark.order(80900)
-    def test_modify_injection_group_create_no_append(self, saw_instance):
-        try:
-            saw_instance.InjectionGroupCreate("TestIG2", "Gen", 1.0, "ALL", append=False)
-        except (PowerWorldPrerequisiteError, PowerWorldError):
-            pytest.skip("Injection group create not available")
-
-    @pytest.mark.order(81000)
-    def test_modify_interfaces_auto_insert(self, saw_instance):
-        try:
-            saw_instance.InterfacesAutoInsert("AREA", delete_existing=True, use_filters=False)
-        except (PowerWorldPrerequisiteError, PowerWorldError):
-            pytest.skip("Interface auto-insert not available")
-
-    @pytest.mark.order(81100)
-    def test_modify_interfaces_auto_insert_with_filters(self, saw_instance):
-        try:
-            saw_instance.InterfacesAutoInsert("AREA", delete_existing=False, use_filters=True, prefix="TEST_")
-        except (PowerWorldPrerequisiteError, PowerWorldError):
-            pytest.skip("Interface auto-insert not available")
-
-    @pytest.mark.order(81200)
-    def test_modify_set_participation_factors(self, saw_instance):
-        saw_instance.SetParticipationFactors("CONSTANT", 1.0, "SYSTEM")
-
-    @pytest.mark.order(81300)
-    def test_modify_set_scheduled_voltage(self, saw_instance):
-        buses = saw_instance.GetParametersMultipleElement("Bus", ["BusNum"])
-        assert buses is not None and not buses.empty, "Test case must contain buses"
-        bus_key = create_object_string("Bus", buses.iloc[0]["BusNum"])
-        try:
-            saw_instance.SetScheduledVoltageForABus(bus_key, 1.0)
-        except (PowerWorldPrerequisiteError, PowerWorldError):
-            pytest.skip("SetScheduledVoltage not available")
-
-    @pytest.mark.order(81400)
-    def test_modify_set_interface_limit_sum(self, saw_instance):
-        try:
-            saw_instance.SetInterfaceLimitToMonitoredElementLimitSum("ALL")
-        except (PowerWorldPrerequisiteError, PowerWorldError):
-            pytest.skip("Interface limit sum not available")
-
-    @pytest.mark.order(81500)
-    def test_modify_rotate_bus_angles(self, saw_instance):
-        buses = saw_instance.GetParametersMultipleElement("Bus", ["BusNum"])
-        assert buses is not None and not buses.empty, "Test case must contain buses"
-        bus_key = create_object_string("Bus", buses.iloc[0]["BusNum"])
-        try:
-            saw_instance.RotateBusAnglesInIsland(bus_key, 0.0)
-        except (PowerWorldPrerequisiteError, PowerWorldError):
-            pytest.skip("Rotate bus angles not available")
-
-    @pytest.mark.order(81600)
-    def test_modify_set_gen_pmax(self, saw_instance):
-        try:
-            saw_instance.SetGenPMaxFromReactiveCapabilityCurve()
-        except (PowerWorldPrerequisiteError, PowerWorldError):
-            pytest.skip("Reactive capability curve not available")
-
-    @pytest.mark.order(81700)
-    def test_modify_remove_3w_xformer(self, saw_instance):
-        try:
-            saw_instance.Remove3WXformerContainer()
-        except (PowerWorldPrerequisiteError, PowerWorldError):
-            pytest.skip("3W transformer removal not available")
-
-    @pytest.mark.order(81800)
-    def test_modify_rename_injection_group(self, saw_instance):
-        try:
-            saw_instance.InjectionGroupCreate("RenameTestIG", "Gen", 1.0, "ALL")
-            saw_instance.RenameInjectionGroup("RenameTestIG", "RenamedIG")
-        except (PowerWorldPrerequisiteError, PowerWorldError):
-            pytest.skip("Injection group rename not available")
-
-    @pytest.mark.order(81900)
-    def test_modify_reassign_ids(self, saw_instance):
-        try:
-            saw_instance.ReassignIDs("Load", "BusName", filter_name="", use_right=False)
-        except (PowerWorldPrerequisiteError, PowerWorldError):
-            pytest.skip("ReassignIDs not available")
-
-    @pytest.mark.order(82000)
-    def test_modify_reassign_ids_right(self, saw_instance):
-        try:
-            saw_instance.ReassignIDs("Load", "BusName", filter_name="ALL", use_right=True)
-        except (PowerWorldPrerequisiteError, PowerWorldError):
-            pytest.skip("ReassignIDs not available")
-
-    @pytest.mark.order(82100)
-    def test_modify_merge_line_terminals(self, saw_instance):
-        try:
-            saw_instance.MergeLineTerminals("SELECTED")
-        except (PowerWorldPrerequisiteError, PowerWorldError):
-            pytest.skip("MergeLineTerminals not available")
-
-    @pytest.mark.order(82200)
-    def test_modify_merge_ms_line_sections(self, saw_instance):
-        try:
-            saw_instance.MergeMSLineSections("SELECTED")
-        except (PowerWorldPrerequisiteError, PowerWorldError):
-            pytest.skip("MergeMSLineSections not available")
-
-    @pytest.mark.order(82300)
-    def test_modify_directions_auto_insert(self, saw_instance):
-        areas = saw_instance.GetParametersMultipleElement("Area", ["AreaNum"])
-        if areas is None or len(areas) < 2:
-            pytest.skip("DirectionsAutoInsert requires a case with at least 2 areas")
-        s = create_object_string("Area", areas.iloc[0]["AreaNum"])
-        b = create_object_string("Area", areas.iloc[1]["AreaNum"])
-        try:
-            saw_instance.DirectionsAutoInsert(s, b, delete_existing=True, use_area_zone_filters=False)
-        except (PowerWorldPrerequisiteError, PowerWorldError):
-            pytest.skip("DirectionsAutoInsert not available")
-
-    @pytest.mark.order(82400)
-    def test_modify_directions_auto_insert_with_filters(self, saw_instance):
-        areas = saw_instance.GetParametersMultipleElement("Area", ["AreaNum"])
-        if areas is None or len(areas) < 2:
-            pytest.skip("DirectionsAutoInsert requires a case with at least 2 areas")
-        s = create_object_string("Area", areas.iloc[0]["AreaNum"])
-        b = create_object_string("Area", areas.iloc[1]["AreaNum"])
-        try:
-            saw_instance.DirectionsAutoInsert(s, b, delete_existing=False, use_area_zone_filters=True)
-        except (PowerWorldPrerequisiteError, PowerWorldError):
-            pytest.skip("Directions with filters not available")
-
-    @pytest.mark.order(82500)
-    def test_modify_directions_auto_insert_ref_opposite(self, saw_instance):
-        try:
-            saw_instance.DirectionsAutoInsertReference("Bus", "Slack", delete_existing=True, opposite_direction=True)
-        except (PowerWorldPrerequisiteError, PowerWorldError):
-            pytest.skip("Directions reference insert not available")
-
-    @pytest.mark.order(82600)
-    def test_modify_change_system_mva_base(self, saw_instance):
-        saw_instance.ChangeSystemMVABase(100.0)
-
-
-class TestGeneralExtended:
-    """Extended tests for General mixin -- uncovered parameter paths."""
-
-    @pytest.mark.order(67000)
-    def test_general_log_clear(self, saw_instance):
-        saw_instance.LogClear()
-
-    @pytest.mark.order(67100)
-    def test_general_log_show(self, saw_instance):
-        saw_instance.LogShow(show=True)
-        saw_instance.LogShow(show=False)
-
-    @pytest.mark.order(67200)
-    def test_general_log_add_datetime(self, saw_instance):
-        saw_instance.LogAddDateTime("TestLabel", include_date=True, include_time=True, include_milliseconds=False)
-
-    @pytest.mark.order(67300)
-    def test_general_log_add_datetime_all(self, saw_instance):
-        saw_instance.LogAddDateTime("TestLabel2", include_date=True, include_time=True, include_milliseconds=True)
-
-    @pytest.mark.order(67400)
-    def test_general_log_add_datetime_minimal(self, saw_instance):
-        saw_instance.LogAddDateTime("TestLabel3", include_date=False, include_time=False, include_milliseconds=False)
-
-    @pytest.mark.order(67500)
-    def test_general_log_save_append(self, saw_instance, temp_file):
-        tmp = temp_file(".txt")
-        saw_instance.LogAdd("Test1")
-        saw_instance.LogSave(tmp, append=False)
-        saw_instance.LogAdd("Test2")
-        saw_instance.LogSave(tmp, append=True)
-        assert os.path.exists(tmp)
-
-    @pytest.mark.order(67600)
-    def test_general_set_current_directory(self, saw_instance, temp_dir):
-        saw_instance.SetCurrentDirectory(str(temp_dir))
-
-    @pytest.mark.order(67700)
-    def test_general_set_current_directory_create(self, saw_instance, temp_dir):
-        new_dir = os.path.join(str(temp_dir), "test_subdir")
-        saw_instance.SetCurrentDirectory(new_dir, create_if_not_found=True)
-
-    @pytest.mark.order(67800)
-    def test_general_enter_mode(self, saw_instance):
-        saw_instance.EnterMode("EDIT")
-        saw_instance.EnterMode("RUN")
-
-    @pytest.mark.order(67900)
-    def test_general_import_data(self, saw_instance, temp_file):
-        tmp_csv = temp_file(".csv")
-        with open(tmp_csv, "w") as f:
-            f.write("BusNum,BusName\n1,TestBus\n")
-        try:
-            saw_instance.ImportData(tmp_csv, "CSV", header_line=1, create_if_not_found=True)
-        except (PowerWorldPrerequisiteError, PowerWorldError):
-            pytest.skip("ImportData not available")
-
-    @pytest.mark.order(68000)
-    def test_general_load_csv(self, saw_instance, temp_file):
-        tmp_csv = temp_file(".csv")
-        with open(tmp_csv, "w") as f:
-            f.write("ObjectType,Bus\nBusNum,BusName\n1,TestBus\n")
-        try:
-            saw_instance.LoadCSV(tmp_csv, create_if_not_found=True)
-        except (PowerWorldPrerequisiteError, PowerWorldError):
-            pytest.skip("LoadCSV not available")
-
-    @pytest.mark.order(68100)
-    def test_general_save_data_with_extra(self, saw_instance, temp_file):
-        tmp_csv = temp_file(".csv")
-        try:
-            saw_instance.SaveDataWithExtra(
-                tmp_csv, "CSV", "Bus", ["BusNum", "BusName"],
-                header_list=["CaseName"], header_value_list=["TestCase"],
-            )
-            assert os.path.exists(tmp_csv)
-        except (PowerWorldPrerequisiteError, PowerWorldError):
-            pytest.skip("SaveDataWithExtra not available")
-
-    @pytest.mark.order(68200)
-    def test_general_save_data_no_sort(self, saw_instance, temp_file):
-        tmp_aux = temp_file(".aux")
-        saw_instance.SaveData(
-            tmp_aux, "AUX", "Bus", ["BusNum", "BusName"],
-            transpose=False, append=False,
-        )
-        assert os.path.exists(tmp_aux)
-
-    @pytest.mark.order(68300)
-    def test_general_save_data_transposed(self, saw_instance, temp_file):
-        tmp_csv = temp_file(".csv")
-        try:
-            saw_instance.SaveData(
-                tmp_csv, "CSV", "Bus", ["BusNum", "BusName"],
-                transpose=True, append=False,
-            )
-        except (PowerWorldPrerequisiteError, PowerWorldError):
-            pytest.skip("SaveData transposed not available")
-
-    @pytest.mark.order(68400)
-    def test_general_load_aux_create(self, saw_instance, temp_file):
-        tmp_aux = temp_file(".aux")
-        with open(tmp_aux, "w") as f:
-            f.write('DATA (Bus, [BusNum, BusName]) {\n99998 "TestNewBus"\n}\n')
-        saw_instance.LoadAux(tmp_aux, create_if_not_found=True)
-        # Clean up
-        try:
-            saw_instance.Delete("Bus", "BusNum = 99998")
-        except PowerWorldError:
-            pass
-
-    @pytest.mark.order(68500)
-    def test_general_load_aux_directory(self, saw_instance, temp_dir):
-        try:
-            saw_instance.LoadAuxDirectory(str(temp_dir), filter_string="*.aux")
-        except (PowerWorldPrerequisiteError, PowerWorldError):
-            pytest.skip("LoadAuxDirectory not available")
-
-    @pytest.mark.order(68600)
-    def test_general_load_aux_directory_no_filter(self, saw_instance, temp_dir):
-        try:
-            saw_instance.LoadAuxDirectory(str(temp_dir))
-        except (PowerWorldPrerequisiteError, PowerWorldError):
-            pytest.skip("LoadAuxDirectory not available")
-
-    @pytest.mark.order(68700)
-    def test_general_load_data(self, saw_instance, temp_file):
-        tmp_aux = temp_file(".aux")
-        with open(tmp_aux, "w") as f:
-            f.write('DATA (Bus, [BusNum, BusName]) {\n1 "TestBus"\n}\n')
-        try:
-            saw_instance.LoadData(tmp_aux, "Bus")
-        except (PowerWorldPrerequisiteError, PowerWorldError):
-            pytest.skip("LoadData not available")
-
-    @pytest.mark.order(68800)
-    def test_general_stop_aux_file(self, saw_instance):
-        try:
-            saw_instance.StopAuxFile()
-        except (PowerWorldPrerequisiteError, PowerWorldError):
-            pytest.skip("StopAuxFile not available")
-
-    @pytest.mark.order(68900)
-    def test_general_select_all_no_filter(self, saw_instance):
-        saw_instance.SelectAll("Bus")
-        saw_instance.UnSelectAll("Bus")
-
-
-class TestCaseActionsExtended:
-    """Extended tests for Case Actions -- uncovered parameter paths."""
-
-    @pytest.mark.order(90000)
-    def test_case_description_append(self, saw_instance):
-        saw_instance.CaseDescriptionSet("Line 1")
-        saw_instance.CaseDescriptionSet("Line 2", append=True)
-        saw_instance.CaseDescriptionClear()
-
-    @pytest.mark.order(90100)
-    def test_case_save_external_with_ties(self, saw_instance, temp_file):
-        tmp_pwb = temp_file(".pwb")
-        try:
-            saw_instance.SaveExternalSystem(tmp_pwb, with_ties=True)
-        except (PowerWorldPrerequisiteError, PowerWorldError):
-            pytest.skip("SaveExternalSystem with ties not available")
-
-    @pytest.mark.order(90200)
-    def test_case_scale_gen(self, saw_instance):
-        try:
-            saw_instance.Scale("GEN", "FACTOR", [1.0], "SYSTEM")
-        except (PowerWorldPrerequisiteError, PowerWorldError):
-            pytest.skip("Scale GEN not available")
-
-    @pytest.mark.order(90300)
-    def test_case_scale_load_mw(self, saw_instance):
-        try:
-            saw_instance.Scale("LOAD", "MW", [100.0, 50.0], "SYSTEM")
-        except (PowerWorldPrerequisiteError, PowerWorldError):
-            pytest.skip("Scale LOAD MW not available")
-
-    @pytest.mark.order(90400)
-    def test_case_load_ems(self, saw_instance, temp_file):
-        tmp = temp_file(".hdb")
-        try:
-            saw_instance.LoadEMS(tmp)
-        except (PowerWorldPrerequisiteError, PowerWorldError):
-            pytest.skip("LoadEMS not available")
-
-    @pytest.mark.order(90500)
-    def test_case_renumber_custom_index(self, saw_instance):
-        try:
-            saw_instance.RenumberAreas(custom_integer_index=1)
-            saw_instance.RenumberBuses(custom_integer_index=2)
-            saw_instance.RenumberSubs(custom_integer_index=3)
-            saw_instance.RenumberZones(custom_integer_index=4)
-        except (PowerWorldPrerequisiteError, PowerWorldError):
-            pytest.skip("Renumber with custom index not available")
-
-
-@pytest.mark.usefixtures("save_restore_state")
-class TestModifyGaps:
-    """Tests for remaining Modify operations."""
-
-    @pytest.mark.order(83000)
-    def test_create_line_derive_existing(self, saw_instance):
-        """CreateLineDeriveExisting creates a line from existing parameters."""
-        branches = saw_instance.GetParametersMultipleElement(
-            "Branch", ["BusNum", "BusNum:1", "LineCircuit"]
-        )
-        assert branches is not None and not branches.empty, "Test case must contain branches"
-        b = branches.iloc[0]
-        branch_id = create_object_string("Branch", b["BusNum"], b["BusNum:1"], b["LineCircuit"])
-        try:
-            saw_instance.CreateLineDeriveExisting(
-                int(b["BusNum"]), int(b["BusNum:1"]), "99",
-                10.0, branch_id, existing_length=5.0, zero_g=True,
-            )
-        except (PowerWorldPrerequisiteError, PowerWorldError):
-            pytest.skip("CreateLineDeriveExisting not available")
-
-    @pytest.mark.order(83100)
-    def test_merge_buses(self, saw_instance):
-        """MergeBuses completes without error."""
-        buses = saw_instance.GetParametersMultipleElement("Bus", ["BusNum"])
-        assert buses is not None and not buses.empty, "Test case must contain buses"
-        try:
-            saw_instance.MergeBuses("SELECTED", filter_name="")
-        except (PowerWorldPrerequisiteError, PowerWorldError):
-            pytest.skip("MergeBuses not available")
-
-    @pytest.mark.order(83200)
-    def test_move(self, saw_instance):
-        """Move a generator (0% -- no-op)."""
-        gens = saw_instance.GetParametersMultipleElement("Gen", ["BusNum", "GenID"])
-        buses = saw_instance.GetParametersMultipleElement("Bus", ["BusNum"])
-        assert gens is not None and not gens.empty, "Test case must contain generators"
-        assert buses is not None and not buses.empty, "Test case must contain buses"
-        gen_key = create_object_string("Gen", gens.iloc[0]["BusNum"], gens.iloc[0]["GenID"])
-        bus_key = create_object_string("Bus", buses.iloc[0]["BusNum"])
-        try:
-            saw_instance.Move(gen_key, bus_key, how_much=0.0, abort_on_error=True)
-        except (PowerWorldPrerequisiteError, PowerWorldError):
-            pytest.skip("Move not available")
-
-    @pytest.mark.order(83300)
-    def test_split_bus(self, saw_instance):
-        """SplitBus creates a new bus from an existing one."""
-        buses = saw_instance.GetParametersMultipleElement("Bus", ["BusNum"])
-        assert buses is not None and not buses.empty, "Test case must contain buses"
-        bus_key = create_object_string("Bus", buses.iloc[0]["BusNum"])
-        try:
-            saw_instance.SplitBus(bus_key, 99997, insert_tie=True, line_open=False)
-        except (PowerWorldPrerequisiteError, PowerWorldError):
-            pytest.skip("SplitBus not available")
-
-    @pytest.mark.order(83400)
-    def test_tap_transmission_line(self, saw_instance):
-        """TapTransmissionLine taps a line at midpoint."""
-        branches = saw_instance.GetParametersMultipleElement(
-            "Branch", ["BusNum", "BusNum:1", "LineCircuit"]
-        )
-        assert branches is not None and not branches.empty, "Test case must contain branches"
-        b = branches.iloc[0]
-        branch_key = create_object_string("Branch", b["BusNum"], b["BusNum:1"], b["LineCircuit"])
-        try:
-            saw_instance.TapTransmissionLine(
-                branch_key, 50.0, 99996,
-                shunt_model="CAPACITANCE",
-                treat_as_ms_line=False,
-                update_onelines=False,
-                new_bus_name="TapBus",
-            )
-        except (PowerWorldPrerequisiteError, PowerWorldError):
-            pytest.skip("TapTransmissionLine not available")
-
-    @pytest.mark.order(83500)
-    def test_branch_mva_limit_with_limits(self, saw_instance):
-        """BranchMVALimitReorder with explicit limits list."""
-        try:
-            saw_instance.BranchMVALimitReorder(
-                filter_name="ALL",
-                limits=["A", "B", "C"],
-            )
-        except (PowerWorldPrerequisiteError, PowerWorldError):
-            pytest.skip("BranchMVALimitReorder with limits not available")
-
-
-class TestRegionsGaps:
-    """Tests for remaining Regions functions."""
-
-    @pytest.mark.order(85000)
-    def test_region_load_shapefile(self, saw_instance, temp_file):
-        """RegionLoadShapefile completes without error."""
-        tmp = temp_file(".shp")
-        try:
-            saw_instance.RegionLoadShapefile(
-                tmp, "TestClass", ["Name"],
-                add_to_open_onelines=False,
-                display_style_name="",
-                delete_existing=True,
-            )
-        except (PowerWorldPrerequisiteError, PowerWorldError):
-            pytest.skip("RegionLoadShapefile not available")
-
-
-class TestGeneralGaps:
-    """Tests for remaining General mixin functions."""
-
-    @pytest.mark.order(85100)
-    def test_save_object_fields(self, saw_instance, temp_file):
-        """SaveObjectFields writes field metadata to file."""
-        tmp = temp_file(".csv")
-        try:
-            saw_instance.SaveObjectFields(tmp, "Bus", ["BusNum", "BusName"])
-        except (PowerWorldPrerequisiteError, PowerWorldError):
-            pytest.skip("SaveObjectFields not available")
-
-    @pytest.mark.order(85200)
-    def test_load_script(self, saw_instance, temp_file):
-        """LoadScript processes script from aux file."""
-        tmp = temp_file(".aux")
-        with open(tmp, "w") as f:
-            f.write('SCRIPT TestScript\n{\n    LogAdd("Script test");\n}\n')
-        try:
-            saw_instance.LoadScript(tmp, "TestScript")
-        except (PowerWorldPrerequisiteError, PowerWorldError):
-            pytest.skip("LoadScript not available")
-
-    @pytest.mark.order(85300)
-    def test_delete_with_filter(self, saw_instance):
-        """Delete with specific area zone filter."""
-        saw_instance.CreateData("Bus", ["BusNum", "BusName"], [99995, "DeleteTestBus"])
-        try:
-            saw_instance.Delete("Bus", "BusNum = 99995")
-        except (PowerWorldPrerequisiteError, PowerWorldError):
-            pytest.skip("Delete with filter not available")
-
-    @pytest.mark.order(85400)
-    def test_create_data(self, saw_instance):
-        """CreateData creates an object then cleans up."""
-        try:
-            saw_instance.CreateData("Bus", ["BusNum", "BusName"], [99994, "CreateTestBus"])
-            saw_instance.Delete("Bus", "BusNum = 99994")
-        except (PowerWorldPrerequisiteError, PowerWorldError):
-            pytest.skip("CreateData not available")
-
-    @pytest.mark.order(85500)
-    def test_send_to_excel_advanced(self, saw_instance):
-        """SendToExcelAdvanced completes without error (requires Excel)."""
-        try:
-            saw_instance.SendToExcelAdvanced(
-                "Bus", ["BusNum", "BusName"],
-                use_column_headers=True,
-                clear_existing=True,
-            )
-        except (PowerWorldPrerequisiteError, PowerWorldError, OSError):
-            pytest.skip("SendToExcelAdvanced not available (Excel may not be installed)")
 
 
 if __name__ == "__main__":

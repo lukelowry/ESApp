@@ -283,7 +283,7 @@ class PowerflowMixin:
         args = pack_args(f'"{filename}"', app, sa, sr, sb, key_fields, f'"{export_format}"', uaz, udm, abm, icp, dbf)
         return self.RunScriptCommand(f"DiffCaseWriteCompleteModel({args});")
 
-    def DiffCaseWriteBothEPC(self, filename: str, ge_file_type: str = "GE", use_area_zone: bool = False, base_area_zone_meet: bool = True, append: bool = False, export_format: str = "", use_data_maintainer: bool = False):
+    def DiffCaseWriteBothEPC(self, filename: str, ge_file_type: str = "GE19", use_area_zone: bool = False, base_area_zone_meet: bool = True, append: bool = False, export_format: str = "", use_data_maintainer: bool = False):
         """Saves elements that exist in both base and present cases in GE EPC format.
 
         Parameters
@@ -291,7 +291,7 @@ class PowerflowMixin:
         filename : str
             Name of the EPC file to create.
         ge_file_type : str, optional
-            GE EPC file version (e.g., "GE", "GE14"-"GE23"). Defaults to "GE".
+            GE EPC file version (e.g., "GE18", "GE19", "PTI33"). Defaults to "GE19".
         use_area_zone : bool, optional
             If True, use Area/Zone/Owner filter. Defaults to False.
         base_area_zone_meet : bool, optional
@@ -310,7 +310,7 @@ class PowerflowMixin:
         args = pack_args(f'"{filename}"', ge_file_type, uaz, baz, app, f'"{export_format}"', udm)
         return self.RunScriptCommand(f"DiffCaseWriteBothEPC({args});")
 
-    def DiffCaseWriteNewEPC(self, filename: str, ge_file_type: str = "GE", use_area_zone: bool = False, base_area_zone_meet: bool = True, append: bool = False, use_data_maintainer: bool = False):
+    def DiffCaseWriteNewEPC(self, filename: str, ge_file_type: str = "GE19", use_area_zone: bool = False, base_area_zone_meet: bool = True, append: bool = False, use_data_maintainer: bool = False):
         """Saves elements that are new (added) in GE EPC format.
 
         Parameters
@@ -318,7 +318,7 @@ class PowerflowMixin:
         filename : str
             Name of the EPC file to create.
         ge_file_type : str, optional
-            GE EPC file version. Defaults to "GE".
+            GE EPC file version (e.g., "GE18", "GE19", "PTI33"). Defaults to "GE19".
         use_area_zone : bool, optional
             If True, use Area/Zone/Owner filter. Defaults to False.
         base_area_zone_meet : bool, optional
@@ -335,7 +335,7 @@ class PowerflowMixin:
         args = pack_args(f'"{filename}"', ge_file_type, uaz, baz, app, udm)
         return self.RunScriptCommand(f"DiffCaseWriteNewEPC({args});")
 
-    def DiffCaseWriteRemovedEPC(self, filename: str, ge_file_type: str = "GE", use_area_zone: bool = False, base_area_zone_meet: bool = True, append: bool = False, use_data_maintainer: bool = False):
+    def DiffCaseWriteRemovedEPC(self, filename: str, ge_file_type: str = "GE19", use_area_zone: bool = False, base_area_zone_meet: bool = True, append: bool = False, use_data_maintainer: bool = False):
         """Saves elements that were removed in GE EPC format.
 
         Parameters
@@ -343,7 +343,7 @@ class PowerflowMixin:
         filename : str
             Name of the EPC file to create.
         ge_file_type : str, optional
-            GE EPC file version. Defaults to "GE".
+            GE EPC file version (e.g., "GE18", "GE19", "PTI33"). Defaults to "GE19".
         use_area_zone : bool, optional
             If True, use Area/Zone/Owner filter. Defaults to False.
         base_area_zone_meet : bool, optional

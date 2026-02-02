@@ -904,7 +904,6 @@ class SAWBase(object):
         PowerWorldError
             If any of the script commands fail.
         """
-        self.log.debug(f"RunScriptCommand: {Statements}")
         return self._call_simauto("RunScriptCommand", Statements)
 
     def RunScriptCommand2(self, Statements: str, StatusMessage: str):
@@ -1074,6 +1073,8 @@ class SAWBase(object):
         PowerWorldError
             If SimAuto returns an error message (e.g., invalid parameters, operation failed).
         """
+        # TODO debug log of functions being called
+        #self.log.debug(f"Calling: {func}", args)
         try:
             f = getattr(self._pwcom, func)
         except AttributeError:

@@ -138,7 +138,13 @@ class TransientMixin:
         c_stat = YesNo.from_bool(clear_statistics)
         c_time = YesNo.from_bool(clear_time_values)
         c_sol = YesNo.from_bool(clear_solution_details)
-        self.RunScriptCommand(f"TSClearResultsFromRAM({ctg_name},{c_sum},{c_evt},{c_stat},{c_time},{c_sol});")
+        try:
+            self.RunScriptCommand(f"TSClearResultsFromRAM({ctg_name}, {c_sum}, {c_evt}, {c_stat}, {c_time}, {c_sol});")
+        except Exception as e:
+            if "access violation" in str(e).lower():
+                self.log.warning("TSClearResultsFromRAM: PW access violation (no results in RAM to clear)")
+            else:
+                raise
 
     def TSClearPlayInSignals(self) -> None:
         """Deletes all defined PlayIn signals.

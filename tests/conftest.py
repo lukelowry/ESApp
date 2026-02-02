@@ -6,6 +6,9 @@ Provides reusable test fixtures for both offline (mocked) and online
 """
 import pytest
 import os
+import hashlib
+import tempfile
+import warnings
 from typing import TYPE_CHECKING
 from unittest.mock import Mock, patch, MagicMock
 from pathlib import Path
@@ -100,6 +103,47 @@ def saw_session():
 
 
 # -------------------------------------------------------------------------
+# Case file integrity check
+# -------------------------------------------------------------------------
+
+def _file_hash(path):
+    """Compute SHA-256 hash of a file."""
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+@pytest.fixture(scope="session")
+def _case_file_hash():
+    """Record the on-disk hash of the test case file at session start."""
+    case_path = _get_test_case_path()
+    if not case_path or not os.path.exists(case_path):
+        yield None
+        return
+    yield _file_hash(case_path)
+
+
+@pytest.fixture(autouse=True, scope="class")
+def _check_case_file_integrity(_case_file_hash):
+    """Fail loudly if any test class accidentally saves over the case file."""
+    yield
+    if _case_file_hash is None:
+        return
+    case_path = _get_test_case_path()
+    if not case_path or not os.path.exists(case_path):
+        return
+    current_hash = _file_hash(case_path)
+    if current_hash != _case_file_hash:
+        pytest.fail(
+            f"CASE FILE MODIFIED ON DISK! The test case file has been "
+            f"altered by a test. This will corrupt results for subsequent "
+            f"tests. File: {case_path}"
+        )
+
+
+# -------------------------------------------------------------------------
 # GIC multi-case fixture
 # -------------------------------------------------------------------------
 
@@ -135,24 +179,23 @@ def gic_saw(request, saw_session):
     original_case = _get_test_case_path()
     label = os.path.splitext(os.path.basename(case_path))[0]
 
-    # If the requested case is the same as the session case, just yield
-    if os.path.normcase(os.path.abspath(case_path)) == os.path.normcase(os.path.abspath(original_case)):
-        yield saw_session
-        return
-
-    print(f"\n[GIC] Switching to case: {label}")
+    # Always reload the case from disk to ensure a clean state,
+    # even when it's the same as the session case (prior tests may
+    # have modified the in-memory state).
+    print(f"\n[GIC] Loading case: {label}")
     saw_session.CloseCase()
     saw_session.OpenCase(case_path)
     try:
         yield saw_session
     finally:
-        # Restore the original session case
-        print(f"\n[GIC] Restoring original case")
-        try:
-            saw_session.CloseCase()
-            saw_session.OpenCase(original_case)
-        except Exception:
-            pass
+        # Restore the original session case if we switched to a different one
+        if os.path.normcase(os.path.abspath(case_path)) != os.path.normcase(os.path.abspath(original_case)):
+            print(f"\n[GIC] Restoring original case")
+            try:
+                saw_session.CloseCase()
+                saw_session.OpenCase(original_case)
+            except Exception:
+                pass
 
 
 # -------------------------------------------------------------------------
@@ -399,5 +442,53 @@ def save_restore_state(saw_session):
     try:
         saw_session.RestoreState(state_name)
         saw_session.DeleteState(state_name)
+    except Exception:
+        pass
+
+
+# -------------------------------------------------------------------------
+# PW Log Capture — on test failure the PowerWorld message log is
+# retrieved and printed so you can see exactly what PW did.
+# -------------------------------------------------------------------------
+
+_PW_LOG_PATH = os.path.join(tempfile.gettempdir(), "esapp_test_pw_log.txt")
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_makereport(item, call):
+    """Record whether the test call phase failed."""
+    outcome = yield
+    report = outcome.get_result()
+    if report.when == "call" and report.failed:
+        item._pw_test_failed = True
+
+
+@pytest.fixture(autouse=True)
+def _capture_pw_log(request, saw_session):
+    """Clear the PW log before each test; on failure, dump it to stdout."""
+    try:
+        saw_session.LogClear()
+    except Exception:
+        pass
+
+    yield
+
+    # Only retrieve the log when the test failed
+    if not getattr(request.node, "_pw_test_failed", False):
+        return
+
+    try:
+        saw_session.LogSave(_PW_LOG_PATH)
+        if os.path.exists(_PW_LOG_PATH):
+            with open(_PW_LOG_PATH, "r", errors="replace") as f:
+                pw_log = f.read().strip()
+            if pw_log:
+                # Print to stdout — pytest captures this and shows it
+                # in the "Captured stdout teardown" section of the failure.
+                print(f"\n{'=' * 60}")
+                print(f"PW Log ({request.node.name})")
+                print(f"{'=' * 60}")
+                print(pw_log)
+                print(f"{'=' * 60}")
     except Exception:
         pass

@@ -166,9 +166,9 @@ class ModifyMixin:
         Parameters
         ----------
         source : str
-            The source object string (e.g., '[AREA "Top"]', '[BUS 1]').
+            The source object type (e.g., 'AREA', 'BUS', 'ZONE').
         sink : str
-            The sink object string (e.g., '[AREA "Bottom"]', '[BUS 2]').
+            The sink object type (e.g., 'AREA', 'BUS', 'ZONE').
         delete_existing : bool, optional
             If True, deletes existing directions before inserting new ones. Defaults to True.
         use_area_zone_filters : bool, optional
@@ -280,7 +280,7 @@ class ModifyMixin:
             If the SimAuto call fails.
         """
         app = YesNo.from_bool(append)
-        filt = f'"{filter_name}"'
+        filt = format_filter(filter_name)
         args = pack_args(f'"{name}"', object_type, initial_value, filt, app)
         return self.RunScriptCommand(f"InjectionGroupCreate({args});")
 

@@ -158,10 +158,7 @@ class TestContingency:
     @pytest.mark.order(5410)
     def test_contingency_relink(self, saw_instance):
         """Test CTGRelinkUnlinkedElements."""
-        try:
-            saw_instance.CTGRelinkUnlinkedElements()
-        except (PowerWorldPrerequisiteError, PowerWorldError):
-            pytest.skip("CTGRelinkUnlinkedElements not available")
+        saw_instance.CTGRelinkUnlinkedElements()
 
     @pytest.mark.order(5420)
     def test_contingency_sort(self, saw_instance):
@@ -190,10 +187,7 @@ class TestContingency:
                 "Contingency", [name_col, "Skip"], [name, "NO"]
             )
 
-        try:
-            saw_instance.CTGComboSolveAll()
-        except PowerWorldPrerequisiteError:
-            pytest.skip("No active primary contingencies for Combo Analysis")
+        saw_instance.CTGComboSolveAll()
 
     @pytest.mark.order(5600)
     def test_contingency_clone(self, saw_instance):
@@ -222,10 +216,7 @@ class TestContingency:
 
     @pytest.mark.order(5800)
     def test_contingency_create_interface(self, saw_instance):
-        try:
-            saw_instance.CTGCreateContingentInterfaces("")
-        except PowerWorldPrerequisiteError:
-            pytest.skip("Filter 'ALL' not found for CTGCreateContingentInterfaces")
+        saw_instance.CTGCreateContingentInterfaces("")
 
     @pytest.mark.order(5900)
     def test_contingency_join(self, saw_instance):
@@ -259,41 +250,35 @@ class TestContingency:
         saw_instance.CTGWriteAuxUsingOptions(tmp_aux3)
         assert os.path.exists(tmp_aux3)
 
+    @pytest.mark.order(6320)
+    def test_ctg_sort_with_fields(self, saw_instance):
+        """CTGSort with sort field list."""
+        saw_instance.CTGSort(sort_field_list=["Name:+:0"])
 
-class TestFault:
-    """Tests for fault analysis operations."""
-
-    @pytest.mark.order(5300)
-    def test_fault_run(self, saw_instance):
-        buses = saw_instance.GetParametersMultipleElement("Bus", ["BusNum"])
-        assert buses is not None and not buses.empty, "No buses found"
-        bus_str = create_object_string("Bus", buses.iloc[0]["BusNum"])
-        saw_instance.RunFault(bus_str, "SLG")
-        saw_instance.FaultClear()
-
-    @pytest.mark.order(5400)
-    def test_fault_auto(self, saw_instance):
-        # Configure limited auto-insert options (same object as CTG)
+    @pytest.mark.order(6330)
+    def test_ctg_delete_identical(self, saw_instance):
+        """CTGDeleteWithIdenticalActions completes without error."""
         _configure_limited_ctg_auto_insert(saw_instance)
-        saw_instance.FaultAutoInsert()
+        saw_instance.CTGAutoInsert()
+        # Trim and delete excess to avoid long runtimes
+        _trim_contingencies(saw_instance, max_active=5, delete_excess=True)
+        saw_instance.CTGDeleteWithIdenticalActions()
 
-    @pytest.mark.order(5500)
-    def test_fault_multiple(self, saw_instance):
-        _configure_limited_ctg_auto_insert(saw_instance)
-        saw_instance.FaultAutoInsert()
-        try:
-            saw_instance.FaultMultiple()
-        except PowerWorldPrerequisiteError:
-            pytest.skip("No active faults defined for FaultMultiple")
+    @pytest.mark.order(6350)
+    def test_ctg_restore_reference(self, saw_instance):
+        """CTGRestoreReference restores reference state."""
+        saw_instance.CTGSetAsReference()
+        saw_instance.CTGRestoreReference()
 
-
-class TestContingencyAdvanced:
-    """Advanced contingency tests for edge cases and validation."""
+    @pytest.mark.order(6360)
+    def test_ctg_write_aux_using_options(self, saw_instance, temp_file):
+        """CTGWriteAuxUsingOptions writes to file."""
+        tmp = temp_file(".aux")
+        saw_instance.CTGWriteAuxUsingOptions(tmp, append=False)
 
     @pytest.mark.order(6400)
     def test_contingency_get_violations(self, saw_instance):
         """Test retrieving contingency violations."""
-        # Run contingencies first to generate results
         _configure_limited_ctg_auto_insert(saw_instance)
         saw_instance.CTGAutoInsert()
 
@@ -313,37 +298,54 @@ class TestContingencyAdvanced:
         assert ctgs is not None and not ctgs.empty, "No contingencies found for results check"
         assert isinstance(ctgs, pd.DataFrame)
         assert len(ctgs) > 0
-        # Verify expected columns exist
         assert "CTGLabel" in ctgs.columns or len(ctgs.columns) > 0
 
     @pytest.mark.order(6600)
     def test_contingency_skip_behavior(self, saw_instance):
         """Test that skipped contingencies are not solved."""
-        # Skip all contingencies
         saw_instance.SetData("Contingency", ["Skip"], ["YES"], "ALL")
-
-        # Solving should be quick since all are skipped
         saw_instance.SolveContingencies()
 
     @pytest.mark.order(6700)
     def test_contingency_restore_reference(self, saw_instance):
         """Test CTGRestoreReference restores case state."""
-        # Store original state
         original_buses = saw_instance.GetParametersMultipleElement("Bus", ["BusNum", "BusPUVolt"])
         assert original_buses is not None, "Failed to retrieve original bus data"
 
-        # Restore reference
         saw_instance.CTGRestoreReference()
 
-        # Get state after restore
         restored_buses = saw_instance.GetParametersMultipleElement("Bus", ["BusNum", "BusPUVolt"])
         assert restored_buses is not None, "Failed to retrieve restored bus data"
 
         assert len(original_buses) == len(restored_buses)
 
 
-class TestFaultAdvanced:
-    """Advanced fault analysis tests."""
+class TestFault:
+    """Tests for fault analysis operations."""
+
+    @pytest.mark.order(5300)
+    def test_fault_run(self, saw_instance):
+        buses = saw_instance.GetParametersMultipleElement("Bus", ["BusNum"])
+        assert buses is not None and not buses.empty, "No buses found"
+        bus_str = create_object_string("Bus", buses.iloc[0]["BusNum"])
+        saw_instance.RunFault(bus_str, "SLG")
+        saw_instance.FaultClear()
+
+    @pytest.mark.order(5400)
+    def test_fault_auto(self, saw_instance):
+        _configure_limited_ctg_auto_insert(saw_instance)
+        saw_instance.FaultAutoInsert()
+
+    @pytest.mark.order(5500)
+    def test_fault_multiple(self, saw_instance):
+        _configure_limited_ctg_auto_insert(saw_instance)
+        saw_instance.FaultAutoInsert()
+        try:
+            saw_instance.FaultMultiple()
+        except PowerWorldPrerequisiteError as e:
+            if "No active faults" in str(e):
+                pytest.skip("No active faults defined after FaultAutoInsert for this case")
+            raise
 
     @pytest.mark.order(5600)
     def test_fault_types(self, saw_instance):
@@ -352,33 +354,25 @@ class TestFaultAdvanced:
         assert buses is not None and not buses.empty, "No buses found for fault type testing"
         bus_str = create_object_string("Bus", buses.iloc[0]["BusNum"])
 
-        # PowerWorld fault types: SLG (Single Line to Ground), LL (Line to Line),
-        # DLG (Double Line to Ground), 3PB (Three Phase Balanced)
         fault_types = ["SLG", "LL", "DLG", "3PB"]
-        succeeded = 0
         for ftype in fault_types:
-            try:
-                saw_instance.RunFault(bus_str, ftype)
-                saw_instance.FaultClear()
-                succeeded += 1
-            except (PowerWorldPrerequisiteError, PowerWorldError):
-                # Some fault types may not be configured or may fail
-                continue
-        assert succeeded > 0, f"None of {fault_types} succeeded"
+            saw_instance.RunFault(bus_str, ftype)
+            saw_instance.FaultClear()
 
     @pytest.mark.order(5700)
     def test_fault_at_branch(self, saw_instance):
-        """Test fault on branch midpoint."""
-        branches = saw_instance.GetParametersMultipleElement("Branch", ["BusNum", "BusNum:1", "LineCircuit"])
+        """Test fault on branch midpoint (line only — transformers can hang PW)."""
+        branches = saw_instance.GetParametersMultipleElement(
+            "Branch", ["BusNum", "BusNum:1", "LineCircuit", "BranchDeviceType"]
+        )
         assert branches is not None and not branches.empty, "No branches found for branch fault testing"
-        b = branches.iloc[0]
+        lines = branches[branches["BranchDeviceType"] != "Transformer"]
+        if lines.empty:
+            pytest.skip("No non-transformer branches available for midpoint fault test")
+        b = lines.iloc[0]
         branch_str = create_object_string("Branch", b["BusNum"], b["BusNum:1"], b["LineCircuit"])
-        try:
-            # 3PB = Three Phase Balanced fault, location = percentage along branch (0-100)
-            saw_instance.RunFault(branch_str, "3PB", location=50.0)
-            saw_instance.FaultClear()
-        except (PowerWorldPrerequisiteError, PowerWorldError):
-            pytest.skip("Branch fault not supported or failed")
+        saw_instance.RunFault(branch_str, "3PB", location=50.0)
+        saw_instance.FaultClear()
 
 
 class TestContingencyExport:
@@ -388,116 +382,42 @@ class TestContingencyExport:
     def test_contingency_produce_report(self, saw_instance, temp_file):
         """Test CTGProduceReport for report generation."""
         tmp_txt = temp_file(".txt")
-        try:
-            saw_instance.CTGProduceReport(tmp_txt)
-            assert os.path.exists(tmp_txt)
-        except (PowerWorldPrerequisiteError, PowerWorldError):
-            pytest.skip("No contingency results for report")
+        saw_instance.CTGProduceReport(tmp_txt)
+        assert os.path.exists(tmp_txt)
 
     @pytest.mark.order(6900)
     def test_contingency_write_pti(self, saw_instance, temp_file):
         """Test CTGWriteFilePTI for PTI format export."""
         tmp_pti = temp_file(".con")
-        try:
-            saw_instance.CTGWriteFilePTI(tmp_pti)
-            assert os.path.exists(tmp_pti)
-        except (PowerWorldPrerequisiteError, PowerWorldError):
-            pytest.skip("PTI export not available")
+        saw_instance.CTGWriteFilePTI(tmp_pti)
+        assert os.path.exists(tmp_pti)
 
     @pytest.mark.order(7000)
     def test_contingency_write_all_options(self, saw_instance, temp_file):
         """Test CTGWriteAllOptions for options export."""
         tmp_aux = temp_file(".aux")
-        try:
-            saw_instance.CTGWriteAllOptions(tmp_aux)
-            assert os.path.exists(tmp_aux)
-        except (PowerWorldPrerequisiteError, PowerWorldError):
-            pytest.skip("Options export not available")
+        saw_instance.CTGWriteAllOptions(tmp_aux)
+        assert os.path.exists(tmp_aux)
 
     @pytest.mark.order(7100)
-    def test_contingency_compare_two_lists(self, saw_instance):
+    def test_contingency_compare_two_lists(self, saw_instance, temp_file):
         """Test CTGCompareTwoListsofContingencyResults for comparing contingency results."""
+        # Save current contingency results to two files for comparison
+        list1 = temp_file(".aux")
+        list2 = temp_file(".aux")
         try:
-            saw_instance.CTGCompareTwoListsofContingencyResults("CTGList1", "CTGList2")
-        except (PowerWorldPrerequisiteError, PowerWorldError):
-            pytest.skip("No contingency lists to compare")
+            saw_instance.CTGWriteAllOptions(list1)
+            saw_instance.CTGWriteAllOptions(list2)
+            saw_instance.CTGCompareTwoListsofContingencyResults(list1, list2)
+        except (PowerWorldError, PowerWorldPrerequisiteError) as e:
+            pytest.skip(f"CTG compare not supported for this case: {e}")
 
     @pytest.mark.order(7200)
     def test_contingency_write_csv(self, saw_instance, temp_file):
         """Test saving contingency violations to CSV."""
         tmp_csv = temp_file(".csv")
-        try:
-            # Save violation results using the violation matrix method
-            saw_instance.CTGSaveViolationMatrices(
-                tmp_csv, "CSVCOLHEADER", False, ["Branch"], True, True
-            )
-            assert os.path.exists(tmp_csv)
-        except (PowerWorldPrerequisiteError, PowerWorldError):
-            pytest.skip("No violations to save")
-
-
-class TestContingencyGaps:
-    """Tests for remaining Contingency analysis functions."""
-
-    @pytest.mark.order(86000)
-    def test_ctg_sort(self, saw_instance):
-        """CTGSort completes without error."""
-        try:
-            saw_instance.CTGSort()
-        except (PowerWorldPrerequisiteError, PowerWorldError):
-            pytest.skip("CTGSort not available")
-
-    @pytest.mark.order(86100)
-    def test_ctg_sort_with_fields(self, saw_instance):
-        """CTGSort with sort field list."""
-        try:
-            saw_instance.CTGSort(sort_field_list=["Name:+:0"])
-        except (PowerWorldPrerequisiteError, PowerWorldError):
-            pytest.skip("CTGSort with fields not available")
-
-    @pytest.mark.order(86300)
-    def test_ctg_delete_identical(self, saw_instance):
-        """CTGDeleteWithIdenticalActions completes without error."""
-        _configure_limited_ctg_auto_insert(saw_instance)
-        saw_instance.CTGAutoInsert()
-        # Trim and delete excess to avoid long runtimes
-        _trim_contingencies(saw_instance, max_active=5, delete_excess=True)
-        try:
-            saw_instance.CTGDeleteWithIdenticalActions()
-        except (PowerWorldPrerequisiteError, PowerWorldError):
-            pytest.skip("CTGDeleteWithIdenticalActions not available")
-
-    @pytest.mark.order(86400)
-    def test_ctg_relink_unlinked(self, saw_instance):
-        """CTGRelinkUnlinkedElements completes without error."""
-        try:
-            saw_instance.CTGRelinkUnlinkedElements()
-        except (PowerWorldPrerequisiteError, PowerWorldError):
-            pytest.skip("CTGRelinkUnlinkedElements not available")
-
-    @pytest.mark.order(86500)
-    def test_ctg_restore_reference(self, saw_instance):
-        """CTGRestoreReference restores reference state."""
-        try:
-            saw_instance.CTGSetAsReference()
-            saw_instance.CTGRestoreReference()
-        except (PowerWorldPrerequisiteError, PowerWorldError):
-            pytest.skip("CTGRestoreReference not available")
-
-    @pytest.mark.order(86600)
-    def test_ctg_write_aux_using_options(self, saw_instance, temp_file):
-        """CTGWriteAuxUsingOptions writes to file."""
-        tmp = temp_file(".aux")
-        try:
-            saw_instance.CTGWriteAuxUsingOptions(tmp, append=False)
-        except (PowerWorldPrerequisiteError, PowerWorldError):
-            pytest.skip("CTGWriteAuxUsingOptions not available")
-
-    @pytest.mark.order(86700)
-    def test_ctg_write_all_options(self, saw_instance, temp_file):
-        """CTGWriteAllOptions writes to file."""
-        tmp = temp_file(".aux")
-        try:
-            saw_instance.CTGWriteAllOptions(tmp)
-        except (PowerWorldPrerequisiteError, PowerWorldError):
-            pytest.skip("CTGWriteAllOptions not available")
+        # Save violation results using the violation matrix method
+        saw_instance.CTGSaveViolationMatrices(
+            tmp_csv, "CSVCOLHEADER", False, ["Branch"], True, True
+        )
+        assert os.path.exists(tmp_csv)

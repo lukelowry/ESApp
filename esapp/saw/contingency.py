@@ -364,7 +364,7 @@ class ContingencyMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        return self.RunScriptCommand(f'CTGCompareTwoListsofContingencyResults({controlling}, {comparison});')
+        return self.RunScriptCommand(f'CTGCompareTwoListsofContingencyResults("{controlling}", "{comparison}");')
 
     def CTGConvertAllToDeviceCTG(self, keep_original_if_empty: bool = False):
         """Converts breaker/disconnect contingencies to device outages.

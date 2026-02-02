@@ -28,7 +28,7 @@ try:
     from esapp.components import Bus, Gen, Load, Branch, Contingency, Area, Zone, Shunt, GICXFormer, GObject
     from esapp import components as grid
     from esapp.workbench import GridWorkBench
-    from esapp.saw import PowerWorldError, PowerWorldPrerequisiteError, COMError, SimAutoFeatureError, create_object_string
+    from esapp.saw import PowerWorldError, COMError, SimAutoFeatureError, create_object_string
 except ImportError:
     raise
 
@@ -173,10 +173,7 @@ class TestGridWorkBenchFunctions:
         """Tests path_distance()."""
         buses = wb[Bus]
         assert not buses.empty, "Test case must contain buses"
-        try:
-            wb.path_distance(create_object_string("Bus", buses.iloc[0]['BusNum']))
-        except (PowerWorldPrerequisiteError, PowerWorldError):
-            pytest.skip("path_distance not available for this case")
+        wb.path_distance(create_object_string("Bus", buses.iloc[0]['BusNum']))
 
     def test_branch_admittance(self, wb):
         """Tests branch_admittance() delegation."""
@@ -193,21 +190,15 @@ class TestGridWorkBenchFunctions:
 
     def test_buscoords_as_dataframe(self, wb):
         """Tests buscoords(astuple=False) delegation."""
-        try:
-            df = wb.buscoords(astuple=False)
-            assert isinstance(df, pd.DataFrame)
-        except (PowerWorldPrerequisiteError, PowerWorldError):
-            pytest.skip("buscoords not available (no substation data)")
+        df = wb.buscoords(astuple=False)
+        assert isinstance(df, pd.DataFrame)
 
     def test_location(self, wb):
         """Tests busmap, buscoords."""
         m = wb.busmap()
         assert not m.empty
 
-        try:
-            wb.buscoords()
-        except (PowerWorldPrerequisiteError, PowerWorldError):
-            pytest.skip("buscoords not available (no substation data)")
+        wb.buscoords()
 
 
 # -------------------------------------------------------------------------

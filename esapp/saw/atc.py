@@ -354,8 +354,8 @@ class ATCMixin:
         append: bool = False,
         fieldlist: List[str] = None,
         operation: str = "MIN",
-        operation_field: str = "MaxFlow",
-        group_scenario: bool = True,
+        operation_field: str = "TransferLimit",
+        group_scenario: str = "NONE",
     ):
         """Writes out TransferLimiter results from multiple scenario ATC calculations.
 
@@ -377,9 +377,11 @@ class ATCMixin:
             Operation to perform on each grouping: "MIN", "MAX", or "MINMAX".
             Defaults to "MIN".
         operation_field : str, optional
-            Field to use for the min/max operation. Defaults to "MaxFlow".
-        group_scenario : bool, optional
-            If True, groups by scenario. Defaults to True.
+            Field to use for the min/max operation. Must be "TransferLimit"
+            or "ATCExtraMonitor". Defaults to "TransferLimit".
+        group_scenario : str, optional
+            How to group scenarios. Use "NONE" to not group, or a scenario
+            type name. Defaults to "NONE".
 
         Returns
         -------
@@ -391,9 +393,8 @@ class ATCMixin:
             If the SimAuto call fails.
         """
         app = YesNo.from_bool(append)
-        gs = YesNo.from_bool(group_scenario)
         fields = format_list(fieldlist)
-        args = pack_args(f'"{filename}"', filetype, app, fields, operation, operation_field, gs)
+        args = pack_args(f'"{filename}"', filetype, app, fields, operation, operation_field, group_scenario)
         return self.RunScriptCommand(f"ATCWriteScenarioMinMax({args});")
 
     def ATCWriteToExcel(self, worksheet_name: str, fieldlist: List[str] = None):
