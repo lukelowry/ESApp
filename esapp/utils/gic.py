@@ -10,7 +10,7 @@ Classes
 -------
 GIC
     Main application class providing GIC analysis methods, model generation,
-    and PowerWorld integration via the Indexable interface.
+    and PowerWorld integration.
 
 Key Features
 ------------
@@ -49,9 +49,9 @@ from scipy.sparse.linalg import inv as sinv
 
 from esapp.saw._enums import YesNo
 
+from .._descriptors import GICOption
 from ..components import GIC_Options_Value, GICInputVoltObject
 from ..components import Branch, Substation, Bus, Gen, GICXFormer
-from ..indexable import Indexable
 
 __all__ = ['GIC', 'jac_decomp']
 
@@ -79,19 +79,20 @@ def jac_decomp(jac):
     yield jac[nbus:, nbus:]   # dQ/dV
 
 
-class GIC(Indexable):
+class GIC:
     """
     GIC analysis application for PowerWorld integration.
 
     Provides methods for GIC calculations, sensitivity analysis, and
-    model generation using PowerWorld case data via the Indexable interface.
+    model generation using PowerWorld case data. All data access is
+    delegated to the parent PowerWorld instance.
 
     This class is accessed via ``PowerWorld.gic``.
 
     GIC Options
     -----------
     GIC analysis requires certain options to be enabled for full functionality.
-    The most important is ``set_pf_include(True)`` which must be called before
+    The most important is ``pf_include = True`` which must be set before
     retrieving GIC data like transformer coil resistances (GICCoilR fields).
     Methods like ``model()`` and ``gmatrix()`` automatically
     enable this option. Use ``configure()`` to set multiple options at once.
@@ -110,6 +111,13 @@ class GIC(Indexable):
     settings : View or modify all GIC settings.
     """
 
+    pf_include = GICOption('IncludeInPowerFlow')
+    ts_include = GICOption('IncludeTimeDomain')
+    calc_mode  = GICOption('CalcMode', is_bool=False)
+
+    def __init__(self, pw=None):
+        self._pw = pw
+
     # --- GIC Options Configuration ---
 
     def _set_gic_option(self, option: str, value) -> None:
@@ -126,13 +134,13 @@ class GIC(Indexable):
         if isinstance(value, bool):
             value = YesNo.from_bool(value)
 
-        self.esa.EnterMode("EDIT")
-        self.esa.SetData(
+        self._pw.esa.EnterMode("EDIT")
+        self._pw.esa.SetData(
             'GIC_Options_Value',
             ['VariableName', 'ValueField'],
             [option, value]
         )
-        self.esa.EnterMode("RUN")
+        self._pw.esa.EnterMode("RUN")
 
     def get_gic_option(self, option: str) -> str:
         """
@@ -188,55 +196,9 @@ class GIC(Indexable):
         >>> pw.gic.configure(ts_include=True)  # Enable for transient stability
         >>> pw.gic.configure(calc_mode='TimeVarying')  # For time series analysis
         """
-        self.set_pf_include(pf_include)
-        self.set_ts_include(ts_include)
-        self.set_calc_mode(calc_mode)
-
-    def set_pf_include(self, enable: bool = True) -> None:
-        """
-        Enable or disable GIC effects in power flow calculations.
-
-        This option MUST be enabled (True) before accessing GIC-related
-        data from PowerWorld, including transformer coil resistances
-        (GICCoilRFrom, GICCoilRTo) and other GIC fields.
-
-        Parameters
-        ----------
-        enable : bool, default True
-            Whether to include GIC effects in power flow.
-
-        Note
-        ----
-        Methods like ``model()`` and ``gmatrix_from_powerworld()``
-        automatically call this with ``enable=True``.
-        """
-        self._set_gic_option('IncludeInPowerFlow', enable)
-
-    def set_ts_include(self, enable: bool = True) -> None:
-        """
-        Enable or disable GIC effects in transient stability simulations.
-
-        Parameters
-        ----------
-        enable : bool, default True
-            Whether to include GIC effects in transient stability.
-        """
-        self._set_gic_option('IncludeTimeDomain', enable)
-
-    def set_calc_mode(self, mode: str) -> None:
-        """
-        Set the GIC calculation mode.
-
-        Parameters
-        ----------
-        mode : str
-            One of:
-            - 'SnapShot': Single time point calculation
-            - 'TimeVarying': Time series from uniform field
-            - 'NonUniformTimeVarying': Time series with spatial variation
-            - 'SpatiallyUniformTimeVarying': Spatially uniform time series
-        """
-        self._set_gic_option('CalcMode', mode)
+        self.pf_include = pf_include
+        self.ts_include = ts_include
+        self.calc_mode = calc_mode
 
     # --- G-Matrix Retrieval ---
 
@@ -268,8 +230,8 @@ class GIC(Indexable):
         configure : Set GIC options manually.
         """
         # Ensure GIC is included in power flow before retrieving matrix
-        self.set_pf_include(True)
-        return self.esa.get_gmatrix(full=not sparse)
+        self.pf_include = True
+        return self._pw.esa.get_gmatrix(full=not sparse)
 
     def storm(self, maxfield: float, direction: float, solvepf: bool = True) -> None:
         """
@@ -284,11 +246,11 @@ class GIC(Indexable):
         solvepf : bool, default True
             Whether to include GIC results in power flow solution.
         """
-        self.esa.GICCalculate(maxfield, direction, solvepf)
+        self._pw.esa.GICCalculate(maxfield, direction, solvepf)
 
     def cleargic(self) -> None:
         """Clear all GIC calculation results from the case."""
-        self.esa.RunScriptCommand("GICClear;")
+        self._pw.esa.RunScriptCommand("GICClear;")
 
     def loadb3d(self, ftype: str, fname: str, setuponload: bool = True) -> None:
         """
@@ -303,7 +265,7 @@ class GIC(Indexable):
         setuponload : bool, default True
             Whether to set up time-varying series on load.
         """
-        self.esa.GICLoad3DEfield(ftype, fname, setuponload)
+        self._pw.esa.GICLoad3DEfield(ftype, fname, setuponload)
 
     def settings(self, value: Optional[DataFrame] = None) -> Optional[DataFrame]:
         """
@@ -319,7 +281,7 @@ class GIC(Indexable):
         DataFrame or None
             Current settings if value is None.
         """
-        return self.esa.GetParametersMultipleElement(
+        return self._pw.esa.GetParametersMultipleElement(
                 GIC_Options_Value.TYPE,
                 GIC_Options_Value.fields
         )[['VariableName', 'ValueField']]
@@ -345,7 +307,7 @@ class GIC(Indexable):
             values = list(row)
             # Quote the WhoAmI identifier (contains spaces) for PowerWorld
             values[0] = f'"{values[0]}"'
-            self.esa.SetData(obj, fields, values)
+            self._pw.esa.SetData(obj, fields, values)
 
     # --- Model ---
 
@@ -377,22 +339,22 @@ class GIC(Indexable):
         gmatrix_from_powerworld : Get just the G-matrix from PowerWorld.
         configure : Set GIC options manually.
         """
-        self.set_pf_include(True)
+        self.pf_include = True
         MOHM = 1e6
 
         # ---- Data from PowerWorld ----
-        subs  = self[Substation, ["SubNum", "GICUsedSubGroundOhms", "Longitude", "Latitude"]]
-        buses = self[Bus, ["BusNum", "BusNomVolt", "SubNum"]]
-        lines = self[Branch, ["BusNum", "BusNum:1", "GICConductance", "BranchDeviceType"]]
+        subs  = self._pw[Substation, ["SubNum", "GICUsedSubGroundOhms", "Longitude", "Latitude"]]
+        buses = self._pw[Bus, ["BusNum", "BusNomVolt", "SubNum"]]
+        lines = self._pw[Branch, ["BusNum", "BusNum:1", "GICConductance", "BranchDeviceType"]]
         lines = lines.loc[lines['BranchDeviceType'] != 'Transformer',["BusNum", "BusNum:1", "GICConductance"]]
-        xf = self[GICXFormer, [
+        xf = self._pw[GICXFormer, [
             "BusNum3W", "BusNum3W:1", "SubNum", "SubNum:1",
             "GICXFCoilR1", "GICXFCoilR1:1", "GICXFConfigUsed",
             "GICBlockDevice", "GICAutoXFUsed", "GICXF3Type",
             "GICXFMVABase", "GICModelKUsed",
         ]]
         xf = xf[xf['GICXF3Type'].astype(str).str.upper() != 'YES'].copy()
-        gens = (self[Gen, ["BusNum", "GICConductance", "GICGenIncludeImplicitGSU"]]
+        gens = (self._pw[Gen, ["BusNum", "GICConductance", "GICGenIncludeImplicitGSU"]]
                 .query("GICConductance != 0 and GICGenIncludeImplicitGSU != 'NO'")
                 .merge(buses[['BusNum', 'SubNum']], on='BusNum', how='inner'))
 

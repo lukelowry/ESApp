@@ -12,16 +12,6 @@ REQUIREMENTS:
     - A valid PowerWorld case file path set in ``tests/config_test.py``
       (variable ``SAW_TEST_CASE``) or via the ``SAW_TEST_CASE`` env variable
 
-RELATED TEST FILES:
-    - test_integration_saw_core.py          -- base SAW operations, logging, I/O
-    - test_integration_saw_modify.py        -- destructive modify, region, case actions
-    - test_integration_saw_powerflow.py     -- power flow, matrices, sensitivity, topology
-    - test_integration_saw_contingency.py   -- contingency and fault analysis
-    - test_integration_saw_gic.py           -- GIC analysis
-    - test_integration_saw_transient.py     -- transient stability
-    - test_integration_saw_operations.py    -- ATC, OPF, PV/QV, time step, weather, scheduled
-    - test_integration_network.py           -- Network topology
-
 USAGE:
     pytest tests/test_integration_workbench.py -v
 """
@@ -50,14 +40,11 @@ def wb(saw_session):
     Wraps the session-scoped SAW instance in a PowerWorld object.
     """
     workbench = PowerWorld()
-    workbench.set_esa(saw_session)
+    workbench.esa = saw_session
     return workbench
 
 
 class TestPowerWorldFunctions:
-    # -------------------------------------------------------------------------
-    # Simulation Control
-    # -------------------------------------------------------------------------
 
     def test_simulation_control(self, wb, temp_file):
         """Tests flatstart, pflow, save, log, command, mode."""
@@ -72,23 +59,15 @@ class TestPowerWorldFunctions:
         assert os.path.exists(tmp_pwb)
 
         wb.log("Adapter Test Message")
-        wb.command('LogAdd("Command Test");')
 
         wb.edit_mode()
         wb.run_mode()
 
-    # -------------------------------------------------------------------------
-    # Data Retrieval
-    # -------------------------------------------------------------------------
-
     def test_voltage_retrieval(self, wb):
-        """Tests voltage() delegation to statics."""
+        """Tests voltage() in all modes."""
         v = wb.voltage()
         assert len(v) > 0
         assert np.iscomplexobj(v.values)
-
-        v_complex = wb.voltage(complex=True)
-        assert np.iscomplexobj(v_complex.values)
 
         v_mag, v_ang = wb.voltage(complex=False)
         assert len(v_mag) > 0
@@ -101,55 +80,40 @@ class TestPowerWorldFunctions:
         assert len(v_kv_mag) > 0
 
     def test_component_retrieval(self, wb):
-        """Tests generations, loads, shunts, lines, transformers, areas, zones."""
+        """Tests gens, loads, shunts, lines, transformers, areas, zones."""
         assert not wb.gens().empty
         assert not wb.loads().empty
-        shunts = wb.shunts()
-        assert isinstance(shunts, pd.DataFrame)
-        xfmrs = wb.transformers()
-        assert isinstance(xfmrs, pd.DataFrame)
+        assert isinstance(wb.shunts(), pd.DataFrame)
+        assert isinstance(wb.transformers(), pd.DataFrame)
         assert not wb.lines().empty
         assert not wb.areas().empty
         assert not wb.zones().empty
 
-    # -------------------------------------------------------------------------
-    # Modification
-    # -------------------------------------------------------------------------
-
-    def test_modification(self, wb):
-        """Tests set_voltages, branch ops, gen/load ops, scaling."""
+    def test_set_voltages(self, wb):
+        """Tests set_voltages round-trip."""
         v = wb.voltage(complex=True, pu=True)
         wb.set_voltages(v)
 
-        lines = wb.lines()
-        assert not lines.empty, "Test case must contain lines"
-        l = lines.iloc[0]
-        wb.open_branch(l['BusNum'], l['BusNum:1'], l['LineCircuit'])
-        wb.close_branch(l['BusNum'], l['BusNum:1'], l['LineCircuit'])
-
-    # -------------------------------------------------------------------------
-    # Analysis & Difference Flows
-    # -------------------------------------------------------------------------
-
-    def test_analysis(self, wb, temp_file):
-        """Tests contingency, violations, mismatches, islands, diff flows."""
-
+    def test_analysis(self, wb):
+        """Tests violations, mismatches, net injection."""
         viols = wb.violations()
         assert isinstance(viols, pd.DataFrame)
 
-        mp, mq = wb.mismatch()
-        assert not mp.empty
-        assert not mq.empty
+        P, Q = wb.mismatch()
+        assert not P.empty
+        assert not Q.empty
 
+        S = wb.mismatch(asComplex=True)
+        assert np.iscomplexobj(S)
 
-    # -------------------------------------------------------------------------
-    # Sensitivity, Faults
-    # -------------------------------------------------------------------------
+        Pn, Qn = wb.netinj()
+        assert len(Pn) > 0
+        Sn = wb.netinj(asComplex=True)
+        assert np.iscomplexobj(Sn)
 
     def test_print_log(self, wb):
         """Tests print_log() with all parameter combinations."""
         wb.log("Print log test message")
-
         output = wb.print_log()
         assert isinstance(output, str)
 
@@ -160,197 +124,121 @@ class TestPowerWorldFunctions:
         cleared = wb.print_log(clear=True)
         assert isinstance(cleared, str)
 
-    def test_mismatch_complex(self, wb):
-        """Tests mismatch(asComplex=True)."""
-        wb.pflow(getvolts=False)
-        mm = wb.mismatch(asComplex=True)
-        assert np.iscomplexobj(mm)
-
-    def test_netinj(self, wb):
-        """Tests netinj() in both modes."""
-        P, Q = wb.netinj()
-        assert len(P) > 0
-        assert len(Q) > 0
-
-        S = wb.netinj(asComplex=True)
-        assert np.iscomplexobj(S)
-        assert len(S) > 0
-
-    def test_branch_admittance(self, wb):
-        """Tests branch_admittance() delegation."""
-        Yf, Yt = wb.branch_admittance()
-        assert Yf.shape[0] > 0
-        assert Yt.shape[0] > 0
-        assert Yf.shape == Yt.shape
-
-    def test_jacobian(self, wb):
-        """Tests jacobian() delegation."""
-        wb.pflow(getvolts=False)
-        J = wb.jacobian()
-        assert J.shape[0] > 0
-
-    def test_buscoords_as_dataframe(self, wb):
-        """Tests buscoords(astuple=False) delegation."""
-        df = wb.buscoords(astuple=False)
-        assert isinstance(df, pd.DataFrame)
-
     def test_location(self, wb):
         """Tests busmap, buscoords."""
         m = wb.busmap()
         assert not m.empty
-
         wb.buscoords()
+        df = wb.buscoords(astuple=False)
+        assert isinstance(df, pd.DataFrame)
 
-
-# -------------------------------------------------------------------------
-# Workbench-level Static Analysis
-# -------------------------------------------------------------------------
 
 class TestWorkbenchStatics:
-    """Workbench-level static analysis: power flow, voltage, Y-bus, Jacobian.
-
-    These complement the SAW-level tests in test_integration_saw_powerflow.py
-    by exercising the higher-level PowerWorld delegation methods.
-    """
+    """Workbench-level static analysis: power flow, voltage, Y-bus, Jacobian."""
 
     def test_pflow(self, wb):
-        """Power flow solve and voltage retrieval."""
+        """Power flow solve with and without voltage retrieval."""
         v = wb.pflow(getvolts=True)
         assert v is not None
         assert len(v) > 0
         assert np.iscomplexobj(v.values)
 
-    def test_pflow_no_volts(self, wb):
-        """Power flow without returning voltages."""
         result = wb.pflow(getvolts=False)
         assert result is None
 
-    def test_voltage_complex(self, wb):
-        """Complex voltage retrieval."""
+    def test_voltage(self, wb):
+        """Voltage retrieval in all modes: complex/tuple, pu/kV."""
         v = wb.voltage(complex=True, pu=True)
         assert np.iscomplexobj(v.values)
         assert len(v) > 0
 
-    def test_voltage_tuple(self, wb):
-        """Magnitude + angle voltage retrieval."""
         mag, ang = wb.voltage(complex=False, pu=True)
         assert len(mag) > 0
         assert len(ang) > 0
 
-    def test_voltage_kv(self, wb):
-        """KV voltage retrieval."""
-        v = wb.voltage(complex=True, pu=False)
-        assert len(v) > 0
+        v_kv = wb.voltage(complex=True, pu=False)
+        assert len(v_kv) > 0
 
-    def test_set_voltages(self, wb):
-        """Set bus voltages from complex vector."""
-        v = wb.voltage(complex=True)
         wb.set_voltages(v)
 
     def test_violations(self, wb):
-        """Bus voltage violations."""
+        """Bus voltage violations with normal and tight limits."""
         viols = wb.violations(v_min=0.9, v_max=1.1)
         assert isinstance(viols, pd.DataFrame)
         assert 'Low' in viols.columns
         assert 'High' in viols.columns
 
-    def test_violations_tight(self, wb):
-        """Tight voltage limits should produce violations."""
-        viols = wb.violations(v_min=0.999, v_max=1.001)
-        assert isinstance(viols, pd.DataFrame)
+        viols_tight = wb.violations(v_min=0.999, v_max=1.001)
+        assert isinstance(viols_tight, pd.DataFrame)
 
-    def test_mismatch(self, wb):
-        """Bus power mismatches."""
+    def test_mismatch_and_netinj(self, wb):
+        """Bus power mismatches and net injection."""
         P, Q = wb.mismatch()
         assert not P.empty
         assert not Q.empty
 
-    def test_mismatch_complex(self, wb):
-        """Complex mismatch."""
         S = wb.mismatch(asComplex=True)
         assert np.iscomplexobj(S)
 
-    def test_netinj(self, wb):
-        """Net injection at each bus."""
-        P, Q = wb.netinj()
-        assert len(P) > 0
-        assert len(Q) > 0
-
-    def test_netinj_complex(self, wb):
-        """Complex net injection."""
-        S = wb.netinj(asComplex=True)
-        assert np.iscomplexobj(S)
+        Pn, Qn = wb.netinj()
+        assert len(Pn) > 0
+        Sn = wb.netinj(asComplex=True)
+        assert np.iscomplexobj(Sn)
 
     def test_ybus(self, wb):
-        """Y-Bus matrix retrieval."""
+        """Y-Bus matrix retrieval, sparse and dense."""
         Y = wb.ybus()
         assert Y.shape[0] > 0
         assert Y.shape[0] == Y.shape[1]
 
-    def test_ybus_dense(self, wb):
-        """Dense Y-Bus matrix."""
-        Y = wb.ybus(dense=True)
-        assert isinstance(Y, np.ndarray)
-        assert Y.shape[0] > 0
-
-    def test_branch_admittance(self, wb):
-        """Branch admittance matrices."""
-        Yf, Yt = wb.branch_admittance()
-        assert Yf.shape[0] > 0
-        assert Yt.shape[0] > 0
-        assert Yf.shape == Yt.shape
+        Y_dense = wb.ybus(dense=True)
+        assert isinstance(Y_dense, np.ndarray)
+        assert Y_dense.shape[0] > 0
 
     def test_jacobian(self, wb):
-        """Power flow Jacobian."""
+        """Jacobian: sparse, dense, polar form, with IDs."""
         wb.pflow(getvolts=False)
+
         J = wb.jacobian()
         assert J.shape[0] > 0
 
-    def test_jacobian_dense(self, wb):
-        """Dense Jacobian."""
-        J = wb.jacobian(dense=True)
-        assert isinstance(J, np.ndarray)
+        J_dense = wb.jacobian(dense=True)
+        assert isinstance(J_dense, np.ndarray)
 
-    def test_jacobian_polar(self, wb):
-        """Polar Jacobian form."""
-        wb.pflow(getvolts=False)
-        J = wb.jacobian(dense=True, form='P')
-        assert isinstance(J, np.ndarray)
-        assert J.shape[0] > 0
-        assert J.shape[0] == J.shape[1]
+        J_polar = wb.jacobian(dense=True, form='P')
+        assert isinstance(J_polar, np.ndarray)
+        assert J_polar.shape[0] > 0
+        assert J_polar.shape[0] == J_polar.shape[1]
 
-    def test_jacobian_with_ids(self, wb):
-        """Jacobian with row/column ID labels."""
-        wb.pflow(getvolts=False)
-        J, ids = wb.jacobian_with_ids(dense=True, form='P')
-        assert isinstance(J, np.ndarray)
+        J_ids, ids = wb.jacobian(dense=True, form='P', ids=True)
+        assert isinstance(J_ids, np.ndarray)
         assert isinstance(ids, list)
         assert len(ids) > 0
 
     def test_solver_options(self, wb):
-        """Solver option methods."""
-        wb.set_do_one_iteration(True)
-        wb.set_do_one_iteration(False)
+        """Solver option descriptors."""
+        wb.do_one_iteration = True
+        wb.do_one_iteration = False
 
-        wb.set_max_iterations(250)
+        wb.max_iterations = 250
 
-        wb.set_disable_angle_rotation(True)
-        wb.set_disable_angle_rotation(False)
+        wb.disable_angle_rotation = True
+        wb.disable_angle_rotation = False
 
-        wb.set_disable_opt_mult(True)
-        wb.set_disable_opt_mult(False)
+        wb.disable_opt_mult = True
+        wb.disable_opt_mult = False
 
-        wb.enable_inner_ss_check(True)
-        wb.enable_inner_ss_check(False)
+        wb.inner_ss_check = True
+        wb.inner_ss_check = False
 
-        wb.disable_gen_mvr_check(True)
-        wb.disable_gen_mvr_check(False)
+        wb.disable_gen_mvr_check = True
+        wb.disable_gen_mvr_check = False
 
-        wb.enable_inner_check_gen_vars(True)
-        wb.enable_inner_check_gen_vars(False)
+        wb.inner_check_gen_vars = True
+        wb.inner_check_gen_vars = False
 
-        wb.enable_inner_backoff_gen_vars(True)
-        wb.enable_inner_backoff_gen_vars(False)
+        wb.inner_backoff_gen_vars = True
+        wb.inner_backoff_gen_vars = False
 
 
 # -------------------------------------------------------------------------
@@ -378,7 +266,6 @@ def test_component_access(wb, component_class):
         pytest.skip(f"Object type {component_class.TYPE} cannot be retrieved via SimAuto: {e.message}")
     except (PowerWorldError, COMError) as e:
         err_msg = str(e)
-        # Access violations and memory errors are PowerWorld internal crashes
         if "Access violation" in err_msg or "memory resources" in err_msg:
             pytest.skip(f"Object type {component_class.TYPE} causes PW crash: {e}")
         with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as tmp:
@@ -405,4 +292,3 @@ def test_component_access(wb, component_class):
 
 if __name__ == "__main__":
     sys.exit(pytest.main(["-v", __file__]))
-

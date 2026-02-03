@@ -37,7 +37,6 @@ from pandas import DataFrame, Series, concat
 from scipy.sparse import diags, coo_matrix, csc_matrix
 
 from ..components import Branch, Bus, DCTransmissionLine, Substation
-from ..indexable import Indexable
 
 __all__ = ['Network', 'BranchType']
 
@@ -60,7 +59,7 @@ class BranchType(Enum):
     DELAY = 3
 
 
-class Network(Indexable):
+class Network:
     """
     Network matrix construction and analysis.
 
@@ -68,18 +67,23 @@ class Network(Indexable):
     branch electrical parameters. AC branches and HVDC transmission lines
     are always included when present in the case.
 
+    This class is accessed via ``PowerWorld.network`` and delegates all
+    data access to its parent PowerWorld instance.
+
     Notes
     -----
     Matrix dimensions follow PowerWorld bus ordering. Use busmap()
     to translate between bus numbers and matrix indices.
     """
 
-    _A = None
+    def __init__(self, pw=None):
+        self._pw = pw
+        self._A = None
 
     def _dc_lines(self) -> DataFrame | None:
         """Return DC transmission line data, or None if unavailable."""
         try:
-            df = self[DCTransmissionLine]
+            df = self._pw[DCTransmissionLine]
             return df if df is not None and len(df) > 0 else None
         except Exception:
             return None
@@ -93,7 +97,7 @@ class Network(Indexable):
         pd.Series
             Series indexed by BusNum with positional values.
         """
-        buses = self[Bus]
+        buses = self._pw[Bus]
         return Series(buses.index, buses["BusNum"])
 
     def incidence(self, remake: bool = True) -> csc_matrix:
@@ -117,7 +121,7 @@ class Network(Indexable):
             return self._A
 
         fields = ["BusNum", "BusNum:1"]
-        branches = self[Branch][fields]
+        branches = self._pw[Branch][fields]
 
         dc = self._dc_lines()
         if dc is not None:
@@ -196,7 +200,7 @@ class Network(Indexable):
         """
         fields = ["LineLengthByParameters", "LineLengthByParameters:2",
                   "LineR:2", "LineX:2"]
-        data = self[Branch, fields][fields]
+        data = self._pw[Branch, fields][fields]
 
         # Prefer user-specified length over calculated
         user = data["LineLengthByParameters"]
@@ -205,7 +209,7 @@ class Network(Indexable):
 
         dc = self._dc_lines()
         if dc is not None:
-            dc_ell = self[DCTransmissionLine, "LineLengthByParameters"]["LineLengthByParameters"]
+            dc_ell = self._pw[DCTransmissionLine, "LineLengthByParameters"]["LineLengthByParameters"]
             ell = concat([ell, dc_ell], ignore_index=True)
 
         if longer_xfmr_lens:
@@ -243,7 +247,7 @@ class Network(Indexable):
         pd.Series
             Complex admittance Y = 1/(R + jX) or impedance Z.
         """
-        branches = self[Branch, ["LineR:2", "LineX:2"]]
+        branches = self._pw[Branch, ["LineR:2", "LineX:2"]]
         Z = branches["LineR:2"] + 1j * branches["LineX:2"]
 
         dc = self._dc_lines()
@@ -261,7 +265,7 @@ class Network(Indexable):
         pd.Series
             Complex shunt admittance Y = G + jB.
         """
-        branches = self[Branch, ["LineG", "LineC"]]
+        branches = self._pw[Branch, ["LineG", "LineC"]]
         return branches["LineG"] + 1j * branches["LineC"]
 
     def gamma(self) -> Series:
@@ -305,7 +309,7 @@ class Network(Indexable):
         """
         Z = self.ybranch(asZ=True)
 
-        Ybus = self.esa.get_ybus()
+        Ybus = self._pw.esa.get_ybus()
         AVG = np.abs(self.incidence()) / 2
         Y = AVG @ Ybus @ np.ones(Ybus.shape[0])
 
@@ -325,8 +329,8 @@ class Network(Indexable):
         -------
         tuple of pd.Series or pd.DataFrame
         """
-        A = self[Bus, "SubNum"]
-        S = self[Substation, ["SubNum", "Longitude", "Latitude"]]
+        A = self._pw[Bus, "SubNum"]
+        S = self._pw[Substation, ["SubNum", "Longitude", "Latitude"]]
         LL = A.merge(S, on="SubNum")
         if astuple:
             return LL["Longitude"], LL["Latitude"]

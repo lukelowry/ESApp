@@ -22,17 +22,6 @@ class Indexable:
     esa: SAW
     fname: str
 
-    def set_esa(self, esa: SAW):
-        """
-        Set the SAW (SimAuto Wrapper) instance for this object.
-
-        Parameters
-        ----------
-        esa : SAW
-            An initialized SAW instance.
-        """
-        self.esa: SAW = esa
-
     @timing
     def open(self):
         """

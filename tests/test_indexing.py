@@ -314,14 +314,6 @@ def test_setitem_with_nan_values(indexable_instance: Indexable):
 # Additional coverage tests
 # =============================================================================
 
-def test_set_esa():
-    """set_esa() correctly assigns the SAW instance."""
-    instance = Indexable()
-    mock_esa = Mock()
-    instance.set_esa(mock_esa)
-    assert instance.esa is mock_esa
-
-
 def test_open_relative_path():
     """open() converts relative path to absolute."""
     from os import path as ospath

@@ -4,14 +4,13 @@ import logging
 import numpy as np
 import pandas as pd
 from pandas import DataFrame, concat
-from scipy.sparse import csr_matrix
 
 from .utils.gic import GIC
 from .utils.network import Network
 from .utils.dynamics import get_ts_results, process_ts_results
 from .indexable import Indexable
-from .components import Bus, Branch, Gen, Load, Shunt, Area, Zone, Substation, Contingency, Sim_Solution_Options
-from .saw import SAW
+from .components import Bus, Branch, Gen, Load, Shunt, Area, Zone
+from ._descriptors import SolverOption
 
 import tempfile
 import os
@@ -29,9 +28,9 @@ class PowerWorld(Indexable):
         fname : str, optional
             Path to the PowerWorld case file (.pwb).
         """
-        # Applications
-        self.network = Network()
-        self.gic     = GIC()
+        # Embedded application modules (back-reference to self)
+        self.network = Network(self)
+        self.gic     = GIC(self)
 
         if fname:
             self.fname = fname
@@ -40,52 +39,36 @@ class PowerWorld(Indexable):
             self.esa = None
             self.fname = None
 
-        # Propagate the esa instance to the applications.
-        self.set_esa(self.esa)
+    # --- Solver Options (descriptors) ---
 
-    def set_esa(self, esa: Optional[SAW]) -> None:
-        """Sets the SAW instance for the workbench and its applications."""
-        super().set_esa(esa)
-        self.network.set_esa(esa)
-        self.gic.set_esa(esa)
+    # Inner power flow loop
+    do_one_iteration       = SolverOption('DoOneIteration')
+    disable_opt_mult       = SolverOption('DisableOptMult')
+    flat_start             = SolverOption('FlatStart')
+    max_iterations         = SolverOption('MaxItr', is_bool=False)
+    max_vcl_iterations     = SolverOption('MaxItr:1', is_bool=False)
+    convergence_tol        = SolverOption('ConvergenceTol', is_bool=False)
+    min_volt_i_load        = SolverOption('MinVoltILoad', is_bool=False)
+    min_volt_s_load        = SolverOption('MinVoltSLoad', is_bool=False)
 
-    # --- Solver Options (from Statics) ---
+    # Voltage control loop
+    inner_ss_check         = SolverOption('SSContPFInnerLoop')
+    disable_gen_mvr_check  = SolverOption('DisableGenMVRCheck')
+    inner_check_gen_vars   = SolverOption('ChkVars')
+    inner_backoff_gen_vars = SolverOption('ChkVars:1')
+    check_taps             = SolverOption('ChkTaps')
+    check_shunts           = SolverOption('ChkShunts')
+    check_phase_shifters   = SolverOption('ChkPhaseShifters')
+    prevent_oscillations   = SolverOption('PreventOscillations')
 
-    def _set_option(self, key: str, enable: bool) -> None:
-        """Set a Sim_Solution_Options boolean flag."""
-        self[Sim_Solution_Options, key] = 'YES' if enable else 'NO'
+    # General
+    disable_angle_rotation = SolverOption('DisableAngleRotation')
+    allow_mult_islands     = SolverOption('AllowMultIslands')
+    eval_solution_island   = SolverOption('EvalSolutionIsland')
+    enforce_gen_mw_limits  = SolverOption('EnforceGenMWLimits')
 
-    def set_do_one_iteration(self, enable: bool = True) -> None:
-        """Enable/disable single iteration mode for power flow."""
-        self._set_option('DoOneIteration', enable)
-
-    def set_max_iterations(self, val: int = 250) -> None:
-        """Set maximum number of iterations for power flow convergence."""
-        self[Sim_Solution_Options, 'MaxItr'] = val
-
-    def set_disable_angle_rotation(self, enable: bool = True) -> None:
-        """Enable/disable angle rotation during power flow."""
-        self._set_option('DisableAngleRotation', enable)
-
-    def set_disable_opt_mult(self, enable: bool = True) -> None:
-        """Enable/disable optimal multiplier during power flow."""
-        self._set_option('DisableOptMult', enable)
-
-    def enable_inner_ss_check(self, enable: bool = True) -> None:
-        """Enable/disable inner steady-state contingency check."""
-        self._set_option('SSContPFInnerLoop', enable)
-
-    def disable_gen_mvr_check(self, enable: bool = True) -> None:
-        """Enable/disable generator MVAR limit checking."""
-        self._set_option('DisableGenMVRCheck', enable)
-
-    def enable_inner_check_gen_vars(self, enable: bool = True) -> None:
-        """Enable/disable inner loop generator VAR checking."""
-        self._set_option('ChkVars', enable)
-
-    def enable_inner_backoff_gen_vars(self, enable: bool = True) -> None:
-        """Enable/disable inner loop generator VAR backoff."""
-        self._set_option('ChkVars:1', enable)
+    # DC approximation
+    dc_mode                = SolverOption('DCPFMode')
 
     # --- Bus Voltage & Analysis ---
 
@@ -107,6 +90,8 @@ class PowerWorld(Indexable):
         Returns
         -------
         pd.Series or tuple of pd.Series
+            If ``complex=True``, a complex-valued Series V = |V| * exp(j*theta).
+            If ``complex=False``, a tuple ``(magnitude, angle_rad)``.
         """
         fields = ["BusPUVolt", "BusAngle"] if pu else ["BusKVVolt", "BusAngle"]
         df = self[Bus, fields]
@@ -205,58 +190,11 @@ class PowerWorld(Indexable):
         Returns
         -------
         np.ndarray or scipy.sparse.csr_matrix
+            The system admittance matrix (n_bus x n_bus).
         """
         return self.esa.get_ybus(dense)
 
-    def branch_admittance(self) -> Tuple[csr_matrix, csr_matrix]:
-        """
-        Compute branch admittance matrices Yf and Yt.
-
-        Returns
-        -------
-        tuple of csr_matrix
-            (Yf, Yt) branch-bus admittance matrices.
-        """
-        bus_df = self[Bus, ["BusNum"]]
-        branch_df = self[Branch, [
-            "BusNum", "BusNum:1", "LineCircuit",
-            "LineR", "LineX", "LineC",
-        ]]
-
-        nb = len(bus_df)
-        nl = len(branch_df)
-
-        R = pd.to_numeric(branch_df["LineR"], errors="coerce").fillna(0).to_numpy(dtype=float)
-        X = pd.to_numeric(branch_df["LineX"], errors="coerce").fillna(0).to_numpy(dtype=float)
-        Z = R + 1j * X
-        # Replace zero impedance with a small value (short circuit approximation)
-        zero_mask = np.abs(Z) < 1e-20
-        Z = np.where(zero_mask, 1e-12, Z)
-        Ys = 1 / Z
-        Bc = pd.to_numeric(branch_df["LineC"], errors="coerce").fillna(0).to_numpy(dtype=float)
-        Ytt = Ys + 1j * Bc / 2
-        Yff = Ytt
-        Yft = -Ys
-        Ytf = -Ys
-
-        bus_to_idx = {bus: idx for idx, bus in enumerate(bus_df["BusNum"])}
-        f = np.array([bus_to_idx[b] for b in branch_df["BusNum"]])
-        t = np.array([bus_to_idx[b] for b in branch_df["BusNum:1"]])
-
-        i = np.r_[range(nl), range(nl)]
-        Yf = csr_matrix(
-            (np.hstack([Yff.reshape(-1), Yft.reshape(-1)]),
-             (i, np.hstack([f, t]))),
-            (nl, nb),
-        )
-        Yt = csr_matrix(
-            (np.hstack([Ytf.reshape(-1), Ytt.reshape(-1)]),
-             (i, np.hstack([f, t]))),
-            (nl, nb),
-        )
-        return Yf, Yt
-
-    def jacobian(self, dense: bool = False, form: str = 'R'):
+    def jacobian(self, dense: bool = False, form: str = 'R', ids: bool = False):
         """
         Get the power flow Jacobian matrix.
 
@@ -266,42 +204,53 @@ class PowerWorld(Indexable):
             If True, return dense array. Else sparse CSR.
         form : str, default 'R'
             Coordinate form: 'R' (rectangular), 'P' (polar), 'DC' (B').
+        ids : bool, default False
+            If True, return ``(matrix, row_ids)`` with row/column labels.
 
         Returns
         -------
         np.ndarray or scipy.sparse.csr_matrix
-        """
-        return self.esa.get_jacobian(dense, form=form)
-
-    def jacobian_with_ids(self, dense: bool = False, form: str = 'R'):
-        """
-        Get the Jacobian matrix with row/column ID labels.
-
-        Parameters
-        ----------
-        dense : bool, default False
-            If True, return dense array. Else sparse CSR.
-        form : str, default 'R'
-            Coordinate form: 'R' (rectangular), 'P' (polar), 'DC' (B').
-
-        Returns
-        -------
+            The power flow Jacobian matrix (when ``ids=False``).
         tuple
-            (matrix, row_ids) where row_ids describes each row/column.
+            ``(matrix, row_ids)`` when ``ids=True``.
         """
-        return self.esa.get_jacobian_with_ids(dense, form=form)
+        if ids:
+            return self.esa.get_jacobian_with_ids(dense, form=form)
+        return self.esa.get_jacobian(dense, form=form)
 
     # --- Network Delegation ---
 
-    def busmap(self):
-        """Bus number to matrix index mapping. Delegates to ``network.busmap()``."""
+    def busmap(self) -> pd.Series:
+        """
+        Create mapping from bus numbers to matrix indices.
+
+        Delegates to ``network.busmap()``.
+
+        Returns
+        -------
+        pd.Series
+            Series indexed by BusNum with positional index values.
+        """
         return self.network.busmap()
 
-    def buscoords(self, astuple=True):
-        """Bus coordinates from substation data. Delegates to ``network.buscoords()``."""
-        return self.network.buscoords(astuple)
+    def buscoords(self, astuple: bool = True):
+        """
+        Retrieve bus latitude and longitude from substation data.
 
-    # --- Simulation Control ---
+        Delegates to ``network.buscoords()``.
+
+        Parameters
+        ----------
+        astuple : bool, default True
+            If True, return ``(Longitude, Latitude)`` as a tuple of Series.
+            If False, return a merged DataFrame.
+
+        Returns
+        -------
+        tuple of pd.Series or DataFrame
+            Bus geographic coordinates.
+        """
+        return self.network.buscoords(astuple)
 
     def pflow(self, getvolts: bool = True, method: str = "POLARNEWT") -> Optional[Union[pd.Series, Tuple[pd.Series, pd.Series]]]:
         """
@@ -316,7 +265,9 @@ class PowerWorld(Indexable):
 
         Returns
         -------
-        pd.Series or tuple or None
+        pd.Series, tuple of pd.Series, or None
+            Complex voltage Series if ``getvolts=True`` (default), or
+            None if ``getvolts=False``.
         """
         self.esa.SolvePowerFlow(method)
         if getvolts:
@@ -380,15 +331,25 @@ class PowerWorld(Indexable):
         self.esa.ResetToFlatStart()
 
     def save(self, filename: Optional[str] = None) -> None:
-        """Saves the case to the specified filename."""
+        """
+        Save the case to disk.
+
+        Parameters
+        ----------
+        filename : str, optional
+            Output file path. If None, overwrites the currently open case.
+        """
         self.esa.SaveCase(filename)
 
-    def command(self, script: str):
-        """Executes a raw script command string."""
-        return self.esa.RunScriptCommand(script)
+    def log(self, message: str) -> None:
+        """
+        Add a message to the PowerWorld message log.
 
-    def log(self, message: str):
-        """Adds a message to the PowerWorld log."""
+        Parameters
+        ----------
+        message : str
+            The message text to append.
+        """
         self.esa.LogAdd(message)
 
     def print_log(self, clear: bool = False, new_only: bool = False):
@@ -451,51 +412,83 @@ class PowerWorld(Indexable):
 
     # --- Data Retrieval ---
 
-    def gens(self):
-        """Returns a DataFrame of generator outputs (MW, Mvar) and status."""
+    def gens(self) -> DataFrame:
+        """
+        Retrieve generator outputs and status.
+
+        Returns
+        -------
+        DataFrame
+            Columns: ``GenMW``, ``GenMVR``, ``GenStatus``, plus key fields.
+        """
         return self[Gen, ["GenMW", "GenMVR", "GenStatus"]]
 
-    def loads(self):
-        """Returns a DataFrame of load demands (MW, Mvar) and status."""
+    def loads(self) -> DataFrame:
+        """
+        Retrieve load demands and status.
+
+        Returns
+        -------
+        DataFrame
+            Columns: ``LoadMW``, ``LoadMVR``, ``LoadStatus``, plus key fields.
+        """
         return self[Load, ["LoadMW", "LoadMVR", "LoadStatus"]]
 
-    def shunts(self):
-        """Returns a DataFrame of switched shunt outputs (MW, Mvar) and status."""
+    def shunts(self) -> DataFrame:
+        """
+        Retrieve switched shunt outputs and status.
+
+        Returns
+        -------
+        DataFrame
+            Columns: ``ShuntMW``, ``ShuntMVR``, ``ShuntStatus``, plus key fields.
+        """
         return self[Shunt, ["ShuntMW", "ShuntMVR", "ShuntStatus"]]
 
-    def lines(self):
-        """Returns all transmission lines."""
+    def lines(self) -> DataFrame:
+        """
+        Retrieve all transmission lines (excluding transformers).
+
+        Returns
+        -------
+        DataFrame
+            All branch fields for branches with ``BranchDeviceType == "Line"``.
+        """
         branches = self[Branch, :]
         return branches[branches["BranchDeviceType"] == "Line"]
 
-    def transformers(self):
-        """Returns all transformers."""
+    def transformers(self) -> DataFrame:
+        """
+        Retrieve all transformers (excluding lines).
+
+        Returns
+        -------
+        DataFrame
+            All branch fields for branches with ``BranchDeviceType == "Transformer"``.
+        """
         branches = self[Branch, :]
         return branches[branches["BranchDeviceType"] == "Transformer"]
 
-    def areas(self):
-        """Returns all areas."""
+    def areas(self) -> DataFrame:
+        """
+        Retrieve all area objects with all available fields.
+
+        Returns
+        -------
+        DataFrame
+            All defined fields for Area objects.
+        """
         return self[Area, :]
 
-    def zones(self):
-        """Returns all zones."""
+    def zones(self) -> DataFrame:
+        """
+        Retrieve all zone objects with all available fields.
+
+        Returns
+        -------
+        DataFrame
+            All defined fields for Zone objects.
+        """
         return self[Zone, :]
 
-    # --- Modification ---
-
-    def open_branch(self, bus1, bus2, ckt='1'):
-        """Opens a branch."""
-        self.esa.ChangeParametersSingleElement(
-            "Branch",
-            ["BusNum", "BusNum:1", "LineCircuit", "LineStatus"],
-            [bus1, bus2, ckt, "Open"],
-        )
-
-    def close_branch(self, bus1, bus2, ckt='1'):
-        """Closes a branch."""
-        self.esa.ChangeParametersSingleElement(
-            "Branch",
-            ["BusNum", "BusNum:1", "LineCircuit", "LineStatus"],
-            [bus1, bus2, ckt, "Closed"],
-        )
 

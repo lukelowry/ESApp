@@ -11,16 +11,6 @@ REQUIREMENTS:
     - A valid PowerWorld case file path set in ``tests/config_test.py``
       (variable ``SAW_TEST_CASE``) or via the ``SAW_TEST_CASE`` env variable
 
-RELATED TEST FILES:
-    - test_integration_saw_core.py          -- base SAW operations, logging, I/O
-    - test_integration_saw_modify.py        -- destructive modify, region, case actions
-    - test_integration_saw_powerflow.py     -- power flow, matrices, sensitivity, topology
-    - test_integration_saw_contingency.py   -- contingency and fault analysis
-    - test_integration_saw_transient.py     -- transient stability
-    - test_integration_saw_operations.py    -- ATC, OPF, PV/QV, time step, weather, scheduled
-    - test_integration_workbench.py         -- PowerWorld facade and statics
-    - test_integration_network.py           -- Network topology
-
 USAGE:
     pytest tests/test_integration_saw_gic.py -v
 """
@@ -54,24 +44,12 @@ def saw_instance(saw_session):
 def wb(saw_session):
     """PowerWorld with live SAW connection."""
     workbench = PowerWorld()
-    workbench.set_esa(saw_session)
+    workbench.esa = saw_session
     return workbench
 
 
 class TestGIC:
-    """GIC analysis: SAW commands, workbench options, model building, G-matrix.
-
-    All GIC-related integration tests are consolidated here. This covers:
-    - Low-level SAW GIC commands (calculate, save, write)
-    - Workbench-level option getters/setters (pf_include, ts_include, calc_mode)
-    - The configure() shorthand
-    - Storm application and result clearing
-    - B3D loading and time-varying CSV upload
-    - GIC settings retrieval and G-matrix extraction
-    - jac_decomp utility
-    - Full model() generation and property validation
-    - G-matrix comparison between model() and PowerWorld
-    """
+    """GIC analysis: SAW commands, workbench options, model building, G-matrix."""
 
     @pytest.mark.order(7300)
     def test_gic_calculate(self, saw_instance):
@@ -124,12 +102,9 @@ class TestGIC:
         assert os.path.exists(tmp_mat)
 
     @pytest.mark.order(7500)
-    def test_gic_setup(self, saw_instance):
+    def test_gic_setup_and_time(self, saw_instance):
         saw_instance.GICSetupTimeVaryingSeries()
         saw_instance.GICShiftOrStretchInputPoints()
-
-    @pytest.mark.order(7600)
-    def test_gic_time(self, saw_instance):
         saw_instance.GICTimeVaryingCalculate(0.0, False)
         saw_instance.GICTimeVaryingAddTime(10.0)
         saw_instance.GICTimeVaryingDeleteAllTimes()
@@ -149,52 +124,43 @@ class TestGIC:
         saw_instance.GICWriteFilePTI(tmp_gic)
 
     @pytest.mark.order(7710)
-    def test_gic_options_pf_include(self, wb):
+    def test_gic_options(self, wb):
+        """Descriptor-based options: pf_include, ts_include, calc_mode, configure."""
         gic = wb.gic
-        gic.set_pf_include(True)
-        assert gic.get_gic_option('IncludeInPowerFlow') == 'YES'
-        gic.set_pf_include(False)
-        assert gic.get_gic_option('IncludeInPowerFlow') == 'NO'
-        gic.set_pf_include(True)
 
-    @pytest.mark.order(7720)
-    def test_gic_options_ts_include(self, wb):
-        gic = wb.gic
-        gic.set_ts_include(True)
+        gic.pf_include = True
+        assert gic.get_gic_option('IncludeInPowerFlow') == 'YES'
+        gic.pf_include = False
+        assert gic.get_gic_option('IncludeInPowerFlow') == 'NO'
+        gic.pf_include = True
+
+        gic.ts_include = True
         assert gic.get_gic_option('IncludeTimeDomain') == 'YES'
-        gic.set_ts_include(False)
+        gic.ts_include = False
         assert gic.get_gic_option('IncludeTimeDomain') == 'NO'
 
-    @pytest.mark.order(7730)
-    def test_gic_options_calc_mode(self, wb):
-        gic = wb.gic
-        gic.set_calc_mode('SnapShot')
+        gic.calc_mode = 'SnapShot'
         assert gic.get_gic_option('CalcMode') == 'SnapShot'
-        gic.set_calc_mode('TimeVarying')
+        gic.calc_mode = 'TimeVarying'
         assert gic.get_gic_option('CalcMode') == 'TimeVarying'
-        gic.set_calc_mode('SnapShot')
+        gic.calc_mode = 'SnapShot'
 
-    @pytest.mark.order(7740)
-    def test_gic_configure(self, wb):
-        gic = wb.gic
         gic.configure(pf_include=True, ts_include=True, calc_mode='TimeVarying')
         assert gic.get_gic_option('IncludeInPowerFlow') == 'YES'
         assert gic.get_gic_option('IncludeTimeDomain') == 'YES'
         assert gic.get_gic_option('CalcMode') == 'TimeVarying'
         gic.configure()
 
+        assert wb.gic.get_gic_option('NonExistentOption12345') is None
+
     @pytest.mark.order(7750)
-    def test_gic_storm(self, wb):
+    def test_gic_storm_and_clear(self, wb):
         wb.gic.storm(1.0, 90.0, solvepf=True)
         wb.gic.storm(1.0, 90.0, solvepf=False)
-
-    @pytest.mark.order(7760)
-    def test_gic_cleargic(self, wb):
         wb.gic.cleargic()
 
     @pytest.mark.order(7770)
     def test_gic_loadb3d(self, wb):
-        """loadb3d with and without setup on load."""
         with pytest.raises((PowerWorldPrerequisiteError, PowerWorldError)):
             wb.gic.loadb3d("STORM", "nonexistent.b3d", setuponload=True)
         with pytest.raises((PowerWorldPrerequisiteError, PowerWorldError)):
@@ -210,23 +176,16 @@ class TestGIC:
         wb.gic.timevary_csv(tmp_csv)
 
     @pytest.mark.order(7780)
-    def test_gic_settings(self, wb):
+    def test_gic_settings_and_gmatrix(self, wb):
         settings = wb.gic.settings()
         assert settings is not None
         assert isinstance(settings, pd.DataFrame)
         assert 'VariableName' in settings.columns
 
-    @pytest.mark.order(7790)
-    def test_gic_gmatrix(self, wb):
         G_sparse = wb.gic.gmatrix(sparse=True)
         assert G_sparse.shape[0] > 0
         G_dense = wb.gic.gmatrix(sparse=False)
         assert isinstance(G_dense, np.ndarray)
-
-    @pytest.mark.order(7800)
-    def test_gic_get_option_missing(self, wb):
-        val = wb.gic.get_gic_option('NonExistentOption12345')
-        assert val is None
 
     @pytest.mark.order(7801)
     def test_jac_decomp(self):
@@ -241,14 +200,15 @@ class TestGIC:
         """Compare computed G-matrix from GIC.model() with PowerWorld's."""
         from scipy.sparse import issparse
 
-        gic = GIC()
-        gic.set_esa(gic_saw)
-        gic.set_pf_include(True)
+        pw = PowerWorld()
+        pw.esa = gic_saw
+        gic = pw.gic
+        gic.pf_include = True
 
-        subs = gic[Substation, ["SubNum", "SubName", "GICSubGroundOhms", "GICUsedSubGroundOhms"]]
-        buses = gic[Bus, ["BusNum", "BusNomVolt", "SubNum"]]
-        branches = gic[Branch, ["BusNum", "BusNum:1", "GICConductance", "BranchDeviceType",
-                                 "GICCoilRFrom", "GICCoilRTo"]]
+        subs = pw[Substation, ["SubNum", "SubName", "GICSubGroundOhms", "GICUsedSubGroundOhms"]]
+        buses = pw[Bus, ["BusNum", "BusNomVolt", "SubNum"]]
+        branches = pw[Branch, ["BusNum", "BusNum:1", "GICConductance", "BranchDeviceType",
+                                "GICCoilRFrom", "GICCoilRTo"]]
         lines = branches.loc[
             branches['BranchDeviceType'] != 'Transformer',
             ["BusNum", "BusNum:1", "GICConductance"]
@@ -291,26 +251,16 @@ class TestGIC:
 
     @pytest.mark.order(7860)
     def test_gic_model(self, wb):
+        """model() returns self and all properties are populated."""
         model = wb.gic.model()
         assert model is wb.gic
 
-    @pytest.mark.order(7870)
-    def test_gic_model_properties(self, wb):
-        wb.gic.model()
-
-        A = wb.gic.A
-        G = wb.gic.G
-        H = wb.gic.H
-        zeta = wb.gic.zeta
-        Px = wb.gic.Px
-        eff = wb.gic.eff
-
-        assert A.shape[0] > 0
-        assert G.shape[0] == G.shape[1]
-        assert H.shape[0] > 0
-        assert zeta.shape[0] > 0
-        assert Px.shape[0] > 0
-        assert eff.shape[0] > 0
+        assert wb.gic.A.shape[0] > 0
+        assert wb.gic.G.shape[0] == wb.gic.G.shape[1]
+        assert wb.gic.H.shape[0] > 0
+        assert wb.gic.zeta.shape[0] > 0
+        assert wb.gic.Px.shape[0] > 0
+        assert wb.gic.eff.shape[0] > 0
 
 
 if __name__ == "__main__":

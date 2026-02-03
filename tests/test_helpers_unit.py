@@ -976,19 +976,18 @@ class TestWorkbenchLogic:
         """Network._dc_lines returns None on exception."""
         from esapp.utils.network import Network
 
-        net = Network()
-        net.esa = MagicMock()
-        # Make __getitem__ raise to simulate DCTransmissionLine not available
-        with patch.object(Network, '__getitem__', side_effect=Exception("no DC lines")):
-            result = net._dc_lines()
-            assert result is None
+        mock_pw = MagicMock()
+        mock_pw.__getitem__ = MagicMock(side_effect=Exception("no DC lines"))
+        net = Network(mock_pw)
+        result = net._dc_lines()
+        assert result is None
 
     def test_gic_get_option_none_settings(self):
         """GIC.get_gic_option returns None when settings() returns None."""
         from esapp.utils.gic import GIC
 
-        gic = GIC()
-        gic.esa = MagicMock()
+        mock_pw = MagicMock()
+        gic = GIC(mock_pw)
         with patch.object(GIC, 'settings', return_value=None):
             result = gic.get_gic_option("IncludeInPowerFlow")
             assert result is None
