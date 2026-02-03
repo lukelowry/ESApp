@@ -47,6 +47,25 @@ wb.dyn.watch(Gen, [TS.Gen.P, TS.Gen.Speed, TS.Gen.Delta])
 
 ---
 
+# GObject Schema Access
+
+Each `GObject` subclass (like `Bus`, `Gen`) exposes its schema via `@classmethod` methods:
+
+```python
+Bus.TYPE()        # 'Bus' — the PowerWorld object type string
+Bus.keys()        # ['BusNum'] — primary key fields
+Bus.fields()      # all field names
+Bus.secondary()   # alternate identifier fields
+Bus.editable()    # user-modifiable fields
+Bus.identifiers() # keys + secondary (as a set)
+Bus.settable()    # identifiers + editable (as a set)
+```
+
+These are populated automatically during class creation by `GObject.__new__`,
+which inspects each member's `FieldPriority` flags.
+
+---
+
 # PWRaw File Schema Description
 
 **File Format:** Tab-Separated Values (TSV)

@@ -68,7 +68,7 @@ class TSWatch:
         """
         fields = []
         for gtype, flds in self._watch_fields.items():
-            pw.esa.TSResultStorageSetAll(object=gtype.TYPE, value=True)
+            pw.esa.TSResultStorageSetAll(object=gtype.TYPE(), value=True)
 
             objs = pw[gtype, ['ObjectID']]
 

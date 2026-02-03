@@ -82,7 +82,7 @@ class Indexable:
 
         # 2. Determine the complete set of fields to retrieve.
         # Always start with the object's key fields.
-        fields_to_get = set(gtype.keys)
+        fields_to_get = set(gtype.keys())
 
         # 3. Add any additional fields based on the request.
         if requested_fields is None:
@@ -90,7 +90,7 @@ class Indexable:
             pass
         elif requested_fields == slice(None):
             # Case: pw[Bus, :] -> add all defined fields.
-            fields_to_get.update(gtype.fields)
+            fields_to_get.update(gtype.fields())
         else:
             # Case: pw[Bus, 'field'] or pw[Bus, ['f1', 'f2']]
             # Normalize to an iterable to handle single or multiple fields.
@@ -110,7 +110,7 @@ class Indexable:
             return None
 
         # 5. Retrieve data from PowerWorld
-        return self.esa.GetParamsRectTyped(gtype.TYPE, sorted(list(fields_to_get)))
+        return self.esa.GetParamsRectTyped(gtype.TYPE(), sorted(list(fields_to_get)))
     
     def __setitem__(self, args, value) -> None:
         """
@@ -185,7 +185,7 @@ class Indexable:
            *"not found"*:
 
            a. Check whether the DataFrame contains all **primary keys**
-              (``gtype.keys``).  If any are missing, raise ``ValueError``
+              (``gtype.keys()``).  If any are missing, raise ``ValueError``
               — we cannot identify/create objects without them.
            b. Fall back to ``ChangeParametersMultipleElement`` which
               iterates row-by-row.  When the SAW property
@@ -208,7 +208,7 @@ class Indexable:
             The GObject subclass representing the type of objects to update.
         df : pandas.DataFrame
             The DataFrame containing object data.  Must include all
-            primary key columns (``gtype.keys``).
+            primary key columns (``gtype.keys()``).
 
         Raises
         ------
@@ -225,17 +225,17 @@ class Indexable:
         non_settable = [c for c in df.columns if not gtype.is_settable(c)]
         if non_settable:
             raise ValueError(
-                f"Cannot set read-only field(s) on {gtype.TYPE}: {non_settable}"
+                f"Cannot set read-only field(s) on {gtype.TYPE()}: {non_settable}"
             )
 
         try:
-            self.esa.ChangeParametersMultipleElementRect(gtype.TYPE, df.columns.tolist(), df)
+            self.esa.ChangeParametersMultipleElementRect(gtype.TYPE(), df.columns.tolist(), df)
         except PowerWorldPrerequisiteError as e:
             if "not found" in str(e).lower():
-                missing_keys = set(gtype.keys) - set(df.columns)
+                missing_keys = set(gtype.keys()) - set(df.columns)
                 if missing_keys:
                     raise ValueError(
-                        f"Missing required primary key field(s) for {gtype.TYPE}: {missing_keys}. "
+                        f"Missing required primary key field(s) for {gtype.TYPE()}: {missing_keys}. "
                         f"All primary keys must be included to create new objects."
                     ) from e
                 # Primary keys present — fall back to
@@ -245,7 +245,7 @@ class Indexable:
                 cols = df.columns.tolist()
                 values = df.values.tolist()
                 try:
-                    self.esa.ChangeParametersMultipleElement(gtype.TYPE, cols, values)
+                    self.esa.ChangeParametersMultipleElement(gtype.TYPE(), cols, values)
                 except PowerWorldPrerequisiteError as create_err:
                     if 'not found' not in str(create_err).lower():
                         raise
@@ -277,11 +277,11 @@ class Indexable:
         non_settable = [f for f in fields if not gtype.is_settable(f)]
         if non_settable:
             raise ValueError(
-                f"Cannot set read-only field(s) on {gtype.TYPE}: {non_settable}"
+                f"Cannot set read-only field(s) on {gtype.TYPE()}: {non_settable}"
             )
         # For objects without keys (e.g., Sim_Solution_Options), we construct
         # the change DataFrame directly without reading from PowerWorld first.
-        if not gtype.keys:
+        if not gtype.keys():
             data_dict = {}
             if len(fields) == 1:
                 data_dict[fields[0]] = [value]
@@ -297,7 +297,7 @@ class Indexable:
         # For objects with keys, we first get the keys (primary keys)
         # of all existing objects to ensure we only modify what's already there.
         else:
-            keys = gtype.keys
+            keys = gtype.keys()
             change_df = self[gtype, keys]
             
             if change_df is None or change_df.empty:
@@ -313,4 +313,4 @@ class Indexable:
                 change_df[fields] = value
         
         # Send the minimal DataFrame to PowerWorld.
-        self.esa.ChangeParametersMultipleElementRect(gtype.TYPE, change_df.columns.tolist(), change_df)
+        self.esa.ChangeParametersMultipleElementRect(gtype.TYPE(), change_df.columns.tolist(), change_df)

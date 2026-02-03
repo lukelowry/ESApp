@@ -25,22 +25,22 @@ def pytest_generate_tests(metafunc):
     """Dynamically parametrize tests that use the g_object fixture."""
     if "g_object" in metafunc.fixturenames:
         classes = get_sample_gobject_subclasses()
-        ids = [c.TYPE if hasattr(c, 'TYPE') else c.__name__ for c in classes]
+        ids = [c.TYPE() if hasattr(c, 'TYPE') else c.__name__ for c in classes]
         metafunc.parametrize("g_object", classes, ids=ids)
     elif "g_object_keyed" in metafunc.fixturenames:
         # Objects that have keys (for tests that require GetParamsRectTyped to return key data)
         classes = get_sample_gobject_subclasses(require_keys=True)
-        ids = [c.TYPE if hasattr(c, 'TYPE') else c.__name__ for c in classes]
+        ids = [c.TYPE() if hasattr(c, 'TYPE') else c.__name__ for c in classes]
         metafunc.parametrize("g_object_keyed", classes, ids=ids)
     elif "g_object_keyed_editable" in metafunc.fixturenames:
         # Objects with keys AND at least 1 editable non-key field
         classes = get_sample_gobject_subclasses(require_keys=True, require_editable_non_key=True)
-        ids = [c.TYPE if hasattr(c, 'TYPE') else c.__name__ for c in classes]
+        ids = [c.TYPE() if hasattr(c, 'TYPE') else c.__name__ for c in classes]
         metafunc.parametrize("g_object_keyed_editable", classes, ids=ids)
     elif "g_object_multi_editable" in metafunc.fixturenames:
         # Objects with at least 2 editable non-key fields
         classes = get_sample_gobject_subclasses(require_multiple_editable=True)
-        ids = [c.TYPE if hasattr(c, 'TYPE') else c.__name__ for c in classes]
+        ids = [c.TYPE() if hasattr(c, 'TYPE') else c.__name__ for c in classes]
         metafunc.parametrize("g_object_multi_editable", classes, ids=ids)
 
 
@@ -62,7 +62,7 @@ def indexable_instance() -> Indexable:
 def test_getitem_key_fields(indexable_instance: Indexable, g_object: Type[grid.GObject]):
     """idx[GObject] retrieves only key fields."""
     mock_esa = indexable_instance.esa
-    unique_keys = sorted(list(set(g_object.keys)))
+    unique_keys = sorted(list(set(g_object.keys())))
 
     if not unique_keys:
         result = indexable_instance[g_object]
@@ -74,14 +74,14 @@ def test_getitem_key_fields(indexable_instance: Indexable, g_object: Type[grid.G
     mock_esa.GetParamsRectTyped.return_value = mock_df
 
     result_df = indexable_instance[g_object]
-    mock_esa.GetParamsRectTyped.assert_called_once_with(g_object.TYPE, unique_keys)
+    mock_esa.GetParamsRectTyped.assert_called_once_with(g_object.TYPE(), unique_keys)
     assert_frame_equal(result_df, mock_df)
 
 
 def test_getitem_all_fields(indexable_instance: Indexable, g_object: Type[grid.GObject]):
     """idx[GObject, :] retrieves all fields."""
     mock_esa = indexable_instance.esa
-    expected_fields = sorted(list(set(g_object.keys) | set(g_object.fields)))
+    expected_fields = sorted(list(set(g_object.keys()) | set(g_object.fields())))
 
     if not expected_fields:
         result = indexable_instance[g_object, :]
@@ -92,24 +92,24 @@ def test_getitem_all_fields(indexable_instance: Indexable, g_object: Type[grid.G
     mock_esa.GetParamsRectTyped.return_value = mock_df
 
     result_df = indexable_instance[g_object, :]
-    mock_esa.GetParamsRectTyped.assert_called_once_with(g_object.TYPE, expected_fields)
+    mock_esa.GetParamsRectTyped.assert_called_once_with(g_object.TYPE(), expected_fields)
     assert_frame_equal(result_df, mock_df)
 
 
 def test_getitem_specific_fields(indexable_instance: Indexable, g_object: Type[grid.GObject]):
     """idx[GObject, ['Field1']] retrieves specific fields plus all keys."""
     mock_esa = indexable_instance.esa
-    specific_fields = [f for f in g_object.fields if f not in g_object.keys]
+    specific_fields = [f for f in g_object.fields() if f not in g_object.keys()]
     if not specific_fields:
         pytest.skip(f"{g_object.__name__} has no non-key fields.")
 
     field = specific_fields[0]
-    expected = sorted(list(set(g_object.keys) | {field}))
+    expected = sorted(list(set(g_object.keys()) | {field}))
     mock_df = pd.DataFrame({f: [1, 2] for f in expected})
     mock_esa.GetParamsRectTyped.return_value = mock_df
 
     result_df = indexable_instance[g_object, [field]]
-    mock_esa.GetParamsRectTyped.assert_called_once_with(g_object.TYPE, expected)
+    mock_esa.GetParamsRectTyped.assert_called_once_with(g_object.TYPE(), expected)
     assert_frame_equal(result_df, mock_df)
 
 
@@ -134,12 +134,12 @@ def test_getitem_none_return(indexable_instance: Indexable):
 def test_setitem_broadcast(indexable_instance: Indexable, g_object: Type[grid.GObject]):
     """idx[GObject, 'Field'] = value broadcasts to all rows."""
     mock_esa = indexable_instance.esa
-    editable_fields = [f for f in g_object.editable if f not in g_object.keys]
+    editable_fields = [f for f in g_object.editable() if f not in g_object.keys()]
     if not editable_fields:
         pytest.skip(f"{g_object.__name__} has no editable non-key fields.")
 
     field = editable_fields[0]
-    unique_keys = sorted(list(set(g_object.keys)))
+    unique_keys = sorted(list(set(g_object.keys())))
 
     if not unique_keys:
         indexable_instance[g_object, field] = 1.234
@@ -159,7 +159,7 @@ def test_setitem_broadcast(indexable_instance: Indexable, g_object: Type[grid.GO
 def test_setitem_bulk_update_from_df(indexable_instance: Indexable, g_object: Type[grid.GObject]):
     """idx[GObject] = df performs bulk update."""
     mock_esa = indexable_instance.esa
-    settable_cols = list(g_object.settable)
+    settable_cols = list(g_object.settable())
     if not settable_cols:
         pytest.skip(f"{g_object.__name__} has no settable fields.")
 
@@ -167,7 +167,7 @@ def test_setitem_bulk_update_from_df(indexable_instance: Indexable, g_object: Ty
     indexable_instance[g_object] = update_df
 
     mock_esa.ChangeParametersMultipleElementRect.assert_called_once_with(
-        g_object.TYPE, update_df.columns.tolist(), update_df
+        g_object.TYPE(), update_df.columns.tolist(), update_df
     )
 
 
@@ -175,13 +175,13 @@ def test_setitem_broadcast_multiple_fields(indexable_instance: Indexable, g_obje
     """idx[GObject, ['F1','F2']] = [v1, v2] broadcasts multiple values."""
     mock_esa = indexable_instance.esa
     g_object = g_object_multi_editable
-    editable_fields = [f for f in g_object.editable if f not in g_object.keys]
+    editable_fields = [f for f in g_object.editable() if f not in g_object.keys()]
     # Filtering already ensures at least 2 editable non-key fields
     assert len(editable_fields) >= 2, f"{g_object.__name__} should have >= 2 editable fields"
 
     fields = editable_fields[:2]
     values = [1.1, 2.2]
-    unique_keys = sorted(list(set(g_object.keys)))
+    unique_keys = sorted(list(set(g_object.keys())))
 
     if not unique_keys:
         indexable_instance[g_object, fields] = values
@@ -214,7 +214,7 @@ def test_setitem_invalid_index(indexable_instance: Indexable):
 
 def test_setitem_non_settable_field(indexable_instance: Indexable):
     """ValueError when setting a read-only field."""
-    non_settable = [f for f in grid.Bus.fields if f not in grid.Bus.settable]
+    non_settable = [f for f in grid.Bus.fields() if f not in grid.Bus.settable()]
     if not non_settable:
         pytest.skip("Bus has no non-settable fields.")
     with pytest.raises(ValueError, match="Cannot set read-only field"):
@@ -223,7 +223,7 @@ def test_setitem_non_settable_field(indexable_instance: Indexable):
 
 def test_setitem_bulk_non_settable_column(indexable_instance: Indexable):
     """ValueError when bulk update includes a read-only column."""
-    non_settable = [f for f in grid.Bus.fields if f not in grid.Bus.settable]
+    non_settable = [f for f in grid.Bus.fields() if f not in grid.Bus.settable()]
     if not non_settable:
         pytest.skip("Bus has no non-settable fields.")
     update_df = pd.DataFrame({"BusNum": [1, 2], non_settable[0]: [100, 200]})
@@ -238,7 +238,7 @@ def test_setitem_bulk_non_settable_column(indexable_instance: Indexable):
 def test_setitem_allows_secondary_identifier_fields(indexable_instance: Indexable):
     """Bulk update with SECONDARY identifier fields is allowed (e.g. LoadID)."""
     mock_esa = indexable_instance.esa
-    assert "LoadID" in grid.Load.settable
+    assert "LoadID" in grid.Load.settable()
     update_df = pd.DataFrame({
         "BusNum": [1, 2], "LoadID": ["1", "2"], "LoadSMW": [10.0, 20.0]
     })
@@ -248,17 +248,17 @@ def test_setitem_allows_secondary_identifier_fields(indexable_instance: Indexabl
 
 def test_gobject_identifiers_property():
     """identifiers includes both primary and secondary keys."""
-    assert "BusNum" in grid.Load.identifiers
-    assert "LoadID" in grid.Load.identifiers
-    assert "BusNum" in grid.Gen.identifiers
-    assert "GenID" in grid.Gen.identifiers
+    assert "BusNum" in grid.Load.identifiers()
+    assert "LoadID" in grid.Load.identifiers()
+    assert "BusNum" in grid.Gen.identifiers()
+    assert "GenID" in grid.Gen.identifiers()
 
 
 def test_keyless_object_single_field(indexable_instance: Indexable):
     """Setting a field on a keyless object creates a single-row DataFrame."""
     mock_esa = indexable_instance.esa
-    assert not grid.Sim_Solution_Options.keys
-    editable = list(grid.Sim_Solution_Options.editable)
+    assert not grid.Sim_Solution_Options.keys()
+    editable = list(grid.Sim_Solution_Options.editable())
     assert len(editable) > 0
 
     indexable_instance[grid.Sim_Solution_Options, editable[0]] = "YES"
@@ -272,7 +272,7 @@ def test_keyless_object_single_field(indexable_instance: Indexable):
 def test_keyless_object_multiple_fields(indexable_instance: Indexable):
     """Setting multiple fields on a keyless object."""
     mock_esa = indexable_instance.esa
-    editable = list(grid.Sim_Solution_Options.editable)
+    editable = list(grid.Sim_Solution_Options.editable())
     assert len(editable) >= 2
 
     fields = editable[:2]
@@ -286,7 +286,7 @@ def test_keyless_object_multiple_fields(indexable_instance: Indexable):
 
 def test_keyless_object_value_length_mismatch(indexable_instance: Indexable):
     """Mismatched field/value counts on keyless object raises ValueError."""
-    editable = list(grid.Sim_Solution_Options.editable)
+    editable = list(grid.Sim_Solution_Options.editable())
     fields = editable[:2]
     with pytest.raises(ValueError, match="must be a list/tuple of the same length"):
         indexable_instance[grid.Sim_Solution_Options, fields] = ["YES", "NO", "EXTRA"]
@@ -295,10 +295,10 @@ def test_keyless_object_value_length_mismatch(indexable_instance: Indexable):
 def test_setitem_with_nan_values(indexable_instance: Indexable):
     """NaN values are passed through to PowerWorld unchanged."""
     mock_esa = indexable_instance.esa
-    editable_fields = [f for f in grid.Bus.editable if f not in grid.Bus.keys]
+    editable_fields = [f for f in grid.Bus.editable() if f not in grid.Bus.keys()]
     if not editable_fields:
         pytest.skip("Bus has no editable non-key fields.")
-    key_field = grid.Bus.keys[0]
+    key_field = grid.Bus.keys()[0]
 
     update_df = pd.DataFrame({
         key_field: [1, 2, 3],
@@ -377,13 +377,13 @@ def test_getitem_with_gobject_enum_field(indexable_instance: Indexable):
         pytest.skip("Could not find a suitable GObject field member.")
 
     field_name = field_member.value[1]
-    expected_fields = sorted(list(set(grid.Bus.keys) | {field_name}))
+    expected_fields = sorted(list(set(grid.Bus.keys()) | {field_name}))
 
     mock_df = pd.DataFrame({f: [1, 2] for f in expected_fields})
     mock_esa.GetParamsRectTyped.return_value = mock_df
 
     result_df = indexable_instance[grid.Bus, field_member]
-    mock_esa.GetParamsRectTyped.assert_called_once_with(grid.Bus.TYPE, expected_fields)
+    mock_esa.GetParamsRectTyped.assert_called_once_with(grid.Bus.TYPE(), expected_fields)
     assert_frame_equal(result_df, mock_df)
 
 
@@ -409,10 +409,10 @@ def test_setitem_broadcast_empty_dataframe(indexable_instance: Indexable, g_obje
     """Setting field on objects when no objects exist (empty DataFrame) is a no-op."""
     mock_esa = indexable_instance.esa
     g_object = g_object_keyed_editable
-    editable_fields = [f for f in g_object.editable if f not in g_object.keys]
+    editable_fields = [f for f in g_object.editable() if f not in g_object.keys()]
 
     # Filtering already ensures keys exist and at least 1 editable non-key field
-    assert g_object.keys, f"{g_object.__name__} should have keys"
+    assert g_object.keys(), f"{g_object.__name__} should have keys"
     assert editable_fields, f"{g_object.__name__} should have editable non-key fields"
 
     mock_esa.GetParamsRectTyped.return_value = pd.DataFrame()
@@ -426,7 +426,7 @@ def test_setitem_broadcast_empty_dataframe(indexable_instance: Indexable, g_obje
 def test_setitem_broadcast_none_dataframe(indexable_instance: Indexable):
     """Setting field when GetParamsRectTyped returns None is a no-op."""
     mock_esa = indexable_instance.esa
-    editable_fields = [f for f in grid.Bus.editable if f not in grid.Bus.keys]
+    editable_fields = [f for f in grid.Bus.editable() if f not in grid.Bus.keys()]
 
     if not editable_fields:
         pytest.skip("Bus has no editable non-key fields.")
@@ -508,16 +508,16 @@ def test_getitem_single_string_field(indexable_instance: Indexable):
     """idx[GObject, 'FieldName'] works with a single string field."""
     mock_esa = indexable_instance.esa
 
-    non_key_fields = [f for f in grid.Bus.fields if f not in grid.Bus.keys]
+    non_key_fields = [f for f in grid.Bus.fields() if f not in grid.Bus.keys()]
     if not non_key_fields:
         pytest.skip("Bus has no non-key fields.")
 
     field = non_key_fields[0]
-    expected_fields = sorted(list(set(grid.Bus.keys) | {field}))
+    expected_fields = sorted(list(set(grid.Bus.keys()) | {field}))
 
     mock_df = pd.DataFrame({f: [1, 2] for f in expected_fields})
     mock_esa.GetParamsRectTyped.return_value = mock_df
 
     result_df = indexable_instance[grid.Bus, field]
-    mock_esa.GetParamsRectTyped.assert_called_once_with(grid.Bus.TYPE, expected_fields)
+    mock_esa.GetParamsRectTyped.assert_called_once_with(grid.Bus.TYPE(), expected_fields)
     assert_frame_equal(result_df, mock_df)

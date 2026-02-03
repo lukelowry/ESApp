@@ -347,13 +347,13 @@ def get_sample_gobject_subclasses(require_keys=False, require_multiple_editable=
 
         # Apply filters if requested
         if require_keys:
-            all_classes = [c for c in all_classes if hasattr(c, 'keys') and c.keys]
+            all_classes = [c for c in all_classes if hasattr(c, 'keys') and c.keys()]
 
         if require_editable_non_key:
             def has_editable_non_key(cls):
                 if not hasattr(cls, 'editable') or not hasattr(cls, 'keys'):
                     return False
-                editable_non_key = [f for f in cls.editable if f not in cls.keys]
+                editable_non_key = [f for f in cls.editable() if f not in cls.keys()]
                 return len(editable_non_key) >= 1
             all_classes = [c for c in all_classes if has_editable_non_key(c)]
 
@@ -361,7 +361,7 @@ def get_sample_gobject_subclasses(require_keys=False, require_multiple_editable=
             def has_multiple_editable(cls):
                 if not hasattr(cls, 'editable') or not hasattr(cls, 'keys'):
                     return False
-                editable_non_key = [f for f in cls.editable if f not in cls.keys]
+                editable_non_key = [f for f in cls.editable() if f not in cls.keys()]
                 return len(editable_non_key) >= 2
             all_classes = [c for c in all_classes if has_multiple_editable(c)]
 
@@ -371,7 +371,7 @@ def get_sample_gobject_subclasses(require_keys=False, require_multiple_editable=
         sample = []
         for type_name in priority_types:
             for cls in all_classes:
-                if hasattr(cls, 'TYPE') and cls.TYPE == type_name:
+                if hasattr(cls, 'TYPE') and cls.TYPE() == type_name:
                     sample.append(cls)
                     break
 

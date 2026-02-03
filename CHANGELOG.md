@@ -1,3 +1,10 @@
+[0.1.3] - 2026-02-03
+--------------------
+
+**Changed**
+- Replaced deprecated `@classmethod @property` pattern in `GObject` with standard `@classmethod` methods for Python 3.13 compatibility (e.g. `Bus.keys` is now `Bus.keys()`)
+- Added Python 3.12 and 3.13 to CI test matrix
+
 [0.1.2] - 2026-02-03
 --------------------
 

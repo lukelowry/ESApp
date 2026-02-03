@@ -36,8 +36,8 @@ class GObject(Enum):
     Subclasses should define their members to build the schema.
 
     The class automatically populates `_FIELDS`, `_KEYS`, and `_TYPE` attributes
-    based on its member definitions. These are exposed through the `fields`,
-    `keys`, and `TYPE` class properties.
+    based on its member definitions. These are exposed through the `fields()`,
+    `keys()`, and `TYPE()` classmethods.
 
     Example:
     --------
@@ -67,21 +67,21 @@ class GObject(Enum):
             cls._SECONDARY = []
         if '_EDITABLE' not in cls.__dict__:
             cls._EDITABLE = []
-        
+
         # The object type string name is the only argument for this member
         if len(args) == 1:
             cls._TYPE = args[0]
-            
+
             # Set integer and name as member value
             value = len(cls.__members__) + 1
             obj = object.__new__(cls)
             obj._value_ = value
 
             return obj
-        
+
         # Everything else is a field with (name, dtype, priority)
         else:
-            field_name_str, field_dtype, field_priority = args 
+            field_name_str, field_dtype, field_priority = args
 
             # Set integer and name as member value
             value = len(cls.__members__) + 1
@@ -104,53 +104,51 @@ class GObject(Enum):
                 cls._EDITABLE.append(field_name_str)
 
             return obj
-    
+
     def __repr__(self) -> str:
         # For the type-defining member, show the type.
         if isinstance(self._value_, int):
-            return f'<{self.__class__.__name__}.{self.name}: TYPE={self.__class__.TYPE}>'
+            return f'<{self.__class__.__name__}.{self.name}: TYPE={self.__class__.TYPE()}>'
         # For field members, show the field info.
         return f'<{self.__class__.__name__}.{self.name}: Field={self._value_[1]}>'
-    
+
     def __str__(self) -> str:
         # For the type-defining member, it has no string field name.
         if isinstance(self._value_, int):
             return self.name
         # For field members, return the PowerWorld field name string.
         return str(self._value_[1])
-    
+
     @classmethod
-    @property
     def keys(cls):
         return getattr(cls, '_KEYS', [])
-    
+
     @classmethod
-    @property
     def fields(cls):
         return getattr(cls, '_FIELDS', [])
 
     @classmethod
-    @property
     def secondary(cls):
         """Secondary identifier fields (used with primary keys to identify records)."""
         return getattr(cls, '_SECONDARY', [])
 
     @classmethod
-    @property
     def editable(cls):
         return getattr(cls, '_EDITABLE', [])
 
     @classmethod
-    @property
     def identifiers(cls):
         """All identifier fields: primary keys + secondary keys."""
         return set(getattr(cls, '_KEYS', [])) | set(getattr(cls, '_SECONDARY', []))
 
     @classmethod
-    @property
     def settable(cls):
         """Fields that can be set: identifiers (primary + secondary keys) + editable fields."""
-        return cls.identifiers | set(getattr(cls, '_EDITABLE', []))
+        return cls.identifiers() | set(getattr(cls, '_EDITABLE', []))
+
+    @classmethod
+    def TYPE(cls):
+        return getattr(cls, '_TYPE', 'NO_OBJECT_NAME')
 
     @classmethod
     def is_editable(cls, field_name: str) -> bool:
@@ -160,9 +158,4 @@ class GObject(Enum):
     @classmethod
     def is_settable(cls, field_name: str) -> bool:
         """Check if a field can be set (either a key or editable)."""
-        return field_name in cls.settable
-
-    @classmethod
-    @property
-    def TYPE(cls):
-        return getattr(cls, '_TYPE', 'NO_OBJECT_NAME')
+        return field_name in cls.settable()

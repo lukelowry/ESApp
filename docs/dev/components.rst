@@ -40,15 +40,15 @@ define fields with ``(PowerWorld name, data type, priority flags)``:
 
         ObjectString = 'Bus'  # Sets Bus.TYPE — must be last member
 
-The base class collects these into queryable properties:
+The base class collects these into queryable classmethods:
 
 .. code-block:: python
 
-    Bus.TYPE        # 'Bus' - PowerWorld object type (from ObjectString)
-    Bus.keys        # ['BusNum'] - primary key fields
-    Bus.fields      # all field names
-    Bus.secondary   # alternate identifier fields
-    Bus.editable    # user-modifiable fields
+    Bus.TYPE()        # 'Bus' - PowerWorld object type (from ObjectString)
+    Bus.keys()        # ['BusNum'] - primary key fields
+    Bus.fields()      # all field names
+    Bus.secondary()   # alternate identifier fields
+    Bus.editable()    # user-modifiable fields
 
 Field Priority Flags
 ~~~~~~~~~~~~~~~~~~~~
@@ -131,4 +131,4 @@ API Stability
 ESA++ uses semantic versioning:
 
 - **Public API** (stable): PowerWorld, component classes, exception types
-- **Internal API** (may change): SAW mixins, Indexable internals, GObject metaclass
+- **Internal API** (may change): SAW mixins, Indexable internals, GObject internals
