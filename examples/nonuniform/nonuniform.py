@@ -7,7 +7,7 @@ assembly for the non-uniform GIC computation:
     I_gic = abs(H @ L @ E)
 
 where:
-- **H** is the transformer-to-branch transfer matrix from ``wb.gic.model()``
+- **H** is the transformer-to-branch transfer matrix from ``pw.gic.model()``
 - **L** maps a gridded E-field vector to branch induced voltages
 - **E** = [Ex.ravel(), Ey.ravel()] is the stacked master E-field vector
 
@@ -20,7 +20,7 @@ Example
 -------
 >>> from examples.nonuniform.nonuniform import build_L_matrix, stack_efield
 >>>
->>> L = build_L_matrix(wb, lons, lats, H.shape[1])
+>>> L = build_L_matrix(pw, lons, lats, H.shape[1])
 >>> E = stack_efield(Ex, Ey)
 >>> gic = np.abs(H @ L @ E)
 """
@@ -136,7 +136,7 @@ def _trace_line_through_grid(x0, y0, x1, y1, xs, ys):
         yield ix, iy, frac_dx, frac_dy
 
 
-def build_L_matrix(wb, lons, lats, n_branches_model):
+def build_L_matrix(pw, lons, lats, n_branches_model):
     """Build the line integration operator L.
 
     L is a sparse matrix of shape ``(n_branches_model, 2*N)`` where
@@ -159,7 +159,7 @@ def build_L_matrix(wb, lons, lats, n_branches_model):
 
     Parameters
     ----------
-    wb : GridWorkBench
+    pw : PowerWorld
         Live workbench instance (used to read branch coordinates).
     lons : np.ndarray
         1-D array of grid longitudes (length nx).
@@ -183,7 +183,7 @@ def build_L_matrix(wb, lons, lats, n_branches_model):
     dlat = lats[1] - lats[0]
 
     # Branch endpoint coordinates
-    br = wb[Branch, ['BusNum', 'BusNum:1', 'BranchDeviceType',
+    br = pw[Branch, ['BusNum', 'BusNum:1', 'BranchDeviceType',
                      'Longitude', 'Longitude:1', 'Latitude', 'Latitude:1']]
 
     lon_a = br['Longitude'].to_numpy()
@@ -238,7 +238,7 @@ def build_L_matrix(wb, lons, lats, n_branches_model):
     return L.tocsr()
 
 
-def bus_gic(wb, gic):
+def bus_gic(pw, gic):
     """Aggregate absolute transformer GICs to bus-level totals.
 
     Each transformer in the H-matrix corresponds to a row in the
@@ -248,7 +248,7 @@ def bus_gic(wb, gic):
 
     Parameters
     ----------
-    wb : GridWorkBench
+    pw : PowerWorld
         Live workbench instance.
     gic : np.ndarray
         Absolute transformer GIC magnitudes (length n_transformers).
@@ -264,7 +264,7 @@ def bus_gic(wb, gic):
 
     gic = np.asarray(gic).ravel()
 
-    xf = wb[GICXFormer, ['BusNum3W', 'BusNum3W:1']]
+    xf = pw[GICXFormer, ['BusNum3W', 'BusNum3W:1']]
     xf = xf.iloc[:len(gic)].copy()
     xf['GIC'] = gic
 
@@ -273,7 +273,7 @@ def bus_gic(wb, gic):
     bus_total.columns = ['BusNum', 'GIC']
 
     # Join with bus coordinates
-    coords = wb[Bus, ['BusNum', 'Longitude', 'Latitude']]
+    coords = pw[Bus, ['BusNum', 'Longitude', 'Latitude']]
     result = bus_total.merge(coords, on='BusNum', how='inner')
     return result
 

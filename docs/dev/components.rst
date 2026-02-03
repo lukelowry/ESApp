@@ -20,7 +20,7 @@ Architecture Overview
    * - ``generate_components.py``
      - Script that parses PWRaw export and generates the above files
    * - ``indexable.py``
-     - Translates ``wb[Bus, "field"]`` syntax into SimAuto calls
+     - Translates ``pw[Bus, "field"]`` syntax into SimAuto calls
 
 GObject Base Class
 ~~~~~~~~~~~~~~~~~~
@@ -107,7 +107,7 @@ Usage Examples
     from esapp.components import Bus, Gen, TS
 
     # Data access with component classes
-    data = wb[Bus, [Bus.BusNum, Bus.BusName, Bus.BusPUVolt]]
+    data = pw[Bus, [Bus.BusNum, Bus.BusName, Bus.BusPUVolt]]
 
     # Check field properties
     Bus.is_editable('BusName')  # True
@@ -125,7 +125,7 @@ Extending ESA++
 1. Create mixin in ``esapp/saw/`` (e.g., ``custom_analysis.py``)
 2. Implement using SAW interface
 3. Add mixin to SAW class in ``esapp/saw/saw.py``
-4. Add convenience wrapper to GridWorkBench if commonly used
+4. Add convenience wrapper to PowerWorld if commonly used
 
 **New Utilities**
 
@@ -144,5 +144,5 @@ API Stability
 
 ESA++ uses semantic versioning:
 
-- **Public API** (stable): GridWorkBench, component classes, exception types
+- **Public API** (stable): PowerWorld, component classes, exception types
 - **Internal API** (may change): SAW mixins, Indexable internals, GObject metaclass

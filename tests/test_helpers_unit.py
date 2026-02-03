@@ -856,119 +856,119 @@ class TestTSFieldIndexing:
 
 
 class TestWorkbenchLogic:
-    """Tests for GridWorkBench Python-side logic (no PowerWorld needed)."""
+    """Tests for PowerWorld Python-side logic (no PowerWorld needed)."""
 
     def test_init_no_fname(self):
-        """GridWorkBench initializes without fname."""
-        from esapp.workbench import GridWorkBench
-        wb = GridWorkBench()
-        assert wb.esa is None
-        assert wb.fname is None
+        """PowerWorld initializes without fname."""
+        from esapp.workbench import PowerWorld
+        pw = PowerWorld()
+        assert pw.esa is None
+        assert pw.fname is None
 
     def test_open_file_not_found(self):
-        """GridWorkBench.open raises FileNotFoundError for missing file."""
-        from esapp.workbench import GridWorkBench
+        """PowerWorld.open raises FileNotFoundError for missing file."""
+        from esapp.workbench import PowerWorld
         from unittest.mock import patch
 
-        wb = GridWorkBench()
-        wb.fname = "C:/nonexistent/file.pwb"
+        pw = PowerWorld()
+        pw.fname = "C:/nonexistent/file.pwb"
 
         with patch('esapp.indexable.path.isabs', return_value=True), \
              patch('esapp.indexable.path.exists', return_value=False):
             with pytest.raises(FileNotFoundError, match="Case file not found"):
-                wb.open()
+                pw.open()
 
     def test_log_output(self):
-        """GridWorkBench.print_log reads and prints log content."""
-        from esapp.workbench import GridWorkBench
+        """PowerWorld.print_log reads and prints log content."""
+        from esapp.workbench import PowerWorld
         from unittest.mock import MagicMock
 
-        wb = GridWorkBench()
-        wb.esa = MagicMock()
-        wb._log_last_position = 0
+        pw = PowerWorld()
+        pw.esa = MagicMock()
+        pw._log_last_position = 0
 
         def mock_log_save(path, append=False):
             with open(path, "w") as f:
                 f.write("Some log output")
 
-        wb.esa.LogSave.side_effect = mock_log_save
+        pw.esa.LogSave.side_effect = mock_log_save
 
-        result = wb.print_log(new_only=False, clear=False)
+        result = pw.print_log(new_only=False, clear=False)
         assert "Some log output" in result
 
     def test_print_log_new_only(self):
-        """GridWorkBench.print_log returns only new content."""
-        from esapp.workbench import GridWorkBench
+        """PowerWorld.print_log returns only new content."""
+        from esapp.workbench import PowerWorld
         from unittest.mock import MagicMock
 
-        wb = GridWorkBench()
-        wb.esa = MagicMock()
-        wb._log_last_position = 5
+        pw = PowerWorld()
+        pw.esa = MagicMock()
+        pw._log_last_position = 5
 
         def mock_log_save(path, append=False):
             with open(path, "w") as f:
                 f.write("Hello World")
 
-        wb.esa.LogSave.side_effect = mock_log_save
+        pw.esa.LogSave.side_effect = mock_log_save
 
-        result = wb.print_log(new_only=True, clear=False)
+        result = pw.print_log(new_only=True, clear=False)
         assert result == " World"
 
     def test_print_log_empty(self):
-        """GridWorkBench.print_log handles empty log output (whitespace only)."""
-        from esapp.workbench import GridWorkBench
+        """PowerWorld.print_log handles empty log output (whitespace only)."""
+        from esapp.workbench import PowerWorld
         from unittest.mock import MagicMock
 
-        wb = GridWorkBench()
-        wb.esa = MagicMock()
-        wb._log_last_position = 0
+        pw = PowerWorld()
+        pw.esa = MagicMock()
+        pw._log_last_position = 0
 
         def mock_log_save(path, append=False):
             with open(path, "w") as f:
                 f.write("   ")
 
-        wb.esa.LogSave.side_effect = mock_log_save
+        pw.esa.LogSave.side_effect = mock_log_save
 
-        result = wb.print_log(new_only=False, clear=False)
+        result = pw.print_log(new_only=False, clear=False)
         assert result == "   "
 
     def test_log_with_clear(self):
-        """GridWorkBench.print_log clears log after reading."""
-        from esapp.workbench import GridWorkBench
+        """PowerWorld.print_log clears log after reading."""
+        from esapp.workbench import PowerWorld
         from unittest.mock import MagicMock
 
-        wb = GridWorkBench()
-        wb.esa = MagicMock()
-        wb._log_last_position = 0
+        pw = PowerWorld()
+        pw.esa = MagicMock()
+        pw._log_last_position = 0
 
         def mock_log_save(path, append=False):
             with open(path, "w") as f:
                 f.write("Log content")
 
-        wb.esa.LogSave.side_effect = mock_log_save
+        pw.esa.LogSave.side_effect = mock_log_save
 
-        wb.print_log(new_only=False, clear=True)
-        wb.esa.LogClear.assert_called_once()
-        assert wb._log_last_position == 0
+        pw.print_log(new_only=False, clear=True)
+        pw.esa.LogClear.assert_called_once()
+        assert pw._log_last_position == 0
 
     def test_close(self):
-        """GridWorkBench.close calls esa.CloseCase."""
-        from esapp.workbench import GridWorkBench
+        """PowerWorld.close calls esa.CloseCase."""
+        from esapp.workbench import PowerWorld
 
-        wb = GridWorkBench()
-        wb.esa = MagicMock()
-        wb.close()
-        wb.esa.CloseCase.assert_called_once()
+        pw = PowerWorld()
+        pw.esa = MagicMock()
+        pw.close()
+        pw.esa.CloseCase.assert_called_once()
 
     def test_ts_solve_empty_results(self):
-        """GridWorkBench.ts_solve returns empty DataFrames when no results."""
-        from esapp.workbench import GridWorkBench
+        """PowerWorld.ts_solve returns empty DataFrames when no results."""
+        from esapp.workbench import PowerWorld
 
-        wb = GridWorkBench()
-        wb.esa = MagicMock()
+        pw = PowerWorld()
+        pw.esa = MagicMock()
 
         with patch("esapp.workbench.get_ts_results", return_value=(None, None)):
-            meta, data = wb.ts_solve("ctg1", ["TSBusVPU"])
+            meta, data = pw.ts_solve("ctg1", ["TSBusVPU"])
             assert meta.empty
             assert data.empty
 

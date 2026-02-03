@@ -17,10 +17,10 @@ Example
 -------
 Basic network matrix operations::
 
-    >>> from esapp import GridWorkBench
-    >>> wb = GridWorkBench("case.pwb")
-    >>> A = wb.network.incidence()  # Incidence matrix
-    >>> L = wb.network.laplacian(BranchType.LENGTH)  # Length-weighted Laplacian
+    >>> from esapp import PowerWorld
+    >>> pw = PowerWorld("case.pwb")
+    >>> A = pw.network.incidence()  # Incidence matrix
+    >>> L = pw.network.laplacian(BranchType.LENGTH)  # Length-weighted Laplacian
 
 See Also
 --------

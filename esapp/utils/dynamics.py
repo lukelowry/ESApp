@@ -26,7 +26,7 @@ class TSWatch:
     -------
     >>> tsw = TSWatch()
     >>> tsw.watch(Gen, [TS.Gen.P, TS.Gen.W])
-    >>> fields = tsw.prepare(wb)
+    >>> fields = tsw.prepare(pw)
     """
 
     def __init__(self):
@@ -52,14 +52,14 @@ class TSWatch:
         self._watch_fields[gtype] = field_names
         return self
 
-    def prepare(self, wb) -> List[str]:
+    def prepare(self, pw) -> List[str]:
         """
         Configure the ESA environment for simulation and build retrieval fields.
 
         Parameters
         ----------
-        wb : GridWorkBench
-            An initialized GridWorkBench instance.
+        pw : PowerWorld
+            An initialized PowerWorld instance.
 
         Returns
         -------
@@ -68,9 +68,9 @@ class TSWatch:
         """
         fields = []
         for gtype, flds in self._watch_fields.items():
-            wb.esa.TSResultStorageSetAll(object=gtype.TYPE, value=True)
+            pw.esa.TSResultStorageSetAll(object=gtype.TYPE, value=True)
 
-            objs = wb[gtype, ['ObjectID']]
+            objs = pw[gtype, ['ObjectID']]
 
             if objs is not None and not objs.empty:
                 valid_ids = objs['ObjectID'].dropna().unique()

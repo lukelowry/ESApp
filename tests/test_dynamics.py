@@ -5,7 +5,7 @@ These are **unit tests** that do NOT require PowerWorld Simulator. All
 PowerWorld interactions are mocked. They test the pure-Python transient
 stability utilities: ContingencyBuilder, SimAction (esapp.utils.contingency),
 TSWatch, get_ts_results, process_ts_results (esapp.utils.dynamics), and
-GridWorkBench.ts_solve (esapp.workbench).
+PowerWorld.ts_solve (esapp.workbench).
 
 USAGE:
     pytest tests/test_dynamics.py -v
@@ -390,28 +390,28 @@ class TestProcessTSResults:
 
 
 # =============================================================================
-# GridWorkBench.ts_solve Tests
+# PowerWorld.ts_solve Tests
 # =============================================================================
 
 class TestTSSolve:
-    """Tests for GridWorkBench.ts_solve() method."""
+    """Tests for PowerWorld.ts_solve() method."""
 
     @pytest.fixture
     def mock_wb(self):
         """Create a mock workbench with ESA for ts_solve testing."""
-        from esapp.workbench import GridWorkBench
+        from esapp.workbench import PowerWorld
 
-        wb = object.__new__(GridWorkBench)
-        wb.esa = MagicMock()
-        wb.esa.TSAutoCorrect.return_value = None
-        wb.esa.TSInitialize.return_value = None
-        wb.esa.TSSolve.return_value = None
-        wb.esa.TSGetResults.return_value = (
+        pw = object.__new__(PowerWorld)
+        pw.esa = MagicMock()
+        pw.esa.TSAutoCorrect.return_value = None
+        pw.esa.TSInitialize.return_value = None
+        pw.esa.TSSolve.return_value = None
+        pw.esa.TSGetResults.return_value = (
             pd.DataFrame({'ColHeader': ['Col1'], 'ObjectType': ['Bus'],
                           'PrimaryKey': ['1'], 'SecondaryKey': [None], 'VariableName': ['VPU']}),
             pd.DataFrame({'time': [0.0, 0.1], 'Col1': [1.0, 0.95]})
         )
-        return wb
+        return pw
 
     def test_accepts_single_contingency(self, mock_wb):
         """ts_solve() accepts a single contingency name as string."""

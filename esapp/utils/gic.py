@@ -24,15 +24,15 @@ Example
 -------
 Basic GIC model generation::
 
-    >>> from esapp import GridWorkBench
-    >>> wb = GridWorkBench("case.pwb")
-    >>> wb.gic.model()
-    >>> H = wb.gic.H  # Linear GIC function matrix
-    >>> G = wb.gic.G  # Conductance Laplacian
+    >>> from esapp import PowerWorld
+    >>> pw = PowerWorld("case.pwb")
+    >>> pw.gic.model()
+    >>> H = pw.gic.H  # Linear GIC function matrix
+    >>> G = pw.gic.G  # Conductance Laplacian
 
 Using PowerWorld's G-matrix directly::
 
-    >>> G_pw = wb.gic.gmatrix()
+    >>> G_pw = pw.gic.gmatrix()
 
 See Also
 --------
@@ -86,7 +86,7 @@ class GIC(Indexable):
     Provides methods for GIC calculations, sensitivity analysis, and
     model generation using PowerWorld case data via the Indexable interface.
 
-    This class is accessed via ``GridWorkBench.gic``.
+    This class is accessed via ``PowerWorld.gic``.
 
     GIC Options
     -----------
@@ -98,11 +98,11 @@ class GIC(Indexable):
 
     Example
     -------
-    >>> wb = GridWorkBench("case.pwb")
-    >>> wb.gic.configure()  # Enable GIC with default options
-    >>> wb.gic.storm(100, 90)  # 100 V/km, 90 degrees
-    >>> wb.gic.model()
-    >>> G = wb.gic.gmatrix()
+    >>> pw = PowerWorld("case.pwb")
+    >>> pw.gic.configure()  # Enable GIC with default options
+    >>> pw.gic.storm(100, 90)  # 100 V/km, 90 degrees
+    >>> pw.gic.model()
+    >>> G = pw.gic.gmatrix()
 
     See Also
     --------
@@ -184,9 +184,9 @@ class GIC(Indexable):
 
         Example
         -------
-        >>> wb.gic.configure()  # Use defaults (pf_include=True)
-        >>> wb.gic.configure(ts_include=True)  # Enable for transient stability
-        >>> wb.gic.configure(calc_mode='TimeVarying')  # For time series analysis
+        >>> pw.gic.configure()  # Use defaults (pf_include=True)
+        >>> pw.gic.configure(ts_include=True)  # Enable for transient stability
+        >>> pw.gic.configure(calc_mode='TimeVarying')  # For time series analysis
         """
         self.set_pf_include(pf_include)
         self.set_ts_include(ts_include)

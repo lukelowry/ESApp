@@ -1,9 +1,9 @@
 """
-Integration tests for the GridWorkBench facade.
+Integration tests for the PowerWorld facade.
 
 These are **integration tests** that require a live connection to PowerWorld
 Simulator via the SimAuto COM interface. They test the top-level
-GridWorkBench facade: case I/O, simulation control, component retrieval,
+PowerWorld facade: case I/O, simulation control, component retrieval,
 data modification, delegation to sub-modules, and workbench-level static
 analysis (power flow, voltage, Y-bus, Jacobian).
 
@@ -37,7 +37,7 @@ import sys
 try:
     from esapp.components import Bus, Gen, Load, Branch, Contingency, Area, Zone, Shunt, GICXFormer, GObject
     from esapp import components as grid
-    from esapp.workbench import GridWorkBench
+    from esapp.workbench import PowerWorld
     from esapp.saw import PowerWorldError, COMError, SimAutoFeatureError, create_object_string
 except ImportError:
     raise
@@ -47,14 +47,14 @@ CRASH_PRONE_COMPONENTS = []
 @pytest.fixture(scope="module")
 def wb(saw_session):
     """
-    Wraps the session-scoped SAW instance in a GridWorkBench object.
+    Wraps the session-scoped SAW instance in a PowerWorld object.
     """
-    workbench = GridWorkBench()
+    workbench = PowerWorld()
     workbench.set_esa(saw_session)
     return workbench
 
 
-class TestGridWorkBenchFunctions:
+class TestPowerWorldFunctions:
     # -------------------------------------------------------------------------
     # Simulation Control
     # -------------------------------------------------------------------------
@@ -210,7 +210,7 @@ class TestWorkbenchStatics:
     """Workbench-level static analysis: power flow, voltage, Y-bus, Jacobian.
 
     These complement the SAW-level tests in test_integration_saw_powerflow.py
-    by exercising the higher-level GridWorkBench delegation methods.
+    by exercising the higher-level PowerWorld delegation methods.
     """
 
     def test_pflow(self, wb):
@@ -367,7 +367,7 @@ def get_gobject_subclasses():
 @pytest.mark.parametrize("component_class", get_gobject_subclasses())
 def test_component_access(wb, component_class):
     """
-    Verifies that GridWorkBench can read key fields for every defined component.
+    Verifies that PowerWorld can read key fields for every defined component.
     """
     if component_class.TYPE in CRASH_PRONE_COMPONENTS:
         pytest.skip(f"Skipping {component_class.TYPE}: Known to cause SimAuto crashes.")

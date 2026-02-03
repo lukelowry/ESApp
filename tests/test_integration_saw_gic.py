@@ -18,7 +18,7 @@ RELATED TEST FILES:
     - test_integration_saw_contingency.py   -- contingency and fault analysis
     - test_integration_saw_transient.py     -- transient stability
     - test_integration_saw_operations.py    -- ATC, OPF, PV/QV, time step, weather, scheduled
-    - test_integration_workbench.py         -- GridWorkBench facade and statics
+    - test_integration_workbench.py         -- PowerWorld facade and statics
     - test_integration_network.py           -- Network topology
 
 USAGE:
@@ -37,7 +37,7 @@ pytestmark = [
 
 try:
     from esapp.saw import SAW, PowerWorldError, PowerWorldPrerequisiteError, create_object_string
-    from esapp.workbench import GridWorkBench
+    from esapp.workbench import PowerWorld
     from esapp.utils import GIC, jac_decomp
     from esapp.components import Bus, Branch, Substation
 except ImportError:
@@ -52,8 +52,8 @@ def saw_instance(saw_session):
 
 @pytest.fixture(scope="module")
 def wb(saw_session):
-    """GridWorkBench with live SAW connection."""
-    workbench = GridWorkBench()
+    """PowerWorld with live SAW connection."""
+    workbench = PowerWorld()
     workbench.set_esa(saw_session)
     return workbench
 

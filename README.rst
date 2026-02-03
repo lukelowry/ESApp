@@ -21,7 +21,7 @@ An open-source Python toolkit for power system automation, providing a high-perf
 Key Features
 ------------
 
-- **Intuitive Indexing Syntax**: Access and modify grid components using a unique indexing system (e.g., ``wb[Bus, "BusPUVolt"]``) that feels like native Python.
+- **Intuitive Indexing Syntax**: Access and modify grid components using a unique indexing system (e.g., ``pw[Bus, "BusPUVolt"]``) that feels like native Python.
 - **Comprehensive SimAuto Wrapper**: Full coverage of PowerWorld's API through the ``SAW`` class, organized into modular mixins for power flow, contingencies, transients, and more.
 - **High-Level Adapter Interface**: A collection of simplified "one-liner" functions for common tasks like GIC calculation, fault analysis, and voltage violation detection.
 - **Native Pandas Integration**: Every data retrieval operation returns a Pandas DataFrame or Series, enabling immediate analysis, filtering, and visualization.
@@ -50,24 +50,24 @@ Here is a quick example of how ESA++ simplifies data access and power flow analy
 
 .. code-block:: python
 
-    from esapp import GridWorkBench
+    from esapp import PowerWorld
     from esapp.components import *
 
     # Open Case
-    wb = GridWorkBench("path/to/case.pwb")
+    pw = PowerWorld("path/to/case.pwb")
 
-    # Retrieve data 
-    bus_data = wb[Bus, ["BusName", "BusPUVolt"]]
+    # Retrieve data
+    bus_data = pw[Bus, ["BusName", "BusPUVolt"]]
 
     # Solve power flow
-    V = wb.pflow()
+    V = pw.pflow()
 
     # Do some action, write to PW
-    violations = wb.violations(v_min=0.95)
-    wb[Gen, "GenMW"] = 100.0
+    violations = pw.violations(v_min=0.95)
+    pw[Gen, "GenMW"] = 100.0
 
     # Save case
-    wb.save()
+    pw.save()
 
 Why ESA++?
 ----------

@@ -7,7 +7,7 @@
 #
 # Usage:
 #   from esapp.components import TS, Gen
-#   wb.dyn.watch(Gen, [TS.Gen.P, TS.Gen.Speed])
+#   pw.dyn.watch(Gen, [TS.Gen.P, TS.Gen.Speed])
 #
 
 from dataclasses import dataclass
@@ -46,7 +46,7 @@ class TS:
 
     Example:
         >>> from esapp.components import TS, Gen
-        >>> wb.dyn.watch(Gen, [TS.Gen.P, TS.Gen.Speed, TS.Gen.Delta])
+        >>> pw.dyn.watch(Gen, [TS.Gen.P, TS.Gen.Speed, TS.Gen.Delta])
     """
 
     class Area:

@@ -8,11 +8,11 @@ execution, and result retrieval through a fluent API.
 
 Example
 -------
-    >>> from esapp import GridWorkBench
+    >>> from esapp import PowerWorld
     >>> from esapp.utils import ContingencyBuilder, SimAction, TSWatch
     >>> from examples.dynamics import Dynamics
-    >>> wb = GridWorkBench("case.pwb")
-    >>> dyn = Dynamics(wb)
+    >>> pw = PowerWorld("case.pwb")
+    >>> dyn = Dynamics(pw)
     >>> dyn.watch(Gen, [TS.Gen.P, TS.Gen.W, TS.Gen.Delta])
     >>> dyn.bus_fault("Fault1", "101", fault_time=1.0, duration=0.1)
     >>> meta, results = dyn.solve("Fault1")
@@ -41,8 +41,8 @@ class Dynamics:
 
     Parameters
     ----------
-    wb : GridWorkBench
-        An initialized GridWorkBench instance.
+    pw : PowerWorld
+        An initialized PowerWorld instance.
 
     Attributes
     ----------
@@ -51,15 +51,15 @@ class Dynamics:
 
     Example
     -------
-    >>> dyn = Dynamics(wb)
+    >>> dyn = Dynamics(pw)
     >>> dyn.runtime = 10.0
     >>> dyn.watch(Gen, [TS.Gen.P, TS.Gen.W])
     >>> dyn.bus_fault("Fault1", "101", fault_time=1.0, duration=0.1)
     >>> meta, data = dyn.solve("Fault1")
     """
 
-    def __init__(self, wb) -> None:
-        self.wb = wb
+    def __init__(self, pw) -> None:
+        self.pw = pw
         self.runtime: float = 5.0
         self._pending_ctgs: Dict[str, ContingencyBuilder] = {}
         self._tswatch = TSWatch()
@@ -123,10 +123,10 @@ class Dynamics:
 
         ctg_df, ele_df = builder.to_dataframes()
 
-        self.wb[TSContingency] = ctg_df
+        self.pw[TSContingency] = ctg_df
 
         if not ele_df.empty:
-            self.wb[TSContingencyElement] = ele_df
+            self.pw[TSContingencyElement] = ele_df
 
         logger.info(f"Uploaded contingency: {name} with {len(ele_df)} events.")
 
@@ -150,6 +150,6 @@ class Dynamics:
             if ctg in self._pending_ctgs:
                 self.upload_contingency(ctg)
 
-        retrieval_fields = self._tswatch.prepare(self.wb)
+        retrieval_fields = self._tswatch.prepare(self.pw)
 
-        return self.wb.ts_solve(ctgs_to_solve, retrieval_fields)
+        return self.pw.ts_solve(ctgs_to_solve, retrieval_fields)

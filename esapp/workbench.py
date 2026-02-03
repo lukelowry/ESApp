@@ -16,13 +16,13 @@ from .saw import SAW
 import tempfile
 import os
 
-class GridWorkBench(Indexable):
+class PowerWorld(Indexable):
     """
     Main entry point for interacting with the PowerWorld grid model.
     """
     def __init__(self, fname: Optional[str] = None):
         """
-        Initialize the GridWorkBench.
+        Initialize the PowerWorld interface.
 
         Parameters
         ----------

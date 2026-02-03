@@ -2,16 +2,16 @@
 Static Analysis Example
 =======================
 
-Advanced static analysis tools built on top of the esapp GridWorkBench.
+Advanced static analysis tools built on top of the esapp PowerWorld.
 Provides continuation power flow, state chain management, ZIP load
 injection, generator limit checking, and random load variation.
 
 Example
 -------
-    >>> from esapp import GridWorkBench
+    >>> from esapp import PowerWorld
     >>> from examples.statics import Statics
-    >>> wb = GridWorkBench("case.pwb")
-    >>> s = Statics(wb)
+    >>> pw = PowerWorld("case.pwb")
+    >>> s = Statics(pw)
     >>> interface = np.array([1, -1, 0, ...])
     >>> for mw in s.continuation_pf(interface, maxiter=100):
     ...     print(f"Converged at {mw:.2f} MW")
@@ -33,16 +33,16 @@ __all__ = ['Statics']
 
 class Statics:
     """
-    Advanced static analysis application using a GridWorkBench instance.
+    Advanced static analysis application using a PowerWorld instance.
 
     Parameters
     ----------
-    wb : GridWorkBench
-        An initialized GridWorkBench instance.
+    pw : PowerWorld
+        An initialized PowerWorld instance.
     """
 
-    def __init__(self, wb) -> None:
-        self.wb = wb
+    def __init__(self, pw) -> None:
+        self.pw = pw
         self._gen_limits_cached = False
         self._dispatch_initialized = False
 
@@ -54,7 +54,7 @@ class Statics:
         """Cache generator limits from PowerWorld on first access."""
         if self._gen_limits_cached:
             return
-        gens = self.wb[Gen, ['GenMVRMin', 'GenMVRMax', 'GenMWMax', 'GenMWMin']]
+        gens = self.pw[Gen, ['GenMVRMin', 'GenMVRMax', 'GenMWMax', 'GenMWMin']]
         self.genqmax = gens['GenMVRMax']
         self.genqmin = gens['GenMVRMin']
         self.genpmax = gens['GenMWMax']
@@ -69,7 +69,7 @@ class Statics:
         if self._dispatch_initialized:
             return
 
-        buses = self.wb[Bus, ['BusNum', 'BusName_NomVolt']]
+        buses = self.pw[Bus, ['BusNum', 'BusName_NomVolt']]
 
         dispatch = DataFrame({
             'BusNum':          buses['BusNum'].values,
@@ -79,11 +79,11 @@ class Statics:
             **{zf: 0.0 for zf in self._ZIP_FIELDS},
         })
 
-        self.wb.esa.EnterMode('EDIT')
+        self.pw.esa.EnterMode('EDIT')
         try:
-            self.wb[Load] = dispatch
+            self.pw[Load] = dispatch
         finally:
-            self.wb.esa.EnterMode('RUN')
+            self.pw.esa.EnterMode('RUN')
 
         self.DispatchPQ = dispatch[['BusNum', 'LoadID'] + self._ZIP_FIELDS].copy()
         self._dispatch_initialized = True
@@ -101,11 +101,11 @@ class Statics:
         """Check if any closed generators exceed P limits."""
         self._ensure_gen_limits()
         if p is None:
-            p = self.wb[Gen, 'GenMW']['GenMW']
+            p = self.pw[Gen, 'GenMW']['GenMW']
         is_high = p > self.genpmax + tol
         is_low = p < self.genpmin - tol
         if is_closed is None:
-            is_closed = self.wb[Gen, 'GenStatus']['GenStatus'] == 'Closed'
+            is_closed = self.pw[Gen, 'GenStatus']['GenStatus'] == 'Closed'
         violation = is_closed & (is_high | is_low)
         return any(violation)
 
@@ -118,11 +118,11 @@ class Statics:
         """Check if any closed generators exceed Q limits."""
         self._ensure_gen_limits()
         if q is None:
-            q = self.wb[Gen, 'GenMVR']['GenMVR']
+            q = self.pw[Gen, 'GenMVR']['GenMVR']
         is_high = q > self.genqmax + tol
         is_low = q < self.genqmin - tol
         if is_closed is None:
-            is_closed = self.wb[Gen, 'GenStatus']['GenStatus'] == 'Closed'
+            is_closed = self.pw[Gen, 'GenStatus']['GenStatus'] == 'Closed'
         violation = is_closed & (is_high | is_low)
         return any(violation)
 
@@ -186,18 +186,18 @@ class Statics:
         log = (lambda msg, **kw: print(msg, **kw)) if verbose else (lambda *a, **k: None)
 
         if restore_when_done:
-            self.wb.esa.StoreState('CPF_BACKUP')
+            self.pw.esa.StoreState('CPF_BACKUP')
 
         lam_current = initialmw
         self.setload(SP=-lam_current * interface)
-        self.wb.pflow(getvolts=False)
-        self.wb.esa.StoreState('CPF_PREV')
+        self.pw.pflow(getvolts=False)
+        self.pw.esa.StoreState('CPF_PREV')
         yield lam_current
 
-        J0, jac_ids = self.wb.jacobian_with_ids(dense=True, form='P')
+        J0, jac_ids = self.pw.jacobian_with_ids(dense=True, form='P')
         n_jac = J0.shape[0]
 
-        bus_nums = self.wb[Bus, 'BusNum']['BusNum'].to_numpy()
+        bus_nums = self.pw[Bus, 'BusNum']['BusNum'].to_numpy()
         bus_to_idx = {int(b): i for i, b in enumerate(bus_nums)}
 
         dF_dlam = self._build_cpf_dFdlam(interface, bus_to_idx, jac_ids, sbase)
@@ -209,7 +209,7 @@ class Statics:
         crossed_nose = False
 
         for it in range(maxiter):
-            J = self.wb.jacobian(dense=True, form='P')
+            J = self.pw.jacobian(dense=True, form='P')
 
             J_aug = np.zeros((n_jac + 1, n_jac + 1))
             J_aug[:n_jac, :n_jac] = J
@@ -242,20 +242,20 @@ class Statics:
 
             self.setload(SP=-lam_pred * interface)
             try:
-                self.wb.pflow(getvolts=False)
+                self.pw.pflow(getvolts=False)
             except Exception:
                 log(' FAIL', end='')
                 step = self._cpf_halve_step(step, min_step)
                 if step < 0:
                     log(f'\n  Step below minimum ({min_step})')
                     break
-                self.wb.esa.RestoreState('CPF_PREV')
+                self.pw.esa.RestoreState('CPF_PREV')
                 log(f' -> retry (step={step:.4f})')
                 continue
 
             reject = False
             if qlim_tol is not None:
-                gen_df = self.wb[Gen, ['GenMVR', 'GenStatus']]
+                gen_df = self.pw[Gen, ['GenMVR', 'GenStatus']]
                 closed = gen_df['GenStatus'] == 'Closed'
                 if self.gens_above_qmax(gen_df['GenMVR'], closed, tol=qlim_tol):
                     log(' Q-LIM', end='')
@@ -270,7 +270,7 @@ class Statics:
                 step = self._cpf_halve_step(step, min_step)
                 if step < 0:
                     break
-                self.wb.esa.RestoreState('CPF_PREV')
+                self.pw.esa.RestoreState('CPF_PREV')
                 continue
 
             if tangent_prev[-1] > 0 and tangent[-1] < 0:
@@ -295,7 +295,7 @@ class Statics:
             elif angle > 0.3:
                 step = max(step * 0.5, min_step)
 
-            self.wb.esa.StoreState('CPF_PREV')
+            self.pw.esa.StoreState('CPF_PREV')
             tangent_prev = tangent.copy()
             lam_current = lam_pred
 
@@ -308,7 +308,7 @@ class Statics:
 
         self.clearloads()
         if restore_when_done:
-            self.wb.esa.RestoreState('CPF_BACKUP')
+            self.pw.esa.RestoreState('CPF_BACKUP')
 
     # ------------------------------------------------------------------
     # State chain management
@@ -322,11 +322,11 @@ class Statics:
     def pushstate(self, verbose: bool = False) -> None:
         """Push current state onto the state chain."""
         self.stateidx += 1
-        self.wb.esa.StoreState(f'GWBState{self.stateidx}')
+        self.pw.esa.StoreState(f'GWBState{self.stateidx}')
         if verbose:
             print(f'Pushed States -> {self.stateidx}')
         if self.stateidx >= self.maxstates:
-            self.wb.esa.DeleteState(f'GWBState{self.stateidx - self.maxstates}')
+            self.pw.esa.DeleteState(f'GWBState{self.stateidx - self.maxstates}')
 
     def istore(self, n: int = 0, verbose: bool = False) -> None:
         """Update the nth state in the chain with current state."""
@@ -334,7 +334,7 @@ class Statics:
             raise Exception("State index out of range")
         if verbose:
             print(f'Store -> {self.stateidx - n}')
-        self.wb.esa.StoreState(f'GWBState{self.stateidx - n}')
+        self.pw.esa.StoreState(f'GWBState{self.stateidx - n}')
 
     def irestore(self, n: int = 1, verbose: bool = False) -> None:
         """Restore the nth previous state from the chain."""
@@ -344,7 +344,7 @@ class Statics:
             raise Exception("State index out of range")
         if verbose:
             print(f'Restore -> {self.stateidx - n}')
-        self.wb.esa.RestoreState(f'GWBState{self.stateidx - n}')
+        self.pw.esa.RestoreState(f'GWBState{self.stateidx - n}')
 
     # ------------------------------------------------------------------
     # ZIP load interface
@@ -378,13 +378,13 @@ class Statics:
             return
 
         write_cols = ['BusNum', 'LoadID'] + changed_cols
-        self.wb[Load] = self.DispatchPQ[write_cols]
+        self.pw[Load] = self.DispatchPQ[write_cols]
 
     def clearloads(self) -> None:
         """Zero all six ZIP components on the dispatch loads."""
         self._ensure_dispatch()
         self.DispatchPQ[self._ZIP_FIELDS] = 0.0
-        self.wb[Load] = self.DispatchPQ
+        self.pw[Load] = self.DispatchPQ
 
     # ------------------------------------------------------------------
     # Random load variation
@@ -396,9 +396,9 @@ class Statics:
     def randomize_load(self, scale: float = 1.0, sigma: float = 0.1) -> None:
         """Apply random variation to system loads."""
         if self.load_nom is None or self.load_df is None:
-            self.load_df = self.wb[Load, 'LoadMW']
+            self.load_df = self.pw[Load, 'LoadMW']
             self.load_nom = self.load_df['LoadMW']
         random_factors = exp(sigma * np.random.random(len(self.load_nom)))
-        self.wb[Load, 'LoadMW'] = scale * self.load_nom * random_factors
+        self.pw[Load, 'LoadMW'] = scale * self.load_nom * random_factors
 
     randload = randomize_load

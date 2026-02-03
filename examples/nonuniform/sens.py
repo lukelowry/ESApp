@@ -5,23 +5,23 @@ Provides standalone functions for computing:
 - Interface flow sensitivity to transformer GIC currents (dBound/dI)
 - E-field to GIC Jacobian (dI/dE)
 
-These functions operate on matrices produced by ``GridWorkBench.gic.model()``
-and require a live ``GridWorkBench`` instance for bus category data.
+These functions operate on matrices produced by ``PowerWorld.gic.model()``
+and require a live ``PowerWorld`` instance for bus category data.
 
 Example
 -------
->>> from esapp import GridWorkBench
+>>> from esapp import PowerWorld
 >>> from esapp.utils import GIC, jac_decomp
 >>> from examples.nonuniform.sens import dBounddI, dIdE
 >>>
->>> wb = GridWorkBench("case.pwb")
->>> wb.gic.model()
->>> H = wb.gic.H
->>> J = wb.jacobian(dense=True)
->>> V = wb.voltage(complex=False)[0].to_numpy()
+>>> pw = PowerWorld("case.pwb")
+>>> pw.gic.model()
+>>> H = pw.gic.H
+>>> J = pw.jacobian(dense=True)
+>>> V = pw.voltage(complex=False)[0].to_numpy()
 >>> eta = ...  # injection vector
->>> PX = wb.gic.Px
->>> sens = dBounddI(wb, eta, PX, J, V)
+>>> PX = pw.gic.Px
+>>> sens = dBounddI(pw, eta, PX, J, V)
 """
 
 import numpy as np
@@ -51,14 +51,14 @@ def signdiag(x):
     return np.diagflat(np.sign(x))
 
 
-def dBounddI(wb, eta, PX, J, V):
+def dBounddI(pw, eta, PX, J, V):
     """
     Compute interface sensitivity with respect to transformer GIC currents.
 
     Parameters
     ----------
-    wb : GridWorkBench
-        Live workbench instance (used to retrieve bus categories).
+    pw : PowerWorld
+        Live PowerWorld instance (used to retrieve bus categories).
     eta : np.ndarray
         Injection vector (n x 1).
     PX : np.ndarray or sparse matrix
@@ -73,7 +73,7 @@ def dBounddI(wb, eta, PX, J, V):
     np.ndarray
         Sensitivity vector (1 x n).
     """
-    buscat = wb[Bus, ['BusCat']]['BusCat']
+    buscat = pw[Bus, ['BusCat']]['BusCat']
     slk = buscat == 'Slack'
     pv = buscat == 'PV'
     pq = ~(slk | pv)

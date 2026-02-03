@@ -17,7 +17,7 @@ ESA++ is an open-source Python toolkit for power system automation, providing a 
 wrapper for PowerWorld's Simulator Automation Server (SimAuto). It transforms complex COM calls
 into intuitive, Pythonic operations.
 
-- **Intuitive Indexing** — Access grid data with ``wb[Bus, "BusPUVolt"]`` syntax
+- **Intuitive Indexing** — Access grid data with ``pw[Bus, "BusPUVolt"]`` syntax
 - **Full SimAuto Coverage** — All PowerWorld API functions through modular mixins
 - **Pandas Integration** — Every query returns a DataFrame
 - **Transient Stability** — Fluent API with ``TS`` field intellisense
@@ -52,11 +52,11 @@ Quick Example
 
 .. code-block:: python
 
-    from esapp import GridWorkBench
+    from esapp import PowerWorld
     from esapp.components import Bus
 
-    wb = GridWorkBench("path/to/case.pwb")
-    voltages = wb[Bus, "BusPUVolt"]
+    pw = PowerWorld("path/to/case.pwb")
+    voltages = pw[Bus, "BusPUVolt"]
 
 See the :doc:`examples <examples/index>` for walkthroughs of reading data,
 writing data, power flow, and workbench utilities.

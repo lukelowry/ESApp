@@ -59,7 +59,7 @@ Tests without PowerWorld access should use `-m unit`. The `--maxfail=5` default 
 
 ## Architecture
 
-### Entry Point: `GridWorkBench` ([workbench.py](esapp/workbench.py))
+### Entry Point: `PowerWorld` ([workbench.py](esapp/workbench.py))
 The main user-facing class. Creates a SAW connection, provides high-level grid analysis methods, and hosts embedded application modules (`network`, `gic`).
 
 ### SAW (SimAuto Wrapper): [esapp/saw/](esapp/saw/)
@@ -73,7 +73,7 @@ The main user-facing class. Creates a SAW connection, provides high-level grid a
 - Other mixins: `GeneralMixin`, `ModifyMixin`, `TopologyMixin`, `GICMixin`, `OPFMixin`, `PVMixin`, `QVMixin`, `ATCMixin`, `FaultMixin`, `RegionsMixin`, `CaseActionsMixin`, `ScheduledActionsMixin`, `TimeStepMixin`, `WeatherMixin`
 
 ### Indexable Interface ([indexable.py](esapp/indexable.py))
-Pythonic `__getitem__` access for grid data: `wb[Bus, ["BusNum", "BusName"]]` returns a DataFrame. Both `GridWorkBench` and `SAW` implement this.
+Pythonic `__getitem__` access for grid data: `pw[Bus, ["BusNum", "BusName"]]` returns a DataFrame. Both `PowerWorld` and `SAW` implement this.
 
 ### Component Definitions: [esapp/components/](esapp/components/)
 - **grid.py** (auto-generated, ~13MB) - `GObject` subclasses for all PowerWorld object types (Bus, Gen, Load, Branch, etc.)
@@ -83,7 +83,7 @@ Pythonic `__getitem__` access for grid data: `wb[Bus, ["BusNum", "BusName"]]` re
 - Do not manually edit `grid.py` or `ts_fields.py`; regenerate them instead.
 
 ### Utility Modules: [esapp/utils/](esapp/utils/)
-Embedded analysis applications accessible from `GridWorkBench`:
+Embedded analysis applications accessible from `PowerWorld`:
 - **GIC** ([gic.py](esapp/utils/gic.py)) - Geomagnetically Induced Currents analysis, G-matrix, E-field Jacobians
 - **Network** ([network.py](esapp/utils/network.py)) - Incidence matrices, Laplacians, bus mapping
 - **Dynamics** ([dynamics.py](esapp/utils/dynamics.py)) - Transient stability result monitoring

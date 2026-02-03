@@ -39,7 +39,7 @@ Test Coverage
    * - ``test_integration_saw_core.py``
      - Core SAW operations, file I/O, data retrieval
    * - ``test_integration_workbench.py``
-     - GridWorkBench data access and indexing
+     - PowerWorld data access and indexing
    * - ``test_integration_saw_powerflow.py``
      - Power flow, matrices (Ybus, Jacobian), PTDF/LODF
    * - ``test_integration_saw_contingency.py``

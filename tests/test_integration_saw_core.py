@@ -18,7 +18,7 @@ RELATED TEST FILES:
     - test_integration_saw_gic.py          -- GIC analysis
     - test_integration_saw_transient.py    -- transient stability
     - test_integration_saw_operations.py   -- ATC, OPF, PV/QV, time step, weather, scheduled
-    - test_integration_workbench.py        -- GridWorkBench facade and statics
+    - test_integration_workbench.py        -- PowerWorld facade and statics
     - test_integration_network.py          -- Network topology
 
 USAGE:

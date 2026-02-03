@@ -65,6 +65,6 @@ Available Grid Object Types
 
 The following component types are available in ``esapp.components``.
 Each class represents a PowerWorld object type that can be used with
-the :class:`~esapp.GridWorkBench` indexing syntax (e.g., ``wb[Bus, "BusNum"]``).
+the :class:`~esapp.PowerWorld` indexing syntax (e.g., ``pw[Bus, "BusNum"]``).
 
 .. grid-component-list::

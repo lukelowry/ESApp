@@ -100,13 +100,13 @@ class Indexable:
 
         # 3. Add any additional fields based on the request.
         if requested_fields is None:
-            # Case: wb.pw[Bus] -> only key fields are needed.
+            # Case: pw[Bus] -> only key fields are needed.
             pass
         elif requested_fields == slice(None):
-            # Case: wb.pw[Bus, :] -> add all defined fields.
+            # Case: pw[Bus, :] -> add all defined fields.
             fields_to_get.update(gtype.fields)
         else:
-            # Case: wb.pw[Bus, 'field'] or wb.pw[Bus, ['f1', 'f2']]
+            # Case: pw[Bus, 'field'] or pw[Bus, ['f1', 'f2']]
             # Normalize to an iterable to handle single or multiple fields.
             if isinstance(requested_fields, (str, GObject)):
                 requested_fields = [requested_fields]
@@ -163,12 +163,12 @@ class Indexable:
         TypeError
             If the index or value types are mismatched or unsupported.
         """
-        # Case 1: Bulk update from a DataFrame. e.g., wb.pw[Bus] = df
+        # Case 1: Bulk update from a DataFrame. e.g., pw[Bus] = df
         if isinstance(args, type) and issubclass(args, GObject):
             self._bulk_update_from_df(args, value)
             return
 
-        # Case 2: Broadcast update to specific fields. e.g., wb.pw[Bus, 'BusPUVolt'] = 1.05
+        # Case 2: Broadcast update to specific fields. e.g., pw[Bus, 'BusPUVolt'] = 1.05
         if isinstance(args, tuple) and len(args) == 2:
             gtype, fields = args
 
@@ -269,7 +269,7 @@ class Indexable:
     def _broadcast_update_to_fields(self, gtype: Type[GObject], fields: list[str], value):
         """Modifies specific fields for existing objects by broadcasting a value.
 
-        This corresponds to the use case: `wb.pw[ObjectType, 'FieldName'] = value`.
+        This corresponds to the use case: `pw[ObjectType, 'FieldName'] = value`.
 
         Parameters
         ----------
