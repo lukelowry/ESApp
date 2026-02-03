@@ -1,7 +1,14 @@
 {
   "permissions": {
     "allow": [
-      "Bash(pip install:*)"
+      "Bash(conda activate esapp*)",
+      "Bash(C:/Users/wyatt/.conda/envs/esapp/python.exe*)",
+      "Bash(C:/Users/wyatt/.conda/envs/esapp/Scripts/pytest*)",
+      "Bash(C:/Users/wyatt/.conda/envs/esapp/Scripts/flake8*)",
+      "Bash(C:/Users/wyatt/.conda/envs/esapp/Scripts/pip*)"
     ]
+  },
+  "env": {
+    "PATH": "C:\\Users\\wyatt\\.conda\\envs\\esapp;C:\\Users\\wyatt\\.conda\\envs\\esapp\\Scripts;${env:PATH}"
   }
 }

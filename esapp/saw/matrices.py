@@ -1,15 +1,17 @@
 import os
 import re
-import tempfile
 from pathlib import Path
 from typing import Union
 
 import numpy as np
 from scipy.sparse import csr_matrix
 
+from ._enums import YesNo
+from ._helpers import get_temp_filepath
+
 
 class MatrixMixin:
-    
+
     def get_ybus(self, full: bool = False, file: Union[str, None] = None) -> Union[np.ndarray, csr_matrix]:
         """Obtain the YBus matrix from PowerWorld.
 
@@ -39,40 +41,43 @@ class MatrixMixin:
         """
         if file:
             _tempfile_path = file
+            _cleanup = False
         else:
-            _tempfile = tempfile.NamedTemporaryFile(mode="w", suffix=".mat", delete=False)
-            _tempfile_path = Path(_tempfile.name).as_posix()
-            _tempfile.close()
-            cmd = f'SaveYbusInMatlabFormat("{_tempfile_path}", NO)'
-            self.RunScriptCommand(cmd)
-        with open(_tempfile_path, "r") as f:
-            f.readline()
-            mat_str = f.read()
-        mat_str = re.sub(r"\s", "", mat_str)
-        lines = re.split(";", mat_str)
-        ie = r"[0-9]+"
-        fe = r"-*[0-9]+\.[0-9]+"
-        dr = re.compile(r"(?:Ybus)=(?:sparse\()({ie})".format(ie=ie))
-        exp = re.compile(r"(?:Ybus\()({ie}),({ie})(?:\)=)({fe})(?:\+j\*)(?:\()({fe})".format(ie=ie, fe=fe))
-        dim = dr.match(lines[0])[1]
-        n = int(dim)
-        row, col, data = [], [], []
-        for line in lines[1:]:
-            match = exp.match(line)
-            if match is None:
-                continue
-            idx1, idx2, real, imag = match.groups()
-            admittance = float(real) + 1j * float(imag)
-            row.append(int(idx1))
-            col.append(int(idx2))
-            data.append(admittance)
+            _tempfile_path = get_temp_filepath(".mat")
+            self._run_script("SaveYbusInMatlabFormat", f'"{_tempfile_path}"', "NO")
+            _cleanup = True
+        try:
+            with open(_tempfile_path, "r") as f:
+                f.readline()
+                mat_str = f.read()
+            mat_str = re.sub(r"\s", "", mat_str)
+            lines = re.split(";", mat_str)
+            ie = r"[0-9]+"
+            fe = r"-*[0-9]+\.[0-9]+"
+            dr = re.compile(r"(?:Ybus)=(?:sparse\()({ie})".format(ie=ie))
+            exp = re.compile(r"(?:Ybus\()({ie}),({ie})(?:\)=)({fe})(?:\+j\*)(?:\()({fe})".format(ie=ie, fe=fe))
+            dim = dr.match(lines[0])[1]
+            n = int(dim)
+            row, col, data = [], [], []
+            for line in lines[1:]:
+                match = exp.match(line)
+                if match is None:
+                    continue
+                idx1, idx2, real, imag = match.groups()
+                admittance = float(real) + 1j * float(imag)
+                row.append(int(idx1))
+                col.append(int(idx2))
+                data.append(admittance)
 
-        sparse_matrix = csr_matrix(
-            (data, (np.asarray(row) - 1, np.asarray(col) - 1)),
-            shape=(n, n),
-            dtype=complex,
-        )
-        return sparse_matrix.toarray() if full else sparse_matrix
+            sparse_matrix = csr_matrix(
+                (data, (np.asarray(row) - 1, np.asarray(col) - 1)),
+                shape=(n, n),
+                dtype=complex,
+            )
+            return sparse_matrix.toarray() if full else sparse_matrix
+        finally:
+            if _cleanup:
+                os.unlink(_tempfile_path)
 
     def get_gmatrix(self, full: bool = False) -> Union[np.ndarray, csr_matrix]:
         """Get the GIC conductance matrix (G).
@@ -101,9 +106,9 @@ class MatrixMixin:
         """
         g_matrix_path, id_file_path = self._make_temp_matrix_files()
         try:
-            cmd = f'GICSaveGMatrix("{g_matrix_path}","{id_file_path}");'
-            self.RunScriptCommand(cmd)
-            self.RunScriptCommand(cmd)
+            # Double call is intentional — PW sometimes requires it for GMatrix.
+            self._run_script("GICSaveGMatrix", f'"{g_matrix_path}"', f'"{id_file_path}"')
+            self._run_script("GICSaveGMatrix", f'"{g_matrix_path}"', f'"{id_file_path}"')
             with open(g_matrix_path, "r") as f:
                 mat_str = f.read()
             sparse_matrix = self._parse_real_matrix(mat_str, "GMatrix")
@@ -112,7 +117,65 @@ class MatrixMixin:
             os.unlink(g_matrix_path)
             os.unlink(id_file_path)
 
-    def get_jacobian(self, full: bool = False) -> Union[np.ndarray, csr_matrix]:
+    def get_gmatrix_with_ids(self, full: bool = False):
+        """Get the GIC conductance matrix (G) along with the node ID mapping.
+
+        This method returns both the G-matrix and a list of node identifiers
+        that describe what each row/column represents (substations and buses).
+
+        Parameters
+        ----------
+        full : bool, optional
+            If True, returns a dense NumPy array. If False (default), returns a
+            SciPy CSR sparse matrix.
+
+        Returns
+        -------
+        tuple
+            A tuple of (G_matrix, node_ids) where:
+            - G_matrix: The G-matrix as either dense array or sparse CSR matrix
+            - node_ids: List of strings describing each node (e.g., "Sub 1", "Bus 101")
+        """
+        g_matrix_path, id_file_path = self._make_temp_matrix_files()
+        try:
+            # Double call is intentional — PW sometimes requires it for GMatrix.
+            self._run_script("GICSaveGMatrix", f'"{g_matrix_path}"', f'"{id_file_path}"')
+            self._run_script("GICSaveGMatrix", f'"{g_matrix_path}"', f'"{id_file_path}"')
+
+            with open(g_matrix_path, "r") as f:
+                mat_str = f.read()
+            sparse_matrix = self._parse_real_matrix(mat_str, "GMatrix")
+
+            with open(id_file_path, "r") as f:
+                id_content = f.read()
+
+            # Parse the ID file - format: "ObjectType, Number, Row/Col, Name"
+            # First line is header, skip it
+            node_ids = []
+            lines = id_content.strip().split('\n')
+            for line in lines[1:]:  # Skip header line
+                line = line.strip()
+                if not line:
+                    continue
+                # Split by comma
+                parts = [p.strip() for p in line.split(',')]
+                # Format: ObjectType, Number, Row/Col, Name - Name is 4th field (index 3)
+                if len(parts) >= 4:
+                    node_ids.append(parts[3])  # Name is 4th field
+                elif len(parts) >= 3:
+                    node_ids.append(parts[2])  # Fallback to 3rd field
+                elif len(parts) >= 2:
+                    node_ids.append(parts[1])  # Fallback to 2nd field
+                else:
+                    node_ids.append(line)
+
+            matrix = sparse_matrix.toarray() if full else sparse_matrix
+            return matrix, node_ids
+        finally:
+            os.unlink(g_matrix_path)
+            os.unlink(id_file_path)
+
+    def get_jacobian(self, full: bool = False, form: str = 'R') -> Union[np.ndarray, csr_matrix]:
         """Get the power flow Jacobian matrix.
 
         This method calls the `SaveJacobian` script command to write the Jacobian
@@ -125,6 +188,9 @@ class MatrixMixin:
         full : bool, optional
             If True, returns a dense NumPy array. If False (default), returns a
             SciPy CSR sparse matrix.
+        form : str, optional
+            Jacobian coordinate form: 'R' for rectangular, 'P' for polar,
+            'DC' for B' matrix. Defaults to 'R'.
 
         Returns
         -------
@@ -140,12 +206,60 @@ class MatrixMixin:
         """
         jac_file_path, id_file_path = self._make_temp_matrix_files()
         try:
-            cmd = f'SaveJacobian("{jac_file_path}","{id_file_path}",M,R);'
-            self.RunScriptCommand(cmd)
+            self._run_script("SaveJacobian", f'"{jac_file_path}"', f'"{id_file_path}"', "M", form)
             with open(jac_file_path, "r") as f:
                 mat_str = f.read()
             sparse_matrix = self._parse_real_matrix(mat_str, "Jac")
             return sparse_matrix.toarray() if full else sparse_matrix
+        finally:
+            os.unlink(jac_file_path)
+            os.unlink(id_file_path)
+
+    def get_jacobian_with_ids(self, full: bool = False, form: str = 'R'):
+        """Get the power flow Jacobian matrix along with row/column ID mapping.
+
+        Returns both the Jacobian matrix and a list of identifiers describing
+        what each row/column represents (equation type and bus number,
+        e.g. ``'dP 101'``, ``'dQ 102'``).
+
+        Parameters
+        ----------
+        full : bool, optional
+            If True, returns a dense NumPy array. If False (default), returns a
+            SciPy CSR sparse matrix.
+        form : str, optional
+            Jacobian coordinate form: 'R' for rectangular, 'P' for polar,
+            'DC' for B' matrix. Defaults to 'R'.
+
+        Returns
+        -------
+        tuple
+            A tuple of (jacobian_matrix, row_ids) where:
+            - jacobian_matrix: The Jacobian as either dense array or sparse CSR matrix
+            - row_ids: List of strings describing each row/column
+        """
+        jac_file_path, id_file_path = self._make_temp_matrix_files()
+        try:
+            self._run_script("SaveJacobian", f'"{jac_file_path}"', f'"{id_file_path}"', "M", form)
+
+            with open(jac_file_path, "r") as f:
+                mat_str = f.read()
+            sparse_matrix = self._parse_real_matrix(mat_str, "Jac")
+
+            with open(id_file_path, "r") as f:
+                id_content = f.read()
+
+            # Jacobian ID file: one label per line, no header.
+            # Each line is an equation label like "dP 101" or "'dP 101'".
+            row_ids = []
+            for line in id_content.strip().split('\n'):
+                line = line.strip()
+                if not line:
+                    continue
+                row_ids.append(line)
+
+            matrix = sparse_matrix.toarray() if full else sparse_matrix
+            return matrix, row_ids
         finally:
             os.unlink(jac_file_path)
             os.unlink(id_file_path)
@@ -161,12 +275,8 @@ class MatrixMixin:
         Tuple[str, str]
             A tuple containing the paths to the temporary matrix file and ID file.
         """
-        mat_file = tempfile.NamedTemporaryFile(mode="w", suffix=".m", delete=False)
-        mat_file_path = Path(mat_file.name).as_posix()
-        mat_file.close()
-        id_file = tempfile.NamedTemporaryFile(mode="w", delete=False)
-        id_file_path = Path(id_file.name).as_posix()
-        id_file.close()
+        mat_file_path = get_temp_filepath(".m")
+        id_file_path = get_temp_filepath(".txt")
         return mat_file_path, id_file_path
 
     def _parse_real_matrix(self, mat_str, matrix_name="Jac"):
@@ -221,9 +331,9 @@ class MatrixMixin:
         jac_form : str, optional
             "R" for AC Jacobian in Rectangular coordinates, "P" for Polar, "DC" for B' matrix. Defaults to "R".
         """
-        return self.RunScriptCommand(f'SaveJacobian("{jac_filename}", "{jid_filename}", {file_type}, {jac_form});')
+        return self._run_script("SaveJacobian", f'"{jac_filename}"', f'"{jid_filename}"', file_type, jac_form)
 
     def SaveYbusInMatlabFormat(self, filename: str, include_voltages: bool = False):
         """Saves the YBus to a file formatted for use with Matlab."""
-        iv = "YES" if include_voltages else "NO"
-        return self.RunScriptCommand(f'SaveYbusInMatlabFormat("{filename}", {iv});')
+        iv = YesNo.from_bool(include_voltages)
+        return self._run_script("SaveYbusInMatlabFormat", f'"{filename}"', iv)

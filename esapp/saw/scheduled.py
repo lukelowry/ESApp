@@ -1,6 +1,9 @@
 """Scheduled Actions specific functions."""
 
 
+from esapp.saw._enums import YesNo
+
+
 class ScheduledActionsMixin:
     """Mixin for Scheduled Actions functions."""
 
@@ -32,9 +35,9 @@ class ScheduledActionsMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        rev = "YES" if revert else "NO"
+        rev = YesNo.from_bool(revert)
         filt = f'"{filter_name}"' if filter_name else ""
-        return self.RunScriptCommand(f'ApplyScheduledActionsAt("{start_time}", "{end_time}", {filt}, {rev});')
+        return self._run_script("ApplyScheduledActionsAt", f'"{start_time}"', f'"{end_time}"', filt, rev)
 
     def IdentifyBreakersForScheduledActions(self, identify_from_normal: bool = True):
         """Identifies breakers for scheduled actions.
@@ -56,8 +59,8 @@ class ScheduledActionsMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        ifn = "YES" if identify_from_normal else "NO"
-        return self.RunScriptCommand(f"IdentifyBreakersForScheduledActions({ifn});")
+        ifn = YesNo.from_bool(identify_from_normal)
+        return self._run_script("IdentifyBreakersForScheduledActions", ifn)
 
     def RevertScheduledActionsAt(self, start_time: str, end_time: str = "", filter_name: str = ""):
         """Reverts scheduled actions that were active during the specified time window.
@@ -85,7 +88,7 @@ class ScheduledActionsMixin:
             If the SimAuto call fails.
         """
         filt = f'"{filter_name}"' if filter_name else ""
-        return self.RunScriptCommand(f'RevertScheduledActionsAt("{start_time}", "{end_time}", {filt});')
+        return self._run_script("RevertScheduledActionsAt", f'"{start_time}"', f'"{end_time}"', filt)
 
     def ScheduledActionsSetReference(self):
         """Sets the current system state as the reference for scheduled actions.
@@ -103,7 +106,7 @@ class ScheduledActionsMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        return self.RunScriptCommand("ScheduledActionsSetReference;")
+        return self._run_script("ScheduledActionsSetReference")
 
     def SetScheduleView(
         self, view_time: str, apply_actions: bool = None, use_normal_status: bool = None, apply_window: bool = None
@@ -134,10 +137,10 @@ class ScheduledActionsMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        aa = "YES" if apply_actions else "NO" if apply_actions is not None else ""
-        uns = "YES" if use_normal_status else "NO" if use_normal_status is not None else ""
-        aw = "YES" if apply_window else "NO" if apply_window is not None else ""
-        return self.RunScriptCommand(f'SetScheduleView("{view_time}", {aa}, {uns}, {aw});')
+        aa = YesNo.from_bool(apply_actions) if apply_actions is not None else None
+        uns = YesNo.from_bool(use_normal_status) if use_normal_status is not None else None
+        aw = YesNo.from_bool(apply_window) if apply_window is not None else None
+        return self._run_script("SetScheduleView", f'"{view_time}"', aa, uns, aw)
 
     def SetScheduleWindow(
         self, start_time: str, end_time: str, resolution: float = None, resolution_units: str = None
@@ -168,6 +171,4 @@ class ScheduledActionsMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        res = str(resolution) if resolution is not None else ""
-        units = resolution_units if resolution_units else ""
-        return self.RunScriptCommand(f'SetScheduleWindow("{start_time}", "{end_time}", {res}, {units});')
+        return self._run_script("SetScheduleWindow", f'"{start_time}"', f'"{end_time}"', resolution, resolution_units)

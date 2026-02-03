@@ -1,6 +1,9 @@
 """Regions specific functions."""
 from typing import List
 
+from ._enums import YesNo
+from ._helpers import format_list
+
 
 class RegionsMixin:
     """Mixin for Regions functions."""
@@ -37,12 +40,10 @@ class RegionsMixin:
         str
             The response from the PowerWorld script command.
         """
-        attrs = "[" + ", ".join(attribute_names) + "]"
-        add = "YES" if add_to_open_onelines else "NO"
-        delete = "YES" if delete_existing else "NO"
-        return self.RunScriptCommand(
-            f'RegionLoadShapefile("{filename}", "{class_name}", {attrs}, {add}, "{display_style_name}", {delete});'
-        )
+        attrs = format_list(attribute_names)
+        add = YesNo.from_bool(add_to_open_onelines)
+        delete = YesNo.from_bool(delete_existing)
+        return self._run_script("RegionLoadShapefile", f'"{filename}"', f'"{class_name}"', attrs, add, f'"{display_style_name}"', delete)
 
     def RegionRename(self, old_name: str, new_name: str, update_onelines: bool = True):
         """
@@ -62,8 +63,8 @@ class RegionsMixin:
         str
             The response from the PowerWorld script command.
         """
-        uo = "YES" if update_onelines else "NO"
-        return self.RunScriptCommand(f'RegionRename("{old_name}", "{new_name}", {uo});')
+        uo = YesNo.from_bool(update_onelines)
+        return self._run_script("RegionRename", f'"{old_name}"', f'"{new_name}"', uo)
 
     def RegionRenameClass(self, old_class: str, new_class: str, update_onelines: bool = True, filter_name: str = ""):
         """
@@ -85,9 +86,9 @@ class RegionsMixin:
         str
             The response from the PowerWorld script command.
         """
-        uo = "YES" if update_onelines else "NO"
+        uo = YesNo.from_bool(update_onelines)
         filt = f'"{filter_name}"' if filter_name else ""
-        return self.RunScriptCommand(f'RegionRenameClass("{old_class}", "{new_class}", {uo}, {filt});')
+        return self._run_script("RegionRenameClass", f'"{old_class}"', f'"{new_class}"', uo, filt)
 
     def RegionRenameProper1(self, old_prop: str, new_prop: str, update_onelines: bool = True, filter_name: str = ""):
         """
@@ -109,9 +110,9 @@ class RegionsMixin:
         str
             The response from the PowerWorld script command.
         """
-        uo = "YES" if update_onelines else "NO"
+        uo = YesNo.from_bool(update_onelines)
         filt = f'"{filter_name}"' if filter_name else ""
-        return self.RunScriptCommand(f'RegionRenameProper1("{old_prop}", "{new_prop}", {uo}, {filt});')
+        return self._run_script("RegionRenameProper1", f'"{old_prop}"', f'"{new_prop}"', uo, filt)
 
     def RegionRenameProper2(self, old_prop: str, new_prop: str, update_onelines: bool = True, filter_name: str = ""):
         """
@@ -133,9 +134,9 @@ class RegionsMixin:
         str
             The response from the PowerWorld script command.
         """
-        uo = "YES" if update_onelines else "NO"
+        uo = YesNo.from_bool(update_onelines)
         filt = f'"{filter_name}"' if filter_name else ""
-        return self.RunScriptCommand(f'RegionRenameProper2("{old_prop}", "{new_prop}", {uo}, {filt});')
+        return self._run_script("RegionRenameProper2", f'"{old_prop}"', f'"{new_prop}"', uo, filt)
 
     def RegionRenameProper3(self, old_prop: str, new_prop: str, update_onelines: bool = True, filter_name: str = ""):
         """
@@ -157,9 +158,9 @@ class RegionsMixin:
         str
             The response from the PowerWorld script command.
         """
-        uo = "YES" if update_onelines else "NO"
+        uo = YesNo.from_bool(update_onelines)
         filt = f'"{filter_name}"' if filter_name else ""
-        return self.RunScriptCommand(f'RegionRenameProper3("{old_prop}", "{new_prop}", {uo}, {filt});')
+        return self._run_script("RegionRenameProper3", f'"{old_prop}"', f'"{new_prop}"', uo, filt)
 
     def RegionRenameProper12Flip(self, update_onelines: bool = True, filter_name: str = ""):
         """
@@ -177,9 +178,9 @@ class RegionsMixin:
         str
             The response from the PowerWorld script command.
         """
-        uo = "YES" if update_onelines else "NO"
+        uo = YesNo.from_bool(update_onelines)
         filt = f'"{filter_name}"' if filter_name else ""
-        return self.RunScriptCommand(f"RegionRenameProper12Flip({uo}, {filt});")
+        return self._run_script("RegionRenameProper12Flip", uo, filt)
 
     def RegionUpdateBuses(self):
         """
@@ -190,4 +191,4 @@ class RegionsMixin:
         str
             The response from the PowerWorld script command.
         """
-        return self.RunScriptCommand("RegionUpdateBuses;")
+        return self._run_script("RegionUpdateBuses")

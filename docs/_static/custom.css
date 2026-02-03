@@ -1,0 +1,23 @@
+/* Compact API layout — tighten spacing around method/function entries */
+dl.py.method,
+dl.py.function,
+dl.py.attribute {
+    margin-bottom: 12px;
+}
+
+dl.field-list > dt {
+    margin-top: 4px;
+}
+
+dl.field-list > dd {
+    margin-bottom: 4px;
+}
+
+dl.field-list > dd > ul {
+    margin-top: 0;
+}
+
+/* Reduce heading gap inside API pages */
+.rst-content .section > .section {
+    margin-top: 12px;
+}

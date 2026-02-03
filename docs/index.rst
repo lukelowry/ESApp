@@ -1,12 +1,10 @@
-ESA++ Documentation
-===================
+ESA++
+=====
 
 .. toctree::
    :maxdepth: 2
-   :caption: Contents
 
    overview
-   guide/index
-   examples/examples
+   examples/index
    api/index
    dev/index

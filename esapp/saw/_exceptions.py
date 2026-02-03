@@ -98,7 +98,7 @@ class PowerWorldPrerequisiteError(PowerWorldError):
     Nuance:
     Many PowerWorld script commands (as defined in the Auxiliary File Format)
     require specific data structures to be populated before execution. For example,
-    `CTGSolve` requires defined contingencies, and `DetermineATC` requires defined
+    `CTGSolve` requires defined contingencies, and `ATCDetermine` requires defined
     transfer directions. This error indicates a setup issue rather than a
     fundamental system failure.
     """
@@ -145,4 +145,62 @@ class CommandNotRespectedError(PowerWorldError):
     change actually occurred.
     """
 
+    pass
+
+
+# =============================================================================
+# Application-level exceptions (consolidated from utils/exceptions.py)
+# =============================================================================
+
+
+class GridObjDNE(Error):
+    """
+    Raised when a grid object data query fails.
+
+    This indicates the requested object does not exist in the case.
+    """
+    pass
+
+
+class FieldDataException(Error):
+    """Raised when there is an issue with field data retrieval or parsing."""
+    pass
+
+
+class AuxParseException(Error):
+    """Raised when parsing an auxiliary file fails."""
+    pass
+
+
+class ContainerDeletedException(Error):
+    """Raised when attempting to access a container that has been deleted."""
+    pass
+
+
+class PowerFlowException(Error):
+    """
+    Raised when a power flow solution error occurs.
+
+    This is the base class for power flow related errors.
+    """
+    pass
+
+
+class BifurcationException(PowerFlowException):
+    """Raised when voltage bifurcation is suspected during power flow."""
+    pass
+
+
+class DivergenceException(PowerFlowException):
+    """Raised when the power flow solution diverges."""
+    pass
+
+
+class GeneratorLimitException(PowerFlowException):
+    """Raised when a generator has exceeded a limit during power flow."""
+    pass
+
+
+class GICException(Error):
+    """Raised when a GIC (Geomagnetically Induced Current) analysis error occurs."""
     pass

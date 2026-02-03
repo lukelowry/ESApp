@@ -1,16 +1,74 @@
-Utilities
-=========
+Utilities & Analysis
+====================
 
-ESA++ includes a variety of utility modules for mathematical operations, geographic analysis, and debugging.
+The ``esapp.utils`` package provides analysis modules, visualization tools, and general helpers.
 
-.. autosummary::
-   :toctree: generated/
+Contingency Builder
+-------------------
 
-   esapp.utils.b3d
-   esapp.utils.decorators
-   esapp.utils.exceptions
-   esapp.utils.map
-   esapp.utils.mathtools
-   esapp.utils.mesh
-   esapp.utils.misc
-   esapp.utils.plotwavelet
+Fluent API for defining transient stability contingencies.
+
+.. currentmodule:: esapp.utils.contingency
+
+.. autoclass:: ContingencyBuilder
+   :members:
+
+.. autoclass:: SimAction
+   :members:
+
+GIC Analysis
+------------
+
+Geomagnetically Induced Current (GIC) analysis tools.
+
+.. currentmodule:: esapp.utils.gic
+
+.. autoclass:: GIC
+   :members:
+   :show-inheritance:
+
+Network Topology
+----------------
+
+Network graph analysis including incidence matrices, Laplacians, and path calculations.
+
+.. currentmodule:: esapp.utils.network
+
+.. autoclass:: Network
+   :members:
+   :show-inheritance:
+
+.. autoclass:: BranchType
+   :members:
+
+Dynamics
+--------
+
+Transient stability simulation utilities for field-watching and result processing.
+
+.. currentmodule:: esapp.utils.dynamics
+
+.. autoclass:: TSWatch
+   :members:
+
+.. autofunction:: get_ts_results
+
+.. autofunction:: process_ts_results
+
+B3D File Format
+---------------
+
+Binary 3D electric field data I/O.
+
+.. currentmodule:: esapp.utils.b3d
+
+.. automodule:: esapp.utils.b3d
+   :members:
+
+General Helpers
+---------------
+
+.. currentmodule:: esapp.utils.misc
+
+.. automodule:: esapp.utils.misc
+   :members:

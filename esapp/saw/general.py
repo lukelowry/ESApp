@@ -1,7 +1,11 @@
 """General script commands and data interaction functions."""
-from typing import List
-import tempfile, os, re, uuid
+from typing import List, Union
+import os, re
 import pandas as pd
+
+from ._enums import YesNo, format_filter, format_filter_areazone
+from ._helpers import (format_list, get_temp_filepath,
+                       parse_aux_content, build_aux_string)
 
 
 class GeneralMixin:
@@ -26,7 +30,7 @@ class GeneralMixin:
         PowerWorldError
             If the SimAuto call fails (e.g., file not found, permission issues).
         """
-        return self.RunScriptCommand(f'CopyFile("{old_filename}", "{new_filename}");')
+        return self._run_script("CopyFile", f'"{old_filename}"', f'"{new_filename}"')
 
     def DeleteFile(self, filename: str):
         """Deletes a specified file.
@@ -45,7 +49,7 @@ class GeneralMixin:
         PowerWorldError
             If the SimAuto call fails (e.g., file not found, permission issues).
         """
-        return self.RunScriptCommand(f'DeleteFile("{filename}");')
+        return self._run_script("DeleteFile", f'"{filename}"')
 
     def RenameFile(self, old_filename: str, new_filename: str):
         """Renames a file from `old_filename` to `new_filename`.
@@ -66,7 +70,7 @@ class GeneralMixin:
         PowerWorldError
             If the SimAuto call fails (e.g., file not found, new name already exists).
         """
-        return self.RunScriptCommand(f'RenameFile("{old_filename}", "{new_filename}");')
+        return self._run_script("RenameFile", f'"{old_filename}"', f'"{new_filename}"')
 
     def WriteTextToFile(self, filename: str, text: str):
         """Writes a given text string to a file.
@@ -88,7 +92,7 @@ class GeneralMixin:
             If the SimAuto call fails (e.g., permission issues).
         """
         escaped_text = text.replace('"', '""')
-        return self.RunScriptCommand(f'WriteTextToFile("{filename}", "{escaped_text}");')
+        return self._run_script("WriteTextToFile", f'"{filename}"', f'"{escaped_text}"')
 
     def LogAdd(self, text: str) -> None:
         """Adds a message to the PowerWorld Simulator Message Log.
@@ -107,7 +111,7 @@ class GeneralMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        return self.RunScriptCommand(f'LogAdd("{text}");')
+        return self._run_script("LogAdd", f'"{text}"')
 
     def LogClear(self) -> None:
         """Clears all messages from the PowerWorld Simulator Message Log.
@@ -121,7 +125,7 @@ class GeneralMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        return self.RunScriptCommand("LogClear;")
+        return self._run_script("LogClear")
 
     def LogShow(self, show: bool = True):
         """Shows or hides the PowerWorld Simulator Message Log window.
@@ -140,8 +144,8 @@ class GeneralMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        yn = "YES" if show else "NO"
-        return self.RunScriptCommand(f"LogShow({yn});")
+        yn = YesNo.from_bool(show)
+        return self._run_script("LogShow", yn)
 
     def LogSave(self, filename: str, append: bool = False):
         """Saves the contents of the PowerWorld Simulator Message Log to a file.
@@ -163,8 +167,8 @@ class GeneralMixin:
         PowerWorldError
             If the SimAuto call fails (e.g., permission issues).
         """
-        app = "YES" if append else "NO"
-        return self.RunScriptCommand(f'LogSave("{filename}", {app});')
+        app = YesNo.from_bool(append)
+        return self._run_script("LogSave", f'"{filename}"', app)
 
     def SetCurrentDirectory(self, directory: str, create_if_not_found: bool = False):
         """Sets the current working directory for PowerWorld Simulator.
@@ -187,8 +191,8 @@ class GeneralMixin:
         PowerWorldError
             If the SimAuto call fails (e.g., invalid path, permission issues).
         """
-        c = "YES" if create_if_not_found else "NO"
-        return self.RunScriptCommand(f'SetCurrentDirectory("{directory}", {c});')
+        c = YesNo.from_bool(create_if_not_found)
+        return self._run_script("SetCurrentDirectory", f'"{directory}"', c)
 
     def EnterMode(self, mode: str) -> None:
         """Enters PowerWorld Simulator into a specific operating mode.
@@ -211,7 +215,7 @@ class GeneralMixin:
         """
         if mode.upper() not in ["RUN", "EDIT"]:
             raise ValueError("Mode must be either 'RUN' or 'EDIT'.")
-        return self.RunScriptCommand(f"EnterMode({mode.upper()});")
+        return self._run_script("EnterMode", mode.upper())
 
     def StoreState(self, statename: str) -> None:
         """Stores the current state of the PowerWorld case under a given name.
@@ -232,15 +236,17 @@ class GeneralMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        return self.RunScriptCommand(f'StoreState("{statename}");')
+        return self._run_script("StoreState", f'"{statename}"')
 
-    def RestoreState(self, statename: str) -> None:
-        """Restores a previously saved user state by its name.
+    def RestoreState(self, statename: str, state_type: str = "USER") -> None:
+        """Restores a previously saved state by its name.
 
         Parameters
         ----------
         statename : str
             The name of the state to restore.
+        state_type : str, optional
+            The type of state to restore. Defaults to "USER".
 
         Returns
         -------
@@ -251,15 +257,17 @@ class GeneralMixin:
         PowerWorldError
             If the SimAuto call fails (e.g., state not found).
         """
-        return self.RunScriptCommand(f'RestoreState(USER, "{statename}");')
+        return self._run_script("RestoreState", state_type, f'"{statename}"')
 
-    def DeleteState(self, statename: str) -> None:
-        """Deletes a previously saved user state by its name.
+    def DeleteState(self, statename: str, state_type: str = "USER") -> None:
+        """Deletes a previously saved state by its name.
 
         Parameters
         ----------
         statename : str
             The name of the state to delete.
+        state_type : str, optional
+            The type of state to delete. Defaults to "USER".
 
         Returns
         -------
@@ -270,7 +278,7 @@ class GeneralMixin:
         PowerWorldError
             If the SimAuto call fails (e.g., state not found).
         """
-        return self.RunScriptCommand(f'DeleteState(USER, "{statename}");')
+        return self._run_script("DeleteState", state_type, f'"{statename}"')
 
     def LoadAux(self, filename: str, create_if_not_found: bool = False):
         """Loads an auxiliary (.aux) file into PowerWorld Simulator.
@@ -292,8 +300,8 @@ class GeneralMixin:
         PowerWorldError
             If the SimAuto call fails (e.g., file not found, syntax error in aux file).
         """
-        c = "YES" if create_if_not_found else "NO"
-        return self.RunScriptCommand(f'LoadAux("{filename}", {c});')
+        c = YesNo.from_bool(create_if_not_found)
+        return self._run_script("LoadAux", f'"{filename}"', c)
 
     def ImportData(self, filename: str, filetype: str, header_line: int = 1, create_if_not_found: bool = False):
         """Imports data from a file in various formats into PowerWorld Simulator.
@@ -318,8 +326,8 @@ class GeneralMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        c = "YES" if create_if_not_found else "NO"
-        return self.RunScriptCommand(f'ImportData("{filename}", {filetype}, {header_line}, {c});')
+        c = YesNo.from_bool(create_if_not_found)
+        return self._run_script("ImportData", f'"{filename}"', filetype, header_line, c)
 
     def LoadCSV(self, filename: str, create_if_not_found: bool = False):
         """Loads a CSV file, typically one formatted similarly to output from `SendToExcel`.
@@ -340,8 +348,8 @@ class GeneralMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        c = "YES" if create_if_not_found else "NO"
-        return self.RunScriptCommand(f'LoadCSV("{filename}", {c});')
+        c = YesNo.from_bool(create_if_not_found)
+        return self._run_script("LoadCSV", f'"{filename}"', c)
 
     def LoadScript(self, filename: str, script_name: str = ""):
         """Loads and runs a script from an auxiliary file.
@@ -363,7 +371,7 @@ class GeneralMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        return self.RunScriptCommand(f'LoadScript("{filename}", "{script_name}");')
+        return self._run_script("LoadScript", f'"{filename}"', f'"{script_name}"')
 
     def SaveData(
         self,
@@ -411,25 +419,16 @@ class GeneralMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        fields = "[" + ", ".join(fieldlist) + "]"
-        subs = "[" + ", ".join(subdatalist) if subdatalist else "[]"
-        if subdatalist:
-            subs += "]"
+        fields = format_list(fieldlist)
+        subs = format_list(subdatalist)
+        sorts = format_list(sortfieldlist)
 
-        sorts = "[" + ", ".join(sortfieldlist) if sortfieldlist else "[]"
-        if sortfieldlist:
-            sorts += "]"
+        filt = format_filter_areazone(filter_name)
 
-        filt = f'"{filter_name}"' if filter_name and filter_name not in ["SELECTED", "AREAZONE"] else filter_name
+        trans = YesNo.from_bool(transpose)
+        app = YesNo.from_bool(append)
 
-        trans = "YES" if transpose else "NO"
-        app = "YES" if append else "NO"
-
-        cmd = (
-            f'SaveData("{filename}", {filetype}, {objecttype}, {fields}, {subs}, '
-            f'{filt}, {sorts}, {trans}, {app});'
-        )
-        return self.RunScriptCommand(cmd)
+        return self._run_script("SaveData", f'"{filename}"', filetype, objecttype, fields, subs, filt, sorts, trans, app)
 
     def SaveDataWithExtra(self, filename: str, filetype: str, objecttype: str, fieldlist: List[str], subdatalist: List[str] = None, filter_name: str = "", sortfieldlist: List[str] = None, header_list: List[str] = None, header_value_list: List[str] = None, transpose: bool = False, append: bool = True):
         """Saves data with extra user-specified header fields and values.
@@ -471,22 +470,17 @@ class GeneralMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        fields = "[" + ", ".join(fieldlist) + "]"
-        subs = "[" + ", ".join(subdatalist) if subdatalist else "[]"
-        if subdatalist: subs += "]"
-        sorts = "[" + ", ".join(sortfieldlist) if sortfieldlist else "[]"
-        if sortfieldlist: sorts += "]"
-        headers = "[" + ", ".join([f'"{h}"' for h in header_list]) if header_list else "[]"
-        if header_list: headers += "]"
-        values = "[" + ", ".join([f'"{v}"' for v in header_value_list]) if header_value_list else "[]"
-        if header_value_list: values += "]"
-        
-        filt = f'"{filter_name}"' if filter_name and filter_name not in ["SELECTED", "AREAZONE"] else filter_name
-        trans = "YES" if transpose else "NO"
-        app = "YES" if append else "NO"
-        
-        cmd = f'SaveDataWithExtra("{filename}", {filetype}, {objecttype}, {fields}, {subs}, {filt}, {sorts}, {headers}, {values}, {trans}, {app});'
-        return self.RunScriptCommand(cmd)
+        fields = format_list(fieldlist)
+        subs = format_list(subdatalist)
+        sorts = format_list(sortfieldlist)
+        headers = format_list(header_list, quote_items=True)
+        values = format_list(header_value_list, quote_items=True)
+
+        filt = format_filter_areazone(filter_name)
+        trans = YesNo.from_bool(transpose)
+        app = YesNo.from_bool(append)
+
+        return self._run_script("SaveDataWithExtra", f'"{filename}"', filetype, objecttype, fields, subs, filt, sorts, headers, values, trans, app)
 
     def SetData(self, objecttype: str, fieldlist: List[str], valuelist: List[str], filter_name: str = ""):
         """Sets data for specified objects and fields.
@@ -513,10 +507,10 @@ class GeneralMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        fields = "[" + ", ".join(fieldlist) + "]"
-        values = "[" + ", ".join([str(v) for v in valuelist]) + "]"
-        filt = f'"{filter_name}"' if filter_name and filter_name not in ["SELECTED", "AREAZONE", "ALL"] else filter_name
-        return self.RunScriptCommand(f"SetData({objecttype}, {fields}, {values}, {filt});")
+        fields = format_list(fieldlist)
+        values = format_list(valuelist, stringify=True)
+        filt = format_filter(filter_name)
+        return self._run_script("SetData", objecttype, fields, values, filt)
 
     def CreateData(self, objecttype: str, fieldlist: List[str], valuelist: List[str]):
         """Creates a new object of a specified type with initial field values.
@@ -540,9 +534,9 @@ class GeneralMixin:
         PowerWorldError
             If the SimAuto call fails (e.g., object already exists, invalid parameters).
         """
-        fields = "[" + ", ".join(fieldlist) + "]"
-        values = "[" + ", ".join([str(v) for v in valuelist]) + "]"
-        return self.RunScriptCommand(f"CreateData({objecttype}, {fields}, {values});")
+        fields = format_list(fieldlist)
+        values = format_list(valuelist, stringify=True)
+        return self._run_script("CreateData", objecttype, fields, values)
 
     def GetSubData(self, objecttype: str, fieldlist: List[str], subdatalist: List[str] = None, filter_name: str = "") -> pd.DataFrame:
         """Retrieves object data including nested SubData sections as a DataFrame.
@@ -575,49 +569,70 @@ class GeneralMixin:
         ...     print(f"Gen {row['BusNum']}: {len(row['BidCurve'])} bid points")
         """
         subdatalist = subdatalist or []
-        tmp = tempfile.NamedTemporaryFile(suffix=".aux", delete=False)
-        tmp.close()
-
-        def parse_line(line: str) -> List[str]:
-            """Parse a line detecting bracket [x,y] or space-delimited format."""
-            line = line.strip()
-            if '[' in line:  # Bracket format: [x, y], [a, b] or [x, y] [a, b]
-                return [m.group(1).strip() for m in re.finditer(r'\[(.*?)\]', line)]
-            else:  # Space-delimited: val1 val2 "val 3"
-                return [x.replace('"', '') for x in re.findall(r'(?:[^\s"]|"(?:\\.|[^"])*")+', line)]
+        tmp_path = get_temp_filepath(".aux")
 
         try:
-            self.SaveData(tmp.name, "AUX", objecttype, fieldlist, subdatalist, filter_name, append=False)
+            self.SaveData(tmp_path, "AUX", objecttype, fieldlist, subdatalist, filter_name, append=False)
 
-            if not os.path.exists(tmp.name): return pd.DataFrame(columns=fieldlist + subdatalist)
-            with open(tmp.name, 'r') as f: content = f.read()
+            if not os.path.exists(tmp_path):
+                return pd.DataFrame(columns=fieldlist + subdatalist)
+            with open(tmp_path, 'r') as f:
+                content = f.read()
 
-            match = re.search(r'DATA\s*\(\w+,\s*\[(.*?)\]\)\s*\{(.*)\}', content, re.DOTALL | re.IGNORECASE)
-            if not match: return pd.DataFrame(columns=fieldlist + subdatalist)
-
-            records, curr, sub_key = [], {}, None
-            splitter = re.compile(r'(?:[^\s"]|"(?:\\.|[^"])*")+')
-
-            for line in match.group(2).strip().split('\n'):
-                line = line.strip()
-                if not line or line.startswith('//'): continue
-
-                if line.upper().startswith('<SUBDATA'):
-                    sub_key = re.search(r'<SUBDATA\s+(\w+)>', line, re.IGNORECASE).group(1)
-                elif line.upper().startswith('</SUBDATA>'):
-                    sub_key = None
-                elif sub_key:
-                    curr.setdefault(sub_key, []).append(parse_line(line))
-                else:
-                    if curr: records.append(curr)
-                    curr = {k: v.replace('"', '') for k, v in zip(fieldlist, splitter.findall(line))}
-                    for s in subdatalist: curr[s] = []
-
-            if curr: records.append(curr)
+            records = parse_aux_content(content, fieldlist, subdatalist)
+            if not records:
+                return pd.DataFrame(columns=fieldlist + subdatalist)
             return pd.DataFrame(records)
 
         finally:
-            if os.path.exists(tmp.name): os.remove(tmp.name)
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+
+    def SetSubData(self, objecttype: str, fieldlist: List[str],
+                   records: List[dict],
+                   subdatatype: Union[str, List[str], None] = None) -> None:
+        """Write object data with optional SubData sections to PowerWorld via AUX.
+
+        This is the write counterpart to ``GetSubData``. It constructs an AUX
+        DATA block and processes it, creating or updating objects including
+        their nested SubData sections.
+
+        Parameters
+        ----------
+        objecttype : str
+            The PowerWorld object type (e.g., "TSContingency", "Gen", "Contingency").
+        fieldlist : List[str]
+            Field names for the parent object's scalar columns.
+        records : List[dict]
+            Each dict must have keys matching ``fieldlist`` for scalar values.
+            If ``subdatatype`` is specified, the dict may also contain a key
+            matching each subdata type whose value is a list of lists (each
+            inner list is one row of subdata values).
+        subdatatype : str, List[str], or None
+            Name(s) of the SubData section(s) (e.g., "CTGElement",
+            "BidCurve", or ["BidCurve", "ReactiveCapability"]).
+            If None, no subdata is written.
+
+        Examples
+        --------
+        >>> saw.SetSubData(
+        ...     "TSContingency",
+        ...     ["TSCTGName", "StartTime", "EndTime", "CTGSkip"],
+        ...     [{
+        ...         "TSCTGName": "Fault1",
+        ...         "StartTime": 0.0,
+        ...         "EndTime": 10.0,
+        ...         "CTGSkip": "NO",
+        ...         "TSContingencyElement": [
+        ...             ["FAULT BUS 1", 1.0],
+        ...             ["CLEAR FAULT 1", 1.083],
+        ...         ]
+        ...     }],
+        ...     subdatatype="TSContingencyElement"
+        ... )
+        """
+        aux = build_aux_string(objecttype, fieldlist, records, subdatatype)
+        self.exec_aux(aux)
 
     def SaveObjectFields(self, filename: str, objecttype: str, fieldlist: List[str]):
         """Saves a list of fields available for the specified objecttype to a file.
@@ -640,8 +655,8 @@ class GeneralMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        fields = "[" + ", ".join(fieldlist) + "]"
-        return self.RunScriptCommand(f'SaveObjectFields("{filename}", {objecttype}, {fields});')
+        fields = format_list(fieldlist)
+        return self._run_script("SaveObjectFields", f'"{filename}"', objecttype, fields)
 
     def Delete(self, objecttype: str, filter_name: str = ""):
         """Deletes objects of a specified type, optionally filtered.
@@ -662,8 +677,8 @@ class GeneralMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        filt = f'"{filter_name}"' if filter_name and filter_name not in ["SELECTED", "AREAZONE"] else filter_name
-        return self.RunScriptCommand(f"Delete({objecttype}, {filt});")
+        filt = format_filter_areazone(filter_name)
+        return self._run_script("Delete", objecttype, filt)
 
     def SelectAll(self, objecttype: str, filter_name: str = ""):
         """Sets the 'Selected' field to YES for objects of a specified type, optionally filtered.
@@ -684,8 +699,8 @@ class GeneralMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        filt = f'"{filter_name}"' if filter_name and filter_name not in ["SELECTED", "AREAZONE"] else filter_name
-        return self.RunScriptCommand(f"SelectAll({objecttype}, {filt});")
+        filt = format_filter_areazone(filter_name)
+        return self._run_script("SelectAll", objecttype, filt)
 
     def UnSelectAll(self, objecttype: str, filter_name: str = ""):
         """Sets the 'Selected' field to NO for objects of a specified type, optionally filtered.
@@ -706,10 +721,10 @@ class GeneralMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        filt = f'"{filter_name}"' if filter_name and filter_name not in ["SELECTED", "AREAZONE"] else filter_name
-        return self.RunScriptCommand(f"UnSelectAll({objecttype}, {filt});")
+        filt = format_filter_areazone(filter_name)
+        return self._run_script("UnSelectAll", objecttype, filt)
 
-    def SendToExcelAdvanced(self, objecttype: str, fieldlist: List[str], filter_name: str = "", use_column_headers: bool = True, workbook: str = "", worksheet: str = "", sortfieldlist: List[str] = None, header_list: List[str] = None, header_value_list: List[str] = None, clear_existing: bool = True, row_shift: int = 0, col_shift: int = 0):
+    def SendtoExcel(self, objecttype: str, fieldlist: List[str], filter_name: str = "", use_column_headers: bool = True, workbook: str = "", worksheet: str = "", sortfieldlist: List[str] = None, header_list: List[str] = None, header_value_list: List[str] = None, clear_existing: bool = True, row_shift: int = 0, col_shift: int = 0):
         """Sends data for specified objects and fields directly to Microsoft Excel with advanced options.
 
         This is an extended version of SendToExcel that provides additional control over
@@ -754,24 +769,20 @@ class GeneralMixin:
         ------
         PowerWorldError
             If the SimAuto call fails (e.g., Excel not installed, invalid parameters).
-        
+
         See Also
         --------
         SendToExcel : Basic version with fewer parameters for simple exports.
         """
-        fields = "[" + ", ".join(fieldlist) + "]"
-        filt = f'"{filter_name}"' if filter_name and filter_name not in ["SELECTED", "AREAZONE"] else filter_name
-        uch = "YES" if use_column_headers else "NO"
-        sorts = "[" + ", ".join(sortfieldlist) if sortfieldlist else "[]"
-        if sortfieldlist: sorts += "]"
-        headers = "[" + ", ".join([f'"{h}"' for h in header_list]) if header_list else "[]"
-        if header_list: headers += "]"
-        values = "[" + ", ".join([f'"{v}"' for v in header_value_list]) if header_value_list else "[]"
-        if header_value_list: values += "]"
-        ce = "YES" if clear_existing else "NO"
-        
-        cmd = f'SendtoExcel({objecttype}, {fields}, {filt}, {uch}, "{workbook}", "{worksheet}", {sorts}, {headers}, {values}, {ce}, {row_shift}, {col_shift});'
-        return self.RunScriptCommand(cmd)
+        fields = format_list(fieldlist)
+        filt = format_filter_areazone(filter_name)
+        uch = YesNo.from_bool(use_column_headers)
+        sorts = format_list(sortfieldlist)
+        headers = format_list(header_list, quote_items=True)
+        values = format_list(header_value_list, quote_items=True)
+        ce = YesNo.from_bool(clear_existing)
+
+        return self._run_script("SendtoExcel", objecttype, fields, filt, uch, f'"{workbook}"', f'"{worksheet}"', sorts, headers, values, ce, row_shift, col_shift)
 
     def LogAddDateTime(
         self,
@@ -804,16 +815,11 @@ class GeneralMixin:
         ------
         PowerWorldError
             If the SimAuto call fails.
-
-        Examples
-        --------
-        >>> saw.LogAddDateTime("DateTime", True, True, True)
-        # Adds a log entry labeled "DateTime" with current date, time, and milliseconds.
         """
-        id = "YES" if include_date else "NO"
-        it = "YES" if include_time else "NO"
-        im = "YES" if include_milliseconds else "NO"
-        return self.RunScriptCommand(f'LogAddDateTime("{label}", {id}, {it}, {im});')
+        id = YesNo.from_bool(include_date)
+        it = YesNo.from_bool(include_time)
+        im = YesNo.from_bool(include_milliseconds)
+        return self._run_script("LogAddDateTime", f'"{label}"', id, it, im)
 
     def LoadAuxDirectory(
         self,
@@ -845,17 +851,12 @@ class GeneralMixin:
         ------
         PowerWorldError
             If the SimAuto call fails (e.g., directory not found).
-
-        Examples
-        --------
-        >>> saw.LoadAuxDirectory("C:/SimCases/AuxFiles", "*.aux", True)
-        # Loads all .aux files from the directory in alphabetical order.
         """
-        c = "YES" if create_if_not_found else "NO"
+        c = YesNo.from_bool(create_if_not_found)
         if filter_string:
-            return self.RunScriptCommand(f'LoadAuxDirectory("{file_directory}", "{filter_string}", {c});')
+            return self._run_script("LoadAuxDirectory", f'"{file_directory}"', f'"{filter_string}"', c)
         else:
-            return self.RunScriptCommand(f'LoadAuxDirectory("{file_directory}", , {c});')
+            return self._run_script("LoadAuxDirectory", f'"{file_directory}"', "", c)
 
     def LoadData(self, filename: str, data_name: str, create_if_not_found: bool = False):
         """Loads a named DATA section from another auxiliary file.
@@ -881,8 +882,8 @@ class GeneralMixin:
         PowerWorldError
             If the SimAuto call fails (e.g., file or data section not found).
         """
-        c = "YES" if create_if_not_found else "NO"
-        return self.RunScriptCommand(f'LoadData("{filename}", {data_name}, {c});')
+        c = YesNo.from_bool(create_if_not_found)
+        return self._run_script("LoadData", f'"{filename}"', data_name, c)
 
     def StopAuxFile(self):
         """Treats the remainder of the file after this command as a comment.
@@ -903,4 +904,4 @@ class GeneralMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        return self.RunScriptCommand("StopAuxFile;")
+        return self._run_script("StopAuxFile")

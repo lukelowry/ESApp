@@ -1,112 +1,29 @@
-from typing import List, Tuple, Union
+from pathlib import Path
+from typing import List, Tuple, Union, Optional
 
 import numpy as np
 import pandas as pd
-
+from ._enums import YesNo, TSGetResultsMode
+from ._exceptions import PowerWorldError
+from ._helpers import format_list, get_temp_filepath, load_ts_csv_results, pack_args
 
 class TransientMixin:
-    def TSGetContingencyResults(
-        self,
-        CtgName: str,
-        ObjFieldList: List[str],
-        StartTime: Union[None, int, float] = None,
-        StopTime: Union[None, int, float] = None,
-    ) -> Union[Tuple[None, None], Tuple[pd.DataFrame, pd.DataFrame]]:
-        """
-        WARNING: This function should only be used after the simulation
-        is run (for example, use this after running script commands
-        TSSolveAll or TSSolve).
-
-        The TSGetContingencyResults function is used to read
-        transient stability results into an external program (Python)
-        using SimAuto.
-
-        `PowerWorld documentation:
-        <https://www.powerworld.com/WebHelp/#MainDocumentation_HTML/TSGetContingencyResults%20Function.htm%3FTocPath%3DAutomation%2520Server%2520Add-On%2520(SimAuto)%7CAutomation%2520Server%2520Functions%7C_____49>`__
-
-        Parameters
-        ----------
-        CtgName : str
-            The contingency to obtain results from. Only one
-            contingency be obtained at a time.
-        ObjFieldList : List[str]
-            A list of strings which may contain plots,
-            subplots, or individual object/field pairs specifying the
-            result variables to obtain.
-        StartTime : Union[None, int, float], optional
-            The time in seconds in the simulation to begin
-            retrieving results. If not specified (None), the start time
-            of the simulation is used. Defaults to None.
-        StopTime : Union[None, int, float], optional
-            The time in seconds in the simulation to stop
-            retrieving results. If not specified, the end time of the
-            simulation is used. Defaults to None.
-        
-        Returns
-        -------
-        Tuple[pd.DataFrame, pd.DataFrame] or Tuple[None, None]
-            A tuple containing two DataFrames, "meta" and "data."
-            Alternatively, if the given CtgName does not exist, a tuple
-            of (None, None) will be returned.
-        """
-        out = self._call_simauto(
-            "TSGetContingencyResults",
-            CtgName,
-            ObjFieldList,
-            str(StartTime),
-            str(StopTime),
-        )
-        # We get (None, (None,)) if the contingency does not exist.
-        if out == (None, (None,)):
-            return None, None
-
-        assert len(out) == 2, "Unexpected return format from PowerWorld."
-
-        # Extract the meta data.
-        meta = pd.DataFrame(
-            out[0],
-            columns=[
-                "ObjectType",
-                "PrimaryKey",
-                "SecondaryKey",
-                "Label",
-                "VariableName",
-                "ColHeader",
-            ],
-        )
-
-        # Remove extraneous white space in the strings.
-        meta = meta.apply(lambda x: x.str.strip(), axis=0)
-
-        # Extract the data.
-        data = pd.DataFrame(out[1])
-
-        # Align column names with meta frame and set time column
-        data.rename(columns=lambda x: x - 1, inplace=True)
-        data.rename(columns={-1: "time"}, inplace=True)
-
-        # Attempt to convert all columns to numeric.
-        data = self._to_numeric(data, errors="ignore")
-        meta = self._to_numeric(meta, errors="ignore")
-
-        return meta, data
 
     def TSTransferStateToPowerFlow(self, calculate_mismatch: bool = False):
-        """Transfers the current transient stability state to the power flow.
+        """Transfers the transient stability state to the power flow.
 
         After running a transient stability simulation, this allows the
         state of the system at the final time step to be loaded into the
         power flow solver for steady-state analysis.
 
-        This is a wrapper for the ``TSTransferStateToPowerFlow`` script command.
-        
         Parameters
         ----------
         calculate_mismatch : bool, optional
-            Set to True to calculate power mismatch when transferring. Defaults to False.
+            If True, calculates power mismatch when transferring transient state
+            to the power flow case. Defaults to False (no mismatch calculation).
         """
-        cm = "YES" if calculate_mismatch else "NO"
-        self.RunScriptCommand(f"TSTransferStateToPowerFlow({cm});")
+        cm = YesNo.from_bool(calculate_mismatch)
+        self._run_script("TSTransferStateToPowerFlow", cm)
 
     def TSInitialize(self):
         """Initializes the transient stability simulation parameters.
@@ -117,8 +34,8 @@ class TransientMixin:
         This is a wrapper for the ``TSInitialize`` script command.
         """
         try:
-            self.RunScriptCommand("TSInitialize()")
-        except Exception:
+            self._run_script("TSInitialize")
+        except PowerWorldError:
             self.log.warning("Failed to Initialize TS Values")
 
     def TSResultStorageSetAll(self, object="ALL", value=True):
@@ -135,33 +52,59 @@ class TransientMixin:
             If True, results for this object type will be stored.
             If False, they will not. Defaults to True.
         """
-        yn = "YES" if value else "NO"
-        self.RunScriptCommand(f"TSResultStorageSetAll({object}, {yn})")
+        yn = YesNo.from_bool(value)
+        self._run_script("TSResultStorageSetAll", object, yn)
 
-    def TSSolve(self, ctgname: str):
+    def TSSolve(
+        self,
+        ctgname: str,
+        start_time: float = None,
+        stop_time: float = None,
+        step_size: float = None,
+        step_in_cycles: bool = False,
+    ):
         """Solves a single transient stability contingency.
-        
+
         This is a wrapper for the ``TSSolve`` script command.
-        
+
         Parameters
         ----------
         ctgname : str
             The name of the contingency to solve.
+        start_time : float, optional
+            Start time in seconds. Overrides the contingency's property.
+        stop_time : float, optional
+            Stop time in seconds. Overrides the contingency's property.
+        step_size : float, optional
+            Step size (in seconds unless step_in_cycles is True).
+            Overrides the contingency's property.
+        step_in_cycles : bool, optional
+            If True, step_size is interpreted as cycles rather than seconds.
+            Defaults to False.
         """
-        self.RunScriptCommand(f'TSSolve("{ctgname}")')
+        if start_time is not None or stop_time is not None or step_size is not None:
+            parts = []
+            parts.append(str(start_time) if start_time is not None else "")
+            parts.append(str(stop_time) if stop_time is not None else "")
+            parts.append(str(step_size) if step_size is not None else "")
+            sic = YesNo.from_bool(step_in_cycles)
+            parts.append(str(sic))
+            self.RunScriptCommand(f'TSSolve("{ctgname}", [{", ".join(parts)}])')
+        else:
+            self._run_script("TSSolve", f'"{ctgname}"')
 
     def TSSolveAll(self):
-        """Solves all defined transient stability contingencies.
-        
-        This is a wrapper for the ``TSSolveAll`` script command.
+        """Solves all defined transient contingencies that are not set to skip.
+
+        Distributed computing is not enabled by default.
         """
-        self.RunScriptCommand("TSSolveAll()")
+        self._run_script("TSSolveAll")
 
     def TSStoreResponse(self, object_type: str = "ALL", value: bool = True):
         """Convenience wrapper to toggle transient stability result storage.
 
         This is a high-level wrapper around ``TSResultStorageSetAll``.
-        
+
         Parameters
         ----------
         object_type : str, optional
@@ -191,19 +134,25 @@ class TransientMixin:
         if ctg_name.upper() not in ["ALL", "SELECTED"] and not ctg_name.startswith('"'):
             ctg_name = f'"{ctg_name}"'
 
-        c_sum = "YES" if clear_summary else "NO"
-        c_evt = "YES" if clear_events else "NO"
-        c_stat = "YES" if clear_statistics else "NO"
-        c_time = "YES" if clear_time_values else "NO"
-        c_sol = "YES" if clear_solution_details else "NO"
-        self.RunScriptCommand(f"TSClearResultsFromRAM({ctg_name},{c_sum},{c_evt},{c_stat},{c_time},{c_sol});")
+        c_sum = YesNo.from_bool(clear_summary)
+        c_evt = YesNo.from_bool(clear_events)
+        c_stat = YesNo.from_bool(clear_statistics)
+        c_time = YesNo.from_bool(clear_time_values)
+        c_sol = YesNo.from_bool(clear_solution_details)
+        try:
+            self._run_script("TSClearResultsFromRAM", ctg_name, c_sum, c_evt, c_stat, c_time, c_sol)
+        except Exception as e:
+            if "access violation" in str(e).lower():
+                self.log.warning("TSClearResultsFromRAM: PW access violation (no results in RAM to clear)")
+            else:
+                raise
 
     def TSClearPlayInSignals(self) -> None:
         """Deletes all defined PlayIn signals.
 
         This is a wrapper for the ``DELETE(PLAYINSIGNAL)`` script command.
         """
-        self.RunScriptCommand("DELETE(PLAYINSIGNAL);")
+        self._run_script("DELETE", "PLAYINSIGNAL")
 
     def TSSetPlayInSignals(self, name: str, times: np.ndarray, signals: np.ndarray) -> None:
         """Sets PlayIn signals using an AUX file command.
@@ -248,16 +197,25 @@ class TransientMixin:
         self.TSClearResultsFromRAM()
 
     def TSAutoCorrect(self):
-        """Runs auto correction of parameters for transient stability."""
-        return self.RunScriptCommand("TSAutoCorrect;")
+        """Runs auto correction of parameters for transient stability.
+
+        Attempts to automatically fix common model parameter issues.
+        """
+        return self._run_script("TSAutoCorrect")
 
     def TSClearAllModels(self):
-        """Clears all transient stability models."""
-        return self.RunScriptCommand("TSClearAllModels;")
+        """Clears all transient stability models from the case."""
+        return self._run_script("TSClearAllModels")
 
     def TSValidate(self):
-        """Validate transient stability models and input values."""
-        return self.RunScriptCommand("TSValidate;")
+        """Validates transient stability models and input values.
+
+        Useful for examining model errors and warnings when preparing a case
+        for analysis. Validation is done automatically when running transient
+        analysis, so this command does not need to be run manually prior to
+        analysis.
+        """
+        return self._run_script("TSValidate")
 
     def TSWriteOptions(
         self,
@@ -273,41 +231,59 @@ class TransientMixin:
     ):
         """Save transient stability option settings to an auxiliary file."""
         opts = [
-            "YES" if save_dynamic_model else "NO",
-            "YES" if save_stability_options else "NO",
-            "YES" if save_stability_events else "NO",
-            "YES" if save_results_events else "NO",
-            "YES" if save_plot_definitions else "NO",
-            "YES" if save_transient_limit_monitors else "NO",
-            "YES" if save_result_analyzer_time_window else "NO",
+            YesNo.from_bool(save_dynamic_model),
+            YesNo.from_bool(save_stability_options),
+            YesNo.from_bool(save_stability_events),
+            YesNo.from_bool(save_results_events),
+            YesNo.from_bool(save_plot_definitions),
+            YesNo.from_bool(save_transient_limit_monitors),
+            YesNo.from_bool(save_result_analyzer_time_window),
         ]
-        opt_str = "[" + ", ".join(opts) + "]"
-        return self.RunScriptCommand(f'TSWriteOptions("{filename}", {opt_str}, {key_field});')
+        opt_str = format_list(opts)
+        return self._run_script("TSWriteOptions", f'"{filename}"', opt_str, key_field)
 
     def TSLoadPTI(self, filename: str):
-        """Loads transient stability data in the PTI format."""
-        return self.RunScriptCommand(f'TSLoadPTI("{filename}");')
+        """Loads transient stability data in the PTI DYR format.
+
+        Parameters
+        ----------
+        filename : str
+            Path to the PTI DYR file to load.
+        """
+        return self._run_script("TSLoadPTI", f'"{filename}"')
 
     def TSLoadGE(self, filename: str):
-        """Loads transient stability data stored in the GE DYD format."""
-        return self.RunScriptCommand(f'TSLoadGE("{filename}");')
+        """Loads transient stability data stored in the GE DYD format.
+
+        Parameters
+        ----------
+        filename : str
+            Path to the GE DYD file to load.
+        """
+        return self._run_script("TSLoadGE", f'"{filename}"')
 
     def TSLoadBPA(self, filename: str):
-        """Loads transient stability data stored in the BPA format."""
-        return self.RunScriptCommand(f'TSLoadBPA("{filename}");')
+        """Loads transient stability data stored in the BPA format.
+
+        Parameters
+        ----------
+        filename : str
+            Path to the BPA file to load.
+        """
+        return self._run_script("TSLoadBPA", f'"{filename}"')
 
     def TSAutoInsertDistRelay(
         self, reach: float, add_from: bool, add_to: bool, transfer_trip: bool, shape: int, filter_name: str
     ):
         """Inserts DistRelay models on the lines meeting the specified filter."""
-        af = "YES" if add_from else "NO"
-        at = "YES" if add_to else "NO"
-        tt = "YES" if transfer_trip else "NO"
-        self.RunScriptCommand(f'TSAutoInsertDistRelay({reach}, {af}, {at}, {tt}, {shape}, "{filter_name}");')
+        af = YesNo.from_bool(add_from)
+        at = YesNo.from_bool(add_to)
+        tt = YesNo.from_bool(transfer_trip)
+        self._run_script("TSAutoInsertDistRelay", reach, af, at, tt, shape, f'"{filter_name}"')
 
     def TSAutoInsertZPOTT(self, reach: float, filter_name: str):
         """Inserts ZPOTT models on the lines meeting the specified filter."""
-        self.RunScriptCommand(f'TSAutoInsertZPOTT({reach}, "{filter_name}");')
+        self._run_script("TSAutoInsertZPOTT", reach, f'"{filter_name}"')
 
     def TSAutoSavePlots(
         self,
@@ -321,66 +297,82 @@ class TransientMixin:
         include_category: bool = False,
     ):
         """Create and save images of the plots."""
-        plots = "[" + ", ".join([f'"{p}"' for p in plot_names]) + "]"
-        ctgs = "[" + ", ".join([f'"{c}"' for c in ctg_names]) + "]"
-        icn = "YES" if include_case_name else "NO"
-        icat = "YES" if include_category else "NO"
-        self.RunScriptCommand(
-            f"TSAutoSavePlots({plots}, {ctgs}, {image_type}, {width}, {height}, {font_scalar}, {icn}, {icat});"
-        )
+        plots = format_list(plot_names, quote_items=True)
+        ctgs = format_list(ctg_names, quote_items=True)
+        icn = YesNo.from_bool(include_case_name)
+        icat = YesNo.from_bool(include_category)
+        self._run_script("TSAutoSavePlots", plots, ctgs, image_type, width, height, font_scalar, icn, icat)
 
     def TSCalculateCriticalClearTime(self, element_or_filter: str):
         """Calculate critical clearing time for faults."""
-        self.RunScriptCommand(f"TSCalculateCriticalClearTime({element_or_filter});")
+        self._run_script("TSCalculateCriticalClearTime", element_or_filter)
 
     def TSCalculateSMIBEigenValues(self):
         """Calculate single machine infinite bus eigenvalues."""
-        self.RunScriptCommand("TSCalculateSMIBEigenValues;")
+        self._run_script("TSCalculateSMIBEigenValues")
 
     def TSClearModelsforObjects(self, object_type: str, filter_name: str = ""):
         """Deletes all transient stability models associated with the objects that meet the filter."""
-        self.RunScriptCommand(f'TSClearModelsforObjects({object_type}, "{filter_name}");')
+        self._run_script("TSClearModelsforObjects", object_type, f'"{filter_name}"')
 
     def TSDisableMachineModelNonZeroDerivative(self, threshold: float = 0.001):
         """Disable machine models with non-zero state derivatives."""
-        self.RunScriptCommand(f"TSDisableMachineModelNonZeroDerivative({threshold});")
+        self._run_script("TSDisableMachineModelNonZeroDerivative", threshold)
 
     def TSGetVCurveData(self, filename: str, filter_name: str):
         """Generates V-curve data for synchronous generators."""
-        self.RunScriptCommand(f'TSGetVCurveData("{filename}", "{filter_name}");')
+        self._run_script("TSGetVCurveData", f'"{filename}"', f'"{filter_name}"')
 
-    def TSWriteResultsToCSV(
-        self,
-        filename: str,
-        mode: str,
-        contingencies: List[str],
-        plots_fields: List[str],
-        start_time: float = None,
-        end_time: float = None,
-    ):
-        """Save out results for specific variables to CSV."""
-        ctgs = "[" + ", ".join([f'"{c}"' for c in contingencies]) + "]"
-        pfs = "[" + ", ".join([f'"{p}"' for p in plots_fields]) + "]"
-        time_args = ""
-        if start_time is not None and end_time is not None:
-            time_args = f", {start_time}, {end_time}"
-        self.RunScriptCommand(f'TSGetResults("{filename}", {mode}, {ctgs}, {pfs}{time_args});')
+    def TSGetResults(
+            self,
+            mode: Union[TSGetResultsMode, str],
+            contingencies: List[str],
+            plots_fields: List[str],
+            filename: Optional[str] = None,
+            start_time: float = None,
+            end_time: float = None,
+        ) -> Tuple[Optional[pd.DataFrame], Optional[pd.DataFrame]]:
+            """Retrieves transient stability results.
+
+            If `filename` is None, creates a temporary file, reads the results
+            into DataFrames, deletes the temporary files, and returns (meta,
+            data).
+            """
+            # 1. Determine File Path
+            is_temp_mode = filename is None
+            file_path = Path(get_temp_filepath(".csv")) if is_temp_mode else Path(filename)
+
+            # PowerWorld requires forward slashes
+            pw_path_str = str(file_path).replace("\\", "/")
+
+            # 2. Format Script Arguments
+            ctgs_str = format_list(contingencies, quote_items=True)
+            pfs_str = format_list(plots_fields, quote_items=True)
+
+            # 3. Execute PowerWorld Command
+            self._run_script("TSGetResults", f'"{pw_path_str}"', mode, ctgs_str, pfs_str, start_time, end_time)
+
+            if not is_temp_mode:
+                return None, None
+
+            # 4. Retrieval and Cleanup
+            return load_ts_csv_results(file_path, delete_files=True)
 
     def TSJoinActiveCTGs(
         self, time_delay: float, delete_existing: bool, join_with_self: bool, filename: str = "", first_ctg: str = "Both"
     ):
         """Joins two lists of TSContingency objects."""
-        de = "YES" if delete_existing else "NO"
-        jws = "YES" if join_with_self else "NO"
-        self.RunScriptCommand(f'TSJoinActiveCTGs({time_delay}, {de}, {jws}, "{filename}", {first_ctg});')
+        de = YesNo.from_bool(delete_existing)
+        jws = YesNo.from_bool(join_with_self)
+        self._run_script("TSJoinActiveCTGs", time_delay, de, jws, f'"{filename}"', first_ctg)
 
     def TSLoadRDB(self, filename: str, model_type: str, filter_name: str = ""):
         """Loads a SEL RDB file."""
-        self.RunScriptCommand(f'TSLoadRDB("{filename}", {model_type}, "{filter_name}");')
+        self._run_script("TSLoadRDB", f'"{filename}"', model_type, f'"{filter_name}"')
 
     def TSLoadRelayCSV(self, filename: str, model_type: str, filter_name: str = ""):
         """Loads relay data from CSV."""
-        self.RunScriptCommand(f'TSLoadRelayCSV("{filename}", {model_type}, "{filter_name}");')
+        self._run_script("TSLoadRelayCSV", f'"{filename}"', model_type, f'"{filter_name}"')
 
     def TSPlotSeriesAdd(
         self,
@@ -393,80 +385,106 @@ class TransientMixin:
         attributes: str = "",
     ):
         """Adds one or multiple plot series to a new or existing plot definition."""
-        self.RunScriptCommand(
-            f'TSPlotSeriesAdd("{plot_name}", {sub_plot_num}, {axis_group_num}, {object_type}, {field_name}, "{filter_name}", "{attributes}");'
-        )
+        self._run_script("TSPlotSeriesAdd", f'"{plot_name}"', sub_plot_num, axis_group_num, object_type, field_name, f'"{filter_name}"', f'"{attributes}"')
 
     def TSRunResultAnalyzer(self, ctg_name: str = ""):
         """Run the Transient Result Analyzer."""
-        self.RunScriptCommand(f'TSRunResultAnalyzer("{ctg_name}");')
+        self._run_script("TSRunResultAnalyzer", f'"{ctg_name}"')
 
     def TSRunUntilSpecifiedTime(
         self,
         ctg_name: str,
         stop_time: float = None,
-        step_size: float = None,
-        steps_in_cycles: bool = False,
+        step_size: float = 0.25,
+        steps_in_cycles: bool = True,
         reset_start_time: bool = False,
         steps_to_do: int = 0,
     ):
         """Allows manual control of the transient stability run."""
-        opts = []
-        if stop_time is not None:
-            opts.append(str(stop_time))
-        if step_size is not None:
-            opts.append(str(step_size))
-        if steps_in_cycles:
-            opts.append("YES")
-        else:
-            opts.append("NO")
-        if reset_start_time:
-            opts.append("YES")
-        else:
-            opts.append("NO")
+        # Construct the options list for the second argument
+        opt_list = [
+            stop_time,
+            step_size,
+            YesNo.from_bool(steps_in_cycles),
+            YesNo.from_bool(reset_start_time)
+        ]
         if steps_to_do > 0:
-            opts.append(str(steps_to_do))
+            opt_list.append(steps_to_do)
 
-        opt_str = "[" + ", ".join(opts) + "]"
-        self.RunScriptCommand(f'TSRunUntilSpecifiedTime("{ctg_name}", {opt_str});')
+        # Use pack_args to build the inner bracket content
+        opt_content = pack_args(*opt_list)
+        opt_str = f"[{opt_content}]"
+
+        self._run_script("TSRunUntilSpecifiedTime", f'"{ctg_name}"', opt_str)
 
     def TSSaveBPA(self, filename: str, diff_case_modified_only: bool = False):
-        """Save transient stability data stored in the BPA IPF format."""
-        dc = "YES" if diff_case_modified_only else "NO"
-        self.RunScriptCommand(f'TSSaveBPA("{filename}", {dc});')
+        """Saves transient stability data in the BPA IPF format.
+
+        Parameters
+        ----------
+        filename : str
+            Path for the output file.
+        diff_case_modified_only : bool, optional
+            If True, only saves models modified from base case. Defaults to False.
+        """
+        dc = YesNo.from_bool(diff_case_modified_only)
+        self._run_script("TSSaveBPA", f'"{filename}"', dc)
 
     def TSSaveGE(self, filename: str, diff_case_modified_only: bool = False):
-        """Save transient stability data stored in the GE DYD format."""
-        dc = "YES" if diff_case_modified_only else "NO"
-        self.RunScriptCommand(f'TSSaveGE("{filename}", {dc});')
+        """Saves transient stability data in the GE DYD format.
+
+        Parameters
+        ----------
+        filename : str
+            Path for the output file.
+        diff_case_modified_only : bool, optional
+            If True, only saves models modified from base case. Defaults to False.
+        """
+        dc = YesNo.from_bool(diff_case_modified_only)
+        self._run_script("TSSaveGE", f'"{filename}"', dc)
 
     def TSSavePTI(self, filename: str, diff_case_modified_only: bool = False):
-        """Save transient stability data stored in the PTI DYR format."""
-        dc = "YES" if diff_case_modified_only else "NO"
-        self.RunScriptCommand(f'TSSavePTI("{filename}", {dc});')
+        """Saves transient stability data in the PTI DYR format.
+
+        Parameters
+        ----------
+        filename : str
+            Path for the output file.
+        diff_case_modified_only : bool, optional
+            If True, only saves models modified from base case. Defaults to False.
+        """
+        dc = YesNo.from_bool(diff_case_modified_only)
+        self._run_script("TSSavePTI", f'"{filename}"', dc)
 
     def TSSaveTwoBusEquivalent(self, filename: str, bus_identifier: str):
         """Save the two bus equivalent model of a specified bus to a PWB file."""
-        self.RunScriptCommand(f'TSSaveTwoBusEquivalent("{filename}", {bus_identifier});')
+        self._run_script("TSSaveTwoBusEquivalent", f'"{filename}"', bus_identifier)
 
     def TSWriteModels(self, filename: str, diff_case_modified_only: bool = False):
-        """Save transient stability dynamic model records only the auxiliary file format."""
-        dc = "YES" if diff_case_modified_only else "NO"
-        self.RunScriptCommand(f'TSWriteModels("{filename}", {dc});')
+        """Saves transient stability dynamic model records to an auxiliary file.
+
+        Parameters
+        ----------
+        filename : str
+            Name and path for the output file. Typically with ``.aux`` extension.
+        diff_case_modified_only : bool, optional
+            If True, only saves models that are new or have had a parameter modified
+            compared to the difference case tool base case. Defaults to False.
+        """
+        dc = YesNo.from_bool(diff_case_modified_only)
+        self._run_script("TSWriteModels", f'"{filename}"', dc)
 
     def TSSetSelectedForTransientReferences(
         self, set_what: str, set_how: str, object_types: List[str], model_types: List[str]
     ):
         """Set the Custom Integer field or Selected field for objects referenced in a transient stability model."""
-        objs = "[" + ", ".join(object_types) + "]"
-        models = "[" + ", ".join(model_types) + "]"
-        self.RunScriptCommand(f"TSSetSelectedForTransientReferences({set_what}, {set_how}, {objs}, {models});")
+        objs = format_list(object_types)
+        models = format_list(model_types)
+        self._run_script("TSSetSelectedForTransientReferences", set_what, set_how, objs, models)
 
     def TSSaveDynamicModels(
         self, filename: str, file_type: str, object_type: str, filter_name: str = "", append: bool = False
     ):
         """Save dynamics models for specified object types to file."""
-        app = "YES" if append else "NO"
-        self.RunScriptCommand(
-            f'TSSaveDynamicModels("{filename}", {file_type}, {object_type}, "{filter_name}", {app});'
-        )
+        app = YesNo.from_bool(append)
+        self._run_script("TSSaveDynamicModels", f'"{filename}"', file_type, object_type, f'"{filter_name}"', app)

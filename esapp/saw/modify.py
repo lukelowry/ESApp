@@ -1,6 +1,13 @@
 """Modify Case Objects specific functions."""
 from typing import List
 
+from ._enums import (
+    YesNo,
+    format_filter,
+    format_filter_selected_only,
+    format_filter_areazone,
+)
+
 
 class ModifyMixin:
     """Mixin for modifying case objects."""
@@ -20,7 +27,7 @@ class ModifyMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        return self.RunScriptCommand("AutoInsertTieLineTransactions;")
+        return self._run_script("AutoInsertTieLineTransactions")
 
     def BranchMVALimitReorder(self, filter_name: str = "", limits: List[str] = None):
         """Modifies MVA limits for branches, allowing reordering or setting specific limits.
@@ -47,10 +54,10 @@ class ModifyMixin:
         # Pad limits to 15 entries (A through O)
         while len(limits) < 15:
             limits.append("")
-        
+
         filt = f'"{filter_name}"' if filter_name else ""
         lim_str = ", ".join(limits)
-        return self.RunScriptCommand(f"BranchMVALimitReorder({filt}, {lim_str});")
+        return self._run_script("BranchMVALimitReorder", filt, lim_str)
 
     def CalculateRXBGFromLengthConfigCondType(self, filter_name: str = ""):
         """Recalculates R, X, G, B parameters for transmission lines using the TransLineCalc tool.
@@ -71,8 +78,8 @@ class ModifyMixin:
         PowerWorldError
             If the SimAuto call fails (e.g., TransLineCalc not registered).
         """
-        filt = f'"{filter_name}"' if filter_name and filter_name != "SELECTED" else filter_name
-        return self.RunScriptCommand(f"CalculateRXBGFromLengthConfigCondType({filt});")
+        filt = format_filter_selected_only(filter_name)
+        return self._run_script("CalculateRXBGFromLengthConfigCondType", filt)
 
     def ChangeSystemMVABase(self, new_base: float):
         """Changes the system MVA base.
@@ -93,7 +100,7 @@ class ModifyMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        return self.RunScriptCommand(f"ChangeSystemMVABase({new_base});")
+        return self._run_script("ChangeSystemMVABase", new_base)
 
     def ClearSmallIslands(self):
         """Identifies the largest island in the system and de-energizes all other smaller islands.
@@ -109,7 +116,7 @@ class ModifyMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        return self.RunScriptCommand("ClearSmallIslands;")
+        return self._run_script("ClearSmallIslands")
 
     def CreateLineDeriveExisting(
         self, from_bus: int, to_bus: int, circuit: str, new_length: float, branch_id: str, existing_length: float = None, zero_g: bool = False
@@ -148,10 +155,8 @@ class ModifyMixin:
             If the SimAuto call fails.
         """
         el = str(existing_length) if existing_length is not None else ""
-        zg = "YES" if zero_g else "NO"
-        return self.RunScriptCommand(
-            f'CreateLineDeriveExisting({from_bus}, {to_bus}, "{circuit}", {new_length}, {branch_id}, {el}, {zg});'
-        )
+        zg = YesNo.from_bool(zero_g)
+        return self._run_script("CreateLineDeriveExisting", from_bus, to_bus, f'"{circuit}"', new_length, branch_id, el, zg)
 
     def DirectionsAutoInsert(self, source: str, sink: str, delete_existing: bool = True, use_area_zone_filters: bool = False):
         """Auto-inserts directions to the case for transfer analysis.
@@ -159,9 +164,9 @@ class ModifyMixin:
         Parameters
         ----------
         source : str
-            The source object string (e.g., '[AREA "Top"]', '[BUS 1]').
+            The source object type (e.g., 'AREA', 'BUS', 'ZONE').
         sink : str
-            The sink object string (e.g., '[AREA "Bottom"]', '[BUS 2]').
+            The sink object type (e.g., 'AREA', 'BUS', 'ZONE').
         delete_existing : bool, optional
             If True, deletes existing directions before inserting new ones. Defaults to True.
         use_area_zone_filters : bool, optional
@@ -176,9 +181,9 @@ class ModifyMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        de = "YES" if delete_existing else "NO"
-        uaz = "YES" if use_area_zone_filters else "NO"
-        return self.RunScriptCommand(f"DirectionsAutoInsert({source}, {sink}, {de}, {uaz});")
+        de = YesNo.from_bool(delete_existing)
+        uaz = YesNo.from_bool(use_area_zone_filters)
+        return self._run_script("DirectionsAutoInsert", source, sink, de, uaz)
 
     def DirectionsAutoInsertReference(self, source_type: str, reference_object: str, delete_existing: bool = True, source_filter: str = "", opposite_direction: bool = False):
         """Auto-inserts directions from multiple source objects to the same ReferenceObject.
@@ -206,10 +211,10 @@ class ModifyMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        de = "YES" if delete_existing else "NO"
+        de = YesNo.from_bool(delete_existing)
         filt = f'"{source_filter}"' if source_filter else '""'
-        od = "YES" if opposite_direction else "NO"
-        return self.RunScriptCommand(f'DirectionsAutoInsertReference({source_type}, "{reference_object}", {de}, {filt}, {od});')
+        od = YesNo.from_bool(opposite_direction)
+        return self._run_script("DirectionsAutoInsertReference", source_type, f'"{reference_object}"', de, filt, od)
 
     def InitializeGenMvarLimits(self):
         """Initializes all generators to be marked as at Mvar limits or not.
@@ -226,7 +231,7 @@ class ModifyMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        return self.RunScriptCommand("InitializeGenMvarLimits;")
+        return self._run_script("InitializeGenMvarLimits")
 
     def InjectionGroupsAutoInsert(self):
         """Inserts injection groups according to the IG_AutoInsert_Options.
@@ -242,7 +247,7 @@ class ModifyMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        return self.RunScriptCommand("InjectionGroupsAutoInsert;")
+        return self._run_script("InjectionGroupsAutoInsert")
 
     def InjectionGroupCreate(self, name: str, object_type: str, initial_value: float, filter_name: str, append: bool = True):
         """Creates or modifies an injection group.
@@ -270,9 +275,9 @@ class ModifyMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        app = "YES" if append else "NO"
-        filt = f'"{filter_name}"'
-        return self.RunScriptCommand(f'InjectionGroupCreate("{name}", {object_type}, {initial_value}, {filt}, {app});')
+        app = YesNo.from_bool(append)
+        filt = format_filter(filter_name)
+        return self._run_script("InjectionGroupCreate", f'"{name}"', object_type, initial_value, filt, app)
 
     def InjectionGroupRemoveDuplicates(self, preference_filter: str = ""):
         """Removes duplicate injection groups.
@@ -293,7 +298,7 @@ class ModifyMixin:
             If the SimAuto call fails.
         """
         filt = f'"{preference_filter}"' if preference_filter else ""
-        return self.RunScriptCommand(f'InjectionGroupRemoveDuplicates({filt});')
+        return self._run_script("InjectionGroupRemoveDuplicates", filt)
 
     def InterfacesAutoInsert(self, type_: str, delete_existing: bool = True, use_filters: bool = False, prefix: str = "", limits: str = "AUTO"):
         """Auto-inserts interfaces based on specified criteria.
@@ -323,9 +328,9 @@ class ModifyMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        de = "YES" if delete_existing else "NO"
-        uf = "YES" if use_filters else "NO"
-        return self.RunScriptCommand(f'InterfacesAutoInsert({type_}, {de}, {uf}, "{prefix}", {limits});')
+        de = YesNo.from_bool(delete_existing)
+        uf = YesNo.from_bool(use_filters)
+        return self._run_script("InterfacesAutoInsert", type_, de, uf, f'"{prefix}"', limits)
 
     def InterfaceAddElementsFromContingency(self, interface_name: str, contingency_name: str):
         """Adds elements from a contingency to an existing interface.
@@ -349,7 +354,7 @@ class ModifyMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        return self.RunScriptCommand(f'InterfaceAddElementsFromContingency("{interface_name}", "{contingency_name}");')
+        return self._run_script("InterfaceAddElementsFromContingency", f'"{interface_name}"', f'"{contingency_name}"')
 
     def InterfaceFlatten(self, interface_name: str):
         """Flattens an interface.
@@ -371,7 +376,7 @@ class ModifyMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        return self.RunScriptCommand(f'InterfaceFlatten("{interface_name}");')
+        return self._run_script("InterfaceFlatten", f'"{interface_name}"')
 
     def InterfaceFlattenFilter(self, filter_name: str):
         """Flattens interfaces that meet a specified filter.
@@ -391,7 +396,7 @@ class ModifyMixin:
             If the SimAuto call fails.
         """
         filt = f'"{filter_name}"' if filter_name else ""
-        return self.RunScriptCommand(f'InterfaceFlattenFilter({filt});')
+        return self._run_script("InterfaceFlattenFilter", filt)
 
     def InterfaceModifyIsolatedElements(self, filter_name: str = ""):
         """Modifies isolated elements within interfaces.
@@ -414,7 +419,7 @@ class ModifyMixin:
             If the SimAuto call fails.
         """
         filt = f'"{filter_name}"' if filter_name else ""
-        return self.RunScriptCommand(f'InterfaceModifyIsolatedElements({filt});')
+        return self._run_script("InterfaceModifyIsolatedElements", filt)
 
     def InterfaceRemoveDuplicates(self, preference_filter: str = ""):
         """Removes duplicate interfaces.
@@ -435,7 +440,7 @@ class ModifyMixin:
             If the SimAuto call fails.
         """
         filt = f'"{preference_filter}"' if preference_filter else ""
-        return self.RunScriptCommand(f'InterfaceRemoveDuplicates({filt});')
+        return self._run_script("InterfaceRemoveDuplicates", filt)
 
     def InterfaceCreate(self, name: str, delete_existing: bool, object_type: str, filter_name: str):
         """Creates or modifies an interface with elements of a single object type.
@@ -460,8 +465,8 @@ class ModifyMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        de = "YES" if delete_existing else "NO"
-        return self.RunScriptCommand(f'InterfaceCreate("{name}", {de}, {object_type}, "{filter_name}");')
+        de = YesNo.from_bool(delete_existing)
+        return self._run_script("InterfaceCreate", f'"{name}"', de, object_type, f'"{filter_name}"')
 
     def MergeBuses(self, element: str, filter_name: str = ""):
         """Merges buses based on specified criteria.
@@ -482,8 +487,8 @@ class ModifyMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        filt = f'"{filter_name}"' if filter_name and filter_name not in ["SELECTED", "AREAZONE"] else filter_name
-        return self.RunScriptCommand(f"MergeBuses({element}, {filt});")
+        filt = format_filter_areazone(filter_name)
+        return self._run_script("MergeBuses", element, filt)
 
     def MergeLineTerminals(self, filter_name: str = "SELECTED"):
         """Merges line terminals.
@@ -504,8 +509,8 @@ class ModifyMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        filt = f'"{filter_name}"' if filter_name and filter_name != "SELECTED" else filter_name
-        return self.RunScriptCommand(f"MergeLineTerminals({filt});")
+        filt = format_filter_selected_only(filter_name)
+        return self._run_script("MergeLineTerminals", filt)
 
     def MergeMSLineSections(self, filter_name: str = "SELECTED"):
         """Eliminates multi-section line records by merging them into single lines.
@@ -524,8 +529,8 @@ class ModifyMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        filt = f'"{filter_name}"' if filter_name and filter_name != "SELECTED" else filter_name
-        return self.RunScriptCommand(f"MergeMSLineSections({filt});")
+        filt = format_filter_selected_only(filter_name)
+        return self._run_script("MergeMSLineSections", filt)
 
     def Move(self, element_a: str, destination: str, how_much: float = 100.0, abort_on_error: bool = True):
         """Moves a generator, load, transmission line, or switched shunt.
@@ -553,8 +558,8 @@ class ModifyMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        abort = "YES" if abort_on_error else "NO"
-        return self.RunScriptCommand(f"Move({element_a}, {destination}, {how_much}, {abort});")
+        abort = YesNo.from_bool(abort_on_error)
+        return self._run_script("Move", element_a, destination, how_much, abort)
 
     def ReassignIDs(self, object_type: str, field: str, filter_name: str = "", use_right: bool = False):
         """Sets IDs of specified objects to the first/last two characters of a specified field.
@@ -582,9 +587,9 @@ class ModifyMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        ur = "YES" if use_right else "NO"
-        filt = f'"{filter_name}"' if filter_name and filter_name not in ["SELECTED", "AREAZONE", "ALL"] else filter_name
-        return self.RunScriptCommand(f"ReassignIDs({object_type}, {field}, {filt}, {ur});")
+        ur = YesNo.from_bool(use_right)
+        filt = format_filter(filter_name)
+        return self._run_script("ReassignIDs", object_type, field, filt, ur)
 
     def Remove3WXformerContainer(self, filter_name: str = ""):
         """Deletes three-winding transformer container objects, leaving their internal two-winding transformers.
@@ -603,8 +608,8 @@ class ModifyMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        filt = f'"{filter_name}"' if filter_name and filter_name not in ["SELECTED", "AREAZONE", "ALL"] else filter_name
-        return self.RunScriptCommand(f"Remove3WXformerContainer({filt});")
+        filt = format_filter(filter_name)
+        return self._run_script("Remove3WXformerContainer", filt)
 
     def RenameInjectionGroup(self, old_name: str, new_name: str):
         """Renames an injection group.
@@ -625,7 +630,7 @@ class ModifyMixin:
         PowerWorldError
             If the SimAuto call fails (e.g., group not found, new name already exists).
         """
-        return self.RunScriptCommand(f'RenameInjectionGroup("{old_name}", "{new_name}");')
+        return self._run_script("RenameInjectionGroup", f'"{old_name}"', f'"{new_name}"')
 
     def RotateBusAnglesInIsland(self, bus_key: str, value: float):
         """Rotates bus angles in an island by a specified value.
@@ -649,7 +654,7 @@ class ModifyMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        return self.RunScriptCommand(f"RotateBusAnglesInIsland({bus_key}, {value});")
+        return self._run_script("RotateBusAnglesInIsland", bus_key, value)
 
     def SetGenPMaxFromReactiveCapabilityCurve(self, filter_name: str = ""):
         """Changes generator maximum MW output (PMax) based on its reactive capability curve.
@@ -668,8 +673,8 @@ class ModifyMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        filt = f'"{filter_name}"' if filter_name and filter_name not in ["SELECTED", "AREAZONE"] else filter_name
-        return self.RunScriptCommand(f"SetGenPMaxFromReactiveCapabilityCurve({filt});")
+        filt = format_filter_areazone(filter_name)
+        return self._run_script("SetGenPMaxFromReactiveCapabilityCurve", filt)
 
     def SetParticipationFactors(self, method: str, constant_value: float, object_str: str):
         """Modifies generator participation factors.
@@ -695,7 +700,7 @@ class ModifyMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        return self.RunScriptCommand(f"SetParticipationFactors({method}, {constant_value}, {object_str});")
+        return self._run_script("SetParticipationFactors", method, constant_value, object_str)
 
     def SetScheduledVoltageForABus(self, bus_id: str, voltage: float):
         """Sets the stored scheduled voltage for a specific bus.
@@ -716,7 +721,7 @@ class ModifyMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        return self.RunScriptCommand(f"SetScheduledVoltageForABus({bus_id}, {voltage});")
+        return self._run_script("SetScheduledVoltageForABus", bus_id, voltage)
 
     def SetInterfaceLimitToMonitoredElementLimitSum(self, filter_name: str = "ALL"):
         """Sets interface limits to the sum of its monitored element limits.
@@ -738,8 +743,8 @@ class ModifyMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        filt = f'"{filter_name}"' if filter_name and filter_name not in ["SELECTED", "AREAZONE", "ALL"] else filter_name
-        return self.RunScriptCommand(f"SetInterfaceLimitToMonitoredElementLimitSum({filt});")
+        filt = format_filter(filter_name)
+        return self._run_script("SetInterfaceLimitToMonitoredElementLimitSum", filt)
 
     def SplitBus(
         self,
@@ -776,11 +781,10 @@ class ModifyMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        tie = "YES" if insert_tie else "NO"
-        open_line = "YES" if line_open else "NO"
-        return self.RunScriptCommand(
-            f'SplitBus({element}, {new_bus_number}, {tie}, {open_line}, "{branch_device_type}");'
-        )
+        tie = YesNo.from_bool(insert_tie)
+        open_line = YesNo.from_bool(line_open)
+        new_bus_number = int(new_bus_number.iloc[0]) if hasattr(new_bus_number, 'iloc') else int(new_bus_number)
+        return self._run_script("SplitBus", element, new_bus_number, tie, open_line, f'"{branch_device_type}"')
 
     def SuperAreaAddAreas(self, name: str, filter_name: str):
         """Adds areas to a Super Area.
@@ -803,8 +807,8 @@ class ModifyMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        filt = f'"{filter_name}"' if filter_name and filter_name not in ["SELECTED", "AREAZONE", "ALL"] else filter_name
-        return self.RunScriptCommand(f'SuperAreaAddAreas("{name}", {filt});')
+        filt = format_filter(filter_name)
+        return self._run_script("SuperAreaAddAreas", f'"{name}"', filt)
 
     def SuperAreaRemoveAreas(self, name: str, filter_name: str):
         """Removes areas from a Super Area.
@@ -825,8 +829,8 @@ class ModifyMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        filt = f'"{filter_name}"' if filter_name and filter_name not in ["SELECTED", "AREAZONE", "ALL"] else filter_name
-        return self.RunScriptCommand(f'SuperAreaRemoveAreas("{name}", {filt});')
+        filt = format_filter(filter_name)
+        return self._run_script("SuperAreaRemoveAreas", f'"{name}"', filt)
 
     def TapTransmissionLine(
         self,
@@ -845,7 +849,7 @@ class ModifyMixin:
         Parameters
         ----------
         element : str
-            The transmission line identifier string (e.g., '[BRANCH 1 2 1]').
+            The transmission line identifier string (e.g., ``[BRANCH 1 2 1]``).
         pos_along_line : float
             The position along the line (0-100%) where the tap is made.
         new_bus_number : int
@@ -870,8 +874,7 @@ class ModifyMixin:
         PowerWorldError
             If the SimAuto call fails.
         """
-        ms = "YES" if treat_as_ms_line else "NO"
-        uo = "YES" if update_onelines else "NO"
-        return self.RunScriptCommand(
-            f'TapTransmissionLine({element}, {pos_along_line}, {new_bus_number}, {shunt_model}, {ms}, {uo}, "{new_bus_name}");'
-        )
+        ms = YesNo.from_bool(treat_as_ms_line)
+        uo = YesNo.from_bool(update_onelines)
+        new_bus_number = int(new_bus_number.iloc[0]) if hasattr(new_bus_number, 'iloc') else int(new_bus_number)
+        return self._run_script("TapTransmissionLine", element, pos_along_line, new_bus_number, shunt_model, ms, uo, new_bus_name)

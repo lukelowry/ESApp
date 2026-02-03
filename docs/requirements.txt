@@ -2,6 +2,7 @@ sphinx
 sphinx-rtd-theme
 sphinx-copybutton
 nbsphinx
+nbconvert
 numpy<2.0
 ipykernel
 matplotlib

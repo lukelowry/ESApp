@@ -1,5 +1,5 @@
 ESA++
-====================================
+=====
 
 .. image:: https://img.shields.io/badge/License-Apache%202.0-blue.svg
    :target: https://opensource.org/licenses/Apache-2.0
@@ -13,93 +13,65 @@ ESA++
    :target: https://esapp.readthedocs.io/
    :alt: Documentation
 
-.. image:: https://img.shields.io/badge/coverage-90%25-brightgreen.svg
-   :alt: Coverage 90%
+.. image:: https://img.shields.io/badge/coverage-98%25-brightgreen.svg
+   :alt: Coverage 98%
 
-An open-source Python toolkit for power system automation, providing a high-performance "syntax-sugar" fork of Easy SimAuto (ESA). This library streamlines interaction with PowerWorld's Simulator Automation Server (SimAuto), transforming complex COM calls into intuitive, Pythonic operations.
+An open-source Python toolkit for power system automation, providing a
+high-performance wrapper for PowerWorld's Simulator Automation Server
+(SimAuto). Transforms complex COM calls into intuitive, Pythonic operations.
 
-Key Features
-------------
-
-- **Intuitive Indexing Syntax**: Access and modify grid components using a unique indexing system (e.g., ``wb[Bus, "BusPUVolt"]``) that feels like native Python.
-- **Comprehensive SimAuto Wrapper**: Full coverage of PowerWorld's API through the ``SAW`` class, organized into modular mixins for power flow, contingencies, transients, and more.
-- **High-Level Adapter Interface**: A collection of simplified "one-liner" functions for common tasks like GIC calculation, fault analysis, and voltage violation detection.
-- **Native Pandas Integration**: Every data retrieval operation returns a Pandas DataFrame or Series, enabling immediate analysis, filtering, and visualization.
-- **Advanced Analysis Apps**: Built-in specialized modules for Network topology analysis, Geomagnetically Induced Currents (GIC), and Forced Oscillation detection.
+- **Intuitive Indexing** -- Access grid data with ``pw[Bus, "BusPUVolt"]`` syntax
+- **Full SimAuto Coverage** -- All PowerWorld API functions through modular mixins
+- **Pandas Integration** -- Every query returns a DataFrame
+- **Pythonic Settings** -- Solver and GIC options as descriptor attributes (``pw.max_iterations = 250``)
+- **Convenience Methods** -- Flows, overloads, PTDF/LODF, snapshot context manager, case summary
+- **Transient Stability** -- Fluent API with ``TS`` field intellisense
+- **Analysis Utilities** -- Built-in GIC, network topology, and contingency tools
 
 Installation
 ------------
 
-The ESA++ package is available on `PyPI <https://pypi.org/project/esapp/>`_
+Requires Windows with PowerWorld Simulator (SimAuto enabled) and Python 3.9+.
 
 .. code-block:: bash
 
     pip install esapp
 
+Quick Example
+-------------
+
+.. code-block:: python
+
+    from esapp import PowerWorld
+    from esapp.components import *
+
+    pw = PowerWorld("path/to/case.pwb")
+
+    # Read data
+    bus_data = pw[Bus, ["BusName", "BusPUVolt"]]
+
+    # Solve power flow
+    V = pw.pflow()
+
+    # Inspect and modify
+    violations = pw.violations(v_min=0.95)
+    pw[Gen, "GenMW"] = 100.0
 
 Documentation
 -------------
 
-For a comprehensive tutorial, usage guides, and the full API reference, please visit our `documentation website <https://esapp.readthedocs.io/>`_.
-
-Usage Example
--------------
-
-Here is a quick example of how ESA++ simplifies data access and power flow analysis.
-
-.. code-block:: python
-
-    from esapp import GridWorkBench
-    from esapp.grid import *
-
-    # Open Case
-    wb = GridWorkBench("path/to/case.pwb")
-
-    # Retrieve data 
-    bus_data = wb[Bus, ["BusName", "BusPUVolt"]]
-
-    # Solve power flow
-    V = wb.pflow()
-
-    # Do some action, write to PW
-    violations = wb.find_violations(v_min=0.95)
-    wb[Gen, "GenMW"] = 100.0
-
-    # Save case
-    wb.save()
-
-Why ESA++?
-----------
-
-Traditional automation of PowerWorld Simulator often involves verbose COM calls and manual data parsing. ESA++ abstracts these complexities:
-
-*   **Speed**: Optimized data transfer between Python and SimAuto.
-*   **Clarity**: Code that reads like the engineering operations it performs.
-*   **Ecosystem**: Built on top of the proven ESA library, adding modern Python features and better integration with the SciPy stack.
-
-
-More Examples
--------------
-
-The `docs/examples/ <https://github.com/lukelowry/ESApp/tree/main/docs/examples>`_ directory contains a gallery of demonstrations, including:
-
-- **Object Field Access**: Reduce the time you spend searching for field names with ESA++ IDE typehints for objects and fields.
-- **Matrix Extraction**: Retrieving Y-Bus, Jacobian, and GIC conductance matrices for external mathematical modeling.
+Full tutorials, API reference, and examples at `esapp.readthedocs.io <https://esapp.readthedocs.io/>`_.
 
 Testing
 -------
 
-ESA++ includes an extensive test suite covering both offline mocks and live PowerWorld connections. To run the tests, install the test dependencies and execute pytest:
-
 .. code-block:: bash
 
     pip install .[test]
-    pytest tests/test_saw.py
+    pytest tests/
 
 Citation
 --------
-
-If you use this toolkit in your research or industrial projects, please cite the original ESA work and this fork:
 
 .. code-block:: bibtex
 
@@ -112,10 +84,10 @@ If you use this toolkit in your research or industrial projects, please cite the
 Authors
 -------
 
-Luke Lowery developed this module during his PhD studies at Texas A&M University. You can learn more on his `research page <https://lukelowry.github.io/>`_ or view his publications on `Google Scholar <https://scholar.google.com/citations?user=CTynuRMAAAAJ&hl=en>`_.
-
-ESA++ is maintained by **Luke Lowery** and **Adam Birchfield** at Texas A&M University. You can explore more of our research at the `Birchfield Research Group <https://birchfield.engr.tamu.edu/>`_.
+Developed by **Luke Lowery** and **Adam Birchfield** at Texas A&M University
+(`Birchfield Research Group <https://birchfield.engr.tamu.edu/>`_).
 
 License
 -------
+
 Distributed under the `Apache License 2.0 <https://www.apache.org/licenses/LICENSE-2.0>`_.

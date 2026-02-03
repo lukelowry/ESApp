@@ -1,5 +1,7 @@
 """Time Step Simulation specific functions."""
-from typing import List
+from typing import List, Union
+from ._helpers import format_list
+from ._enums import FilterKeyword, format_filter
 
 
 class TimeStepMixin:
@@ -21,10 +23,7 @@ class TimeStepMixin:
         str
             The result of the script command.
         """
-        args = ""
-        if start_time and end_time:
-            args = f"{start_time}, {end_time}"
-        return self.RunScriptCommand(f"TimeStepDoRun({args});")
+        return self._run_script("TimeStepDoRun", start_time or None, end_time or None)
 
     def TimeStepDoSinglePoint(self, time_point: str):
         """
@@ -40,7 +39,7 @@ class TimeStepMixin:
         str
             The result of the script command.
         """
-        return self.RunScriptCommand(f"TimeStepDoSinglePoint({time_point});")
+        return self._run_script("TimeStepDoSinglePoint", time_point)
 
     def TimeStepClearResults(self, start_time: str = "", end_time: str = ""):
         """
@@ -58,10 +57,7 @@ class TimeStepMixin:
         str
             The result of the script command.
         """
-        args = ""
-        if start_time and end_time:
-            args = f"{start_time}, {end_time}"
-        return self.RunScriptCommand(f"TimeStepClearResults({args});")
+        return self._run_script("TimeStepClearResults", start_time or None, end_time or None)
 
     def TimeStepDeleteAll(self):
         """
@@ -72,7 +68,7 @@ class TimeStepMixin:
         str
             The result of the script command.
         """
-        return self.RunScriptCommand("TimeStepDeleteAll;")
+        return self._run_script("TimeStepDeleteAll")
 
     def TimeStepResetRun(self):
         """
@@ -83,7 +79,7 @@ class TimeStepMixin:
         str
             The result of the script command.
         """
-        return self.RunScriptCommand("TimeStepResetRun;")
+        return self._run_script("TimeStepResetRun")
 
     def TimeStepAppendPWW(self, filename: str, solution_type: str = "Single Solution"):
         """
@@ -101,7 +97,7 @@ class TimeStepMixin:
         str
             The result of the script command.
         """
-        return self.RunScriptCommand(f'TimeStepAppendPWW("{filename}", "{solution_type}");')
+        return self._run_script("TimeStepAppendPWW", f'"{filename}"', f'"{solution_type}"')
 
     def TimeStepAppendPWWRange(self, filename: str, start_time: str, end_time: str, solution_type: str = "Single Solution"):
         """
@@ -123,7 +119,7 @@ class TimeStepMixin:
         str
             The result of the script command.
         """
-        return self.RunScriptCommand(f'TimeStepAppendPWWRange("{filename}", {start_time}, {end_time}, "{solution_type}");')
+        return self._run_script("TimeStepAppendPWWRange", f'"{filename}"', start_time, end_time, f'"{solution_type}"')
 
     def TimeStepAppendPWWRangeLatLon(self, filename: str, start_time: str, end_time: str, min_lat: float, max_lat: float, min_lon: float, max_lon: float, solution_type: str = "Single Solution"):
         """
@@ -134,7 +130,7 @@ class TimeStepMixin:
         str
             The result of the script command.
         """
-        return self.RunScriptCommand(f'TimeStepAppendPWWRangeLatLon("{filename}", {start_time}, {end_time}, {min_lat}, {max_lat}, {min_lon}, {max_lon}, "{solution_type}");')
+        return self._run_script("TimeStepAppendPWWRangeLatLon", f'"{filename}"', start_time, end_time, min_lat, max_lat, min_lon, max_lon, f'"{solution_type}"')
 
     def TimeStepLoadB3D(self, filename: str, solution_type: str = "GIC Only (No Power Flow)"):
         """
@@ -145,7 +141,7 @@ class TimeStepMixin:
         str
             The result of the script command.
         """
-        return self.RunScriptCommand(f'TimeStepLoadB3D("{filename}", "{solution_type}");')
+        return self._run_script("TimeStepLoadB3D", f'"{filename}"', f'"{solution_type}"')
 
     def TimeStepLoadPWW(self, filename: str, solution_type: str = "Single Solution"):
         """
@@ -163,7 +159,7 @@ class TimeStepMixin:
         str
             The result of the script command.
         """
-        return self.RunScriptCommand(f'TimeStepLoadPWW("{filename}", "{solution_type}");')
+        return self._run_script("TimeStepLoadPWW", f'"{filename}"', f'"{solution_type}"')
 
     def TimeStepLoadPWWRange(
         self, filename: str, start_time: str, end_time: str, solution_type: str = "Single Solution"
@@ -176,9 +172,7 @@ class TimeStepMixin:
         str
             The result of the script command.
         """
-        return self.RunScriptCommand(
-            f'TimeStepLoadPWWRange("{filename}", {start_time}, {end_time}, "{solution_type}");'
-        )
+        return self._run_script("TimeStepLoadPWWRange", f'"{filename}"', start_time, end_time, f'"{solution_type}"')
 
     def TimeStepLoadPWWRangeLatLon(self, filename: str, start_time: str, end_time: str, min_lat: float, max_lat: float, min_lon: float, max_lon: float, solution_type: str = "Single Solution"):
         """
@@ -189,7 +183,7 @@ class TimeStepMixin:
         str
             The result of the script command.
         """
-        return self.RunScriptCommand(f'TimeStepLoadPWWRangeLatLon("{filename}", {start_time}, {end_time}, {min_lat}, {max_lat}, {min_lon}, {max_lon}, "{solution_type}");')
+        return self._run_script("TimeStepLoadPWWRangeLatLon", f'"{filename}"', start_time, end_time, min_lat, max_lat, min_lon, max_lon, f'"{solution_type}"')
 
     def TimeStepSavePWW(self, filename: str):
         """
@@ -200,7 +194,7 @@ class TimeStepMixin:
         str
             The result of the script command.
         """
-        return self.RunScriptCommand(f'TimeStepSavePWW("{filename}");')
+        return self._run_script("TimeStepSavePWW", f'"{filename}"')
 
     def TimeStepSaveResultsByTypeCSV(
         self, object_type: str, filename: str, start_time: str = "", end_time: str = ""
@@ -224,10 +218,7 @@ class TimeStepMixin:
         str
             The result of the script command.
         """
-        args = f'{object_type}, "{filename}"'
-        if start_time and end_time:
-            args += f", {start_time}, {end_time}"
-        return self.RunScriptCommand(f"TimeStepSaveResultsByTypeCSV({args});")
+        return self._run_script("TimeStepSaveResultsByTypeCSV", object_type, f'"{filename}"', start_time or None, end_time or None)
 
     def TimeStepSavePWWRange(self, filename: str, start_time: str, end_time: str):
         """
@@ -238,7 +229,7 @@ class TimeStepMixin:
         str
             The result of the script command.
         """
-        return self.RunScriptCommand(f'TimeStepSavePWWRange("{filename}", {start_time}, {end_time});')
+        return self._run_script("TimeStepSavePWWRange", f'"{filename}"', start_time, end_time)
 
     def TIMESTEPSaveSelectedModifyStart(self):
         """
@@ -249,7 +240,7 @@ class TimeStepMixin:
         str
             The result of the script command.
         """
-        return self.RunScriptCommand("TIMESTEPSaveSelectedModifyStart;")
+        return self._run_script("TIMESTEPSaveSelectedModifyStart")
 
     def TIMESTEPSaveSelectedModifyFinish(self):
         """
@@ -260,7 +251,7 @@ class TimeStepMixin:
         str
             The result of the script command.
         """
-        return self.RunScriptCommand("TIMESTEPSaveSelectedModifyFinish;")
+        return self._run_script("TIMESTEPSaveSelectedModifyFinish")
 
     def TIMESTEPSaveInputCSV(self, filename: str, field_list: List[str], start_time: str = "", end_time: str = ""):
         """
@@ -271,11 +262,10 @@ class TimeStepMixin:
         str
             The result of the script command.
         """
-        fields = "[" + ", ".join(field_list) + "]"
-        args = f'"{filename}", {fields}, {start_time}, {end_time}'
-        return self.RunScriptCommand(f"TIMESTEPSaveInputCSV({args});")
+        fields = format_list(field_list)
+        return self._run_script("TIMESTEPSaveInputCSV", f'"{filename}"', fields, start_time, end_time)
 
-    def TimeStepSaveFieldsSet(self, object_type: str, field_list: List[str], filter_name: str = "ALL"):
+    def TimeStepSaveFieldsSet(self, object_type: str, field_list: List[str], filter_name: Union[FilterKeyword, str] = FilterKeyword.ALL):
         """
         Sets fields to save during simulation.
 
@@ -285,17 +275,17 @@ class TimeStepMixin:
             Object type.
         field_list : List[str]
             List of fields.
-        filter_name : str, optional
-            Filter to apply. Defaults to "ALL".
+        filter_name : Union[FilterKeyword, str], optional
+            Filter to apply. Defaults to FilterKeyword.ALL.
 
         Returns
         -------
         str
             The result of the script command.
         """
-        fields = "[" + ", ".join(field_list) + "]"
-        filt = f'"{filter_name}"' if filter_name != "ALL" and filter_name != "SELECTED" else filter_name
-        return self.RunScriptCommand(f"TimeStepSaveFieldsSet({object_type}, {fields}, {filt});")
+        fields = format_list(field_list)
+        filt = format_filter(filter_name)
+        return self._run_script("TimeStepSaveFieldsSet", object_type, fields, filt)
 
     def TimeStepSaveFieldsClear(self, object_types: List[str] = None):
         """
@@ -311,10 +301,8 @@ class TimeStepMixin:
         str
             The result of the script command.
         """
-        objs = ""
-        if object_types:
-            objs = "[" + ", ".join(object_types) + "]"
-        return self.RunScriptCommand(f"TimeStepSaveFieldsClear({objs});")
+        objs = format_list(object_types) if object_types else ""
+        return self._run_script("TimeStepSaveFieldsClear", objs)
 
     def TimeStepLoadTSB(self, filename: str):
         """
@@ -325,7 +313,7 @@ class TimeStepMixin:
         str
             The result of the script command.
         """
-        return self.RunScriptCommand(f'TimeStepLoadTSB("{filename}");')
+        return self._run_script("TimeStepLoadTSB", f'"{filename}"')
 
     def TimeStepSaveTSB(self, filename: str):
         """
@@ -336,4 +324,4 @@ class TimeStepMixin:
         str
             The result of the script command.
         """
-        return self.RunScriptCommand(f'TimeStepSaveTSB("{filename}");')
+        return self._run_script("TimeStepSaveTSB", f'"{filename}"')
