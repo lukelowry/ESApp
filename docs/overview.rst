@@ -20,6 +20,8 @@ into intuitive, Pythonic operations.
 - **Intuitive Indexing** — Access grid data with ``pw[Bus, "BusPUVolt"]`` syntax
 - **Full SimAuto Coverage** — All PowerWorld API functions through modular mixins
 - **Pandas Integration** — Every query returns a DataFrame
+- **Pythonic Settings** — Solver and GIC options as descriptor attributes (``pw.max_iterations = 250``)
+- **Convenience Methods** — Flows, overloads, PTDF/LODF, snapshot context manager, case summary
 - **Transient Stability** — Fluent API with ``TS`` field intellisense
 - **Analysis Utilities** — Built-in GIC, network topology, and contingency tools
 
@@ -53,7 +55,7 @@ Quick Example
 .. code-block:: python
 
     from esapp import PowerWorld
-    from esapp.components import Bus
+    from esapp.components import *
 
     pw = PowerWorld("path/to/case.pwb")
     voltages = pw[Bus, "BusPUVolt"]

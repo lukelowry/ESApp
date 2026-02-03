@@ -998,6 +998,95 @@ class TestWorkbenchLogic:
         result = gic.pf_include
         assert result is None
 
+    def test_gic_option_descriptor_bool_get_true(self):
+        """GICOption bool descriptor returns True when value is YES."""
+        from esapp.utils.gic import GIC
+        from esapp.saw._enums import YesNo
+        import pandas as pd
+
+        mock_pw = MagicMock()
+        mock_pw.__getitem__ = MagicMock(return_value=pd.DataFrame({
+            'VariableName': ['IncludeInPowerFlow'],
+            'ValueField': [YesNo.YES]
+        }))
+        gic = GIC(mock_pw)
+        assert gic.pf_include is True
+
+    def test_gic_option_descriptor_bool_get_false(self):
+        """GICOption bool descriptor returns False when value is NO."""
+        from esapp.utils.gic import GIC
+        from esapp.saw._enums import YesNo
+        import pandas as pd
+
+        mock_pw = MagicMock()
+        mock_pw.__getitem__ = MagicMock(return_value=pd.DataFrame({
+            'VariableName': ['IncludeInPowerFlow'],
+            'ValueField': [YesNo.NO]
+        }))
+        gic = GIC(mock_pw)
+        assert gic.pf_include is False
+
+    def test_gic_option_descriptor_nonbool_get(self):
+        """GICOption non-bool descriptor returns raw value."""
+        from esapp.utils.gic import GIC
+        import pandas as pd
+
+        mock_pw = MagicMock()
+        mock_pw.__getitem__ = MagicMock(return_value=pd.DataFrame({
+            'VariableName': ['CalcMode'],
+            'ValueField': ['SnapShot']
+        }))
+        gic = GIC(mock_pw)
+        assert gic.calc_mode == 'SnapShot'
+
+    def test_gic_option_descriptor_bool_set(self):
+        """GICOption bool descriptor calls SetData with YES/NO and EDIT/RUN."""
+        from esapp.utils.gic import GIC
+        from esapp.saw._enums import YesNo
+
+        mock_pw = MagicMock()
+        mock_esa = MagicMock()
+        mock_pw.esa = mock_esa
+        gic = GIC(mock_pw)
+
+        gic.pf_include = True
+        mock_esa.EnterMode.assert_any_call("EDIT")
+        mock_esa.SetData.assert_called_with(
+            'GIC_Options_Value',
+            ['VariableName', 'ValueField'],
+            ['IncludeInPowerFlow', YesNo.YES]
+        )
+        mock_esa.EnterMode.assert_called_with("RUN")
+
+    def test_gic_option_descriptor_nonbool_set(self):
+        """GICOption non-bool descriptor passes value directly."""
+        from esapp.utils.gic import GIC
+
+        mock_pw = MagicMock()
+        mock_esa = MagicMock()
+        mock_pw.esa = mock_esa
+        gic = GIC(mock_pw)
+
+        gic.calc_mode = 'TimeVarying'
+        mock_esa.SetData.assert_called_with(
+            'GIC_Options_Value',
+            ['VariableName', 'ValueField'],
+            ['CalcMode', 'TimeVarying']
+        )
+
+    def test_gic_option_descriptor_class_level_access(self):
+        """GICOption class-level access returns the descriptor itself."""
+        from esapp.utils.gic import GIC
+
+        desc = GIC.pf_include
+        assert hasattr(desc, 'key')
+        assert desc.key == 'IncludeInPowerFlow'
+        assert desc.is_bool is True
+
+        desc_nb = GIC.calc_mode
+        assert desc_nb.key == 'CalcMode'
+        assert desc_nb.is_bool is False
+
     def test_load_ts_csv_results_unlink_oserror(self, tmp_path):
         """load_ts_csv_results handles OSError on temp file unlink."""
         from esapp.saw._helpers import load_ts_csv_results

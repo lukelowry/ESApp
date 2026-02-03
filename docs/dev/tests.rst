@@ -22,7 +22,7 @@ Test Coverage
    * - ``test_indexing.py``
      - Indexable data access syntax, broadcast, bulk update
    * - ``test_helpers_unit.py``
-     - SAW helpers: df_to_aux, path conversion, formatting
+     - SAW helpers: df_to_aux, path conversion, formatting, GICOption descriptor mechanics
    * - ``test_dynamics.py``
      - Dynamics module: ContingencyBuilder, SimAction enum
    * - ``test_utils.py``
@@ -39,7 +39,7 @@ Test Coverage
    * - ``test_integration_saw_core.py``
      - Core SAW operations, file I/O, data retrieval
    * - ``test_integration_workbench.py``
-     - PowerWorld data access and indexing
+     - PowerWorld data access, indexing, solver option descriptors, convenience features (flows, overloads, snapshot, PTDF, LODF, properties, summary)
    * - ``test_integration_saw_powerflow.py``
      - Power flow, matrices (Ybus, Jacobian), PTDF/LODF
    * - ``test_integration_saw_contingency.py``
@@ -47,7 +47,7 @@ Test Coverage
    * - ``test_integration_network.py``
      - Network topology, incidence matrices, graph analysis
    * - ``test_integration_saw_gic.py``
-     - GIC analysis and calculations
+     - GIC analysis, calculations, GIC option descriptors, G-matrix comparison
    * - ``test_integration_saw_modify.py``
      - Case modification and data manipulation
    * - ``test_integration_saw_operations.py``

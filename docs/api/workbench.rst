@@ -8,3 +8,17 @@ SimAuto with a Pythonic interface for case management, data access, and analysis
 
 .. autoclass:: PowerWorld
    :members:
+
+Descriptors
+-----------
+
+Lightweight descriptor classes that map Python attributes to PowerWorld option fields.
+Used by ``PowerWorld`` for solver options and by ``GIC`` for GIC analysis options.
+
+.. currentmodule:: esapp._descriptors
+
+.. autoclass:: SolverOption
+   :members:
+
+.. autoclass:: GICOption
+   :members:

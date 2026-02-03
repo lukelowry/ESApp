@@ -154,12 +154,45 @@ class TestGIC:
         gic.hotspot_include = False
         assert gic.hotspot_include is False
 
+        gic.skip_equiv_lines = True
+        assert gic.skip_equiv_lines is True
+        gic.skip_equiv_lines = False
+
+        gic.skip_low_r_lines = True
+        assert gic.skip_low_r_lines is True
+        gic.skip_low_r_lines = False
+
         # Non-bool descriptor round-trip
         gic.calc_mode = 'SnapShot'
         assert gic.calc_mode == 'SnapShot'
         gic.calc_mode = 'TimeVarying'
         assert gic.calc_mode == 'TimeVarying'
         gic.calc_mode = 'SnapShot'
+
+        # Non-bool float descriptors
+        orig_angle = gic.efield_angle
+        gic.efield_angle = 45.0
+        assert float(gic.efield_angle) == 45.0
+        if orig_angle is not None:
+            gic.efield_angle = orig_angle
+
+        orig_mag = gic.efield_mag
+        gic.efield_mag = 1.5
+        assert float(gic.efield_mag) == 1.5
+        if orig_mag is not None:
+            gic.efield_mag = orig_mag
+
+        orig_min_kv = gic.min_kv
+        gic.min_kv = 100.0
+        assert float(gic.min_kv) == 100.0
+        if orig_min_kv is not None:
+            gic.min_kv = orig_min_kv
+
+        orig_seg = gic.segment_length_km
+        gic.segment_length_km = 10.0
+        assert float(gic.segment_length_km) == 10.0
+        if orig_seg is not None:
+            gic.segment_length_km = orig_seg
 
         # configure() sets multiple options at once
         gic.configure(pf_include=True, ts_include=True, calc_mode='TimeVarying')
