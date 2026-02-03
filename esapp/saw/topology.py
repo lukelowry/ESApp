@@ -46,10 +46,6 @@ class TopologyMixin:
         -------
         pd.DataFrame
             DataFrame containing BusNum and the calculated distance.
-
-        Examples
-        --------
-        >>> saw.DeterminePathDistance('[BUS 1]', 'X', 'CLOSED', 'CustomFloat')
         """
         self._run_script("DeterminePathDistance", start, BranchDistMeas, BranchFilter, BusField)
 
@@ -136,10 +132,6 @@ class TopologyMixin:
         ------
         PowerWorldError
             If the command fails or no path exists.
-
-        Examples
-        --------
-        >>> saw.DetermineShortestPath('[BUS 1]', '[BUS 7]', 'Z', 'ALL')
         """
         filename = get_temp_filepath(".txt")
 
@@ -179,10 +171,6 @@ class TopologyMixin:
         -------
         str
             The response from the PowerWorld script command.
-
-        Examples
-        --------
-        >>> saw.DoFacilityAnalysis("cut_results.aux", set_selected=True)
         """
         yn = YesNo.from_bool(set_selected)
         return self._run_script("DoFacilityAnalysis", f'"{filename}"', yn)
@@ -219,10 +207,6 @@ class TopologyMixin:
         -------
         str
             The response from the PowerWorld script command.
-
-        Examples
-        --------
-        >>> saw.FindRadialBusPaths(ignore_status=True, bus_or_superbus='BUS')
         """
         ign = YesNo.from_bool(ignore_status)
         treat = YesNo.from_bool(treat_parallel_as_not_radial)
@@ -258,13 +242,6 @@ class TopologyMixin:
         -------
         str
             The response from the PowerWorld script command.
-
-        Examples
-        --------
-        Assign substation numbers to buses without one based on closest bus:
-
-        >>> saw.SetBusFieldFromClosest("SubNumber", "SubNumber IsBlank",
-        ...     "SubNumber NotIsBlank", "All", "Z")
         """
         return self._run_script("SetBusFieldFromClosest", f'"{variable_name}"', f'"{bus_filter_set_to}"', f'"{bus_filter_from_these}"', branch_filter_traverse, branch_dist_meas)
 
@@ -399,10 +376,6 @@ class TopologyMixin:
         See Also
         --------
         ExpandAllBusTopology : Expand topology for all buses.
-
-        Examples
-        --------
-        >>> saw.ExpandBusTopology("BUS 1", "BREAKERANDAHALF")
         """
         return self._run_script("ExpandBusTopology", bus_identifier, topology_type)
 
@@ -432,10 +405,6 @@ class TopologyMixin:
         -------
         str
             The response from the PowerWorld script command.
-
-        Examples
-        --------
-        >>> saw.SaveConsolidatedCase("consolidated_copy.pwb", "PWB")
         """
         tcl = YesNo.from_bool(truncate_ctg_labels)
         ac = YesNo.from_bool(add_comments)
@@ -476,10 +445,6 @@ class TopologyMixin:
         See Also
         --------
         OpenWithBreakers : Disconnect objects by opening breakers.
-
-        Examples
-        --------
-        >>> saw.CloseWithBreakers("GEN", "[1 1]", switching_types=["Breaker"])
         """
         only = YesNo.from_bool(only_specified)
         cnc = YesNo.from_bool(close_normally_closed)
@@ -529,10 +494,6 @@ class TopologyMixin:
         See Also
         --------
         CloseWithBreakers : Energize objects by closing breakers.
-
-        Examples
-        --------
-        >>> saw.OpenWithBreakers("BRANCH", "[1 2 1]", switching_types=["Breaker"])
         """
         ono = YesNo.from_bool(open_normally_open)
         sw_types = format_list(switching_types, quote_items=True) if switching_types else '["Breaker"]'

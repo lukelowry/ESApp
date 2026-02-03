@@ -6,9 +6,6 @@ It is organized into functional mixins for power flow, contingencies, optimizati
 transient stability, GIC, ATC, topology, and data management. Access SAW through ``wb.esa``
 from ``GridWorkBench``.
 
-SAW Class
----------
-
 .. currentmodule:: esapp.saw
 
 .. autoclass:: SAW
@@ -16,7 +13,7 @@ SAW Class
    :no-members:
 
 General Program Actions
-~~~~~~~~~~~~~~~~~~~~~~
+-----------------------
 
 .. autoclass:: esapp.saw.base.SAWBase
    :members:
@@ -27,21 +24,21 @@ General Program Actions
    :noindex:
 
 Data Interaction
-~~~~~~~~~~~~~~~~
+----------------
 
 .. autoclass:: esapp.saw.data.DataMixin
    :members:
    :noindex:
 
 Case Actions
-~~~~~~~~~~~~
+------------
 
 .. autoclass:: esapp.saw.case_actions.CaseActionsMixin
    :members:
    :noindex:
 
 Modify Case Objects
-~~~~~~~~~~~~~~~~~~~
+-------------------
 
 .. autoclass:: esapp.saw.modify.ModifyMixin
    :members:
@@ -52,7 +49,7 @@ Modify Case Objects
    :noindex:
 
 Power Flow
-~~~~~~~~~~
+----------
 
 .. autoclass:: esapp.saw.powerflow.PowerflowMixin
    :members:
@@ -63,91 +60,91 @@ Power Flow
    :noindex:
 
 Sensitivity Calculations
-~~~~~~~~~~~~~~~~~~~~~~~~
+------------------------
 
 .. autoclass:: esapp.saw.sensitivity.SensitivityMixin
    :members:
    :noindex:
 
 Contingency Analysis
-~~~~~~~~~~~~~~~~~~~~
+--------------------
 
 .. autoclass:: esapp.saw.contingency.ContingencyMixin
    :members:
    :noindex:
 
 Fault Analysis
-~~~~~~~~~~~~~~
+--------------
 
 .. autoclass:: esapp.saw.fault.FaultMixin
    :members:
    :noindex:
 
 ATC (Available Transfer Capability)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+------------------------------------
 
 .. autoclass:: esapp.saw.atc.ATCMixin
    :members:
    :noindex:
 
 GIC (Geomagnetically Induced Current)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--------------------------------------
 
 .. autoclass:: esapp.saw.gic.GICMixin
    :members:
    :noindex:
 
 OPF (Optimal Power Flow) and SCOPF
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-----------------------------------
 
 .. autoclass:: esapp.saw.opf.OPFMixin
    :members:
    :noindex:
 
 PV Analysis
-~~~~~~~~~~~
+-----------
 
 .. autoclass:: esapp.saw.pv.PVMixin
    :members:
    :noindex:
 
 QV Analysis
-~~~~~~~~~~~
+-----------
 
 .. autoclass:: esapp.saw.qv.QVMixin
    :members:
    :noindex:
 
 Regions
-~~~~~~~
+-------
 
 .. autoclass:: esapp.saw.regions.RegionsMixin
    :members:
    :noindex:
 
 TS (Transient Stability)
-~~~~~~~~~~~~~~~~~~~~~~~~
+------------------------
 
 .. autoclass:: esapp.saw.transient.TransientMixin
    :members:
    :noindex:
 
 Scheduled Actions
-~~~~~~~~~~~~~~~~~
+-----------------
 
 .. autoclass:: esapp.saw.scheduled.ScheduledActionsMixin
    :members:
    :noindex:
 
 Time Step Simulation
-~~~~~~~~~~~~~~~~~~~~
+--------------------
 
 .. autoclass:: esapp.saw.timestep.TimeStepMixin
    :members:
    :noindex:
 
 Weather
-~~~~~~~
+-------
 
 .. autoclass:: esapp.saw.weather.WeatherMixin
    :members:
@@ -166,9 +163,6 @@ enums instead of raw strings provides IDE autocomplete, type checking, and preve
     # Use enums for type-safe parameters
     saw.SolvePowerFlow(SolverMethod.RECTNEWT)
     saw.GetParametersMultipleElement("Bus", ["BusNum", "BusPUVolt"], FilterKeyword.ALL)
-
-Power Flow & Analysis
-~~~~~~~~~~~~~~~~~~~~~
 
 **SolverMethod** - Power flow solution algorithms
 
@@ -220,9 +214,6 @@ Power Flow & Analysis
      - AC Jacobian in Polar coordinates ("P")
    * - ``DC``
      - B' matrix / DC approximation
-
-Filtering & Selection
-~~~~~~~~~~~~~~~~~~~~~
 
 **FilterKeyword** - Special filter keywords (passed unquoted)
 
@@ -308,9 +299,6 @@ Use ``YesNo.from_bool(value)`` to convert Python booleans.
    * - ``LABEL``
      - Label-based identification
 
-File Operations
-~~~~~~~~~~~~~~~
-
 **FileFormat** - Import/export file formats
 
 .. list-table::
@@ -363,9 +351,6 @@ File Operations
    * - ``YES_MS_3W``
      - Include multi-section and 3-winding IDs
 
-Topology & Network
-~~~~~~~~~~~~~~~~~~
-
 **BranchDistanceMeasure** - Distance metrics for topology analysis
 
 .. list-table::
@@ -406,9 +391,6 @@ Topology & Network
      - Use existing island configuration
    * - ``NO``
      - No area reference
-
-Modification & Scaling
-~~~~~~~~~~~~~~~~~~~~~~
 
 **ScalingBasis** - Load/generation scaling basis
 
@@ -462,9 +444,6 @@ Modification & Scaling
    * - ``Breaker``
      - Circuit breaker
 
-Case Operations
-~~~~~~~~~~~~~~~
-
 **StarBusHandling** - Star bus handling for case append
 
 .. list-table::
@@ -504,9 +483,6 @@ Case Operations
    * - ``NUMBERS``
      - Link objects by numbers
 
-Weather & Ratings
-~~~~~~~~~~~~~~~~~
-
 **RatingSetPrecedence** - Rating set precedence for weather-based ratings
 
 .. list-table::
@@ -535,9 +511,6 @@ Weather & Ratings
    * - ``A`` - ``O``
      - Rating sets A through O
 
-Transient Stability
-~~~~~~~~~~~~~~~~~~~
-
 **TSGetResultsMode** - Transient stability results save mode
 
 .. list-table::
@@ -554,7 +527,7 @@ Transient Stability
      - JSIS format output
 
 Helper Functions
-~~~~~~~~~~~~~~~~
+----------------
 
 Functions for formatting filter parameters:
 
@@ -590,9 +563,6 @@ Exception classes for handling PowerWorld and COM errors.
    * - ``CommandNotRespectedError``
      - Raised when PowerWorld silently ignores a command (e.g., setting a value outside allowed limits)
 
-Exception Hierarchy
-~~~~~~~~~~~~~~~~~~~
-
 .. code-block:: text
 
     Exception
@@ -603,9 +573,6 @@ Exception Hierarchy
             ├── PowerWorldPrerequisiteError
             ├── PowerWorldAddonError
             └── CommandNotRespectedError
-
-Usage Example
-~~~~~~~~~~~~~
 
 .. code-block:: python
 

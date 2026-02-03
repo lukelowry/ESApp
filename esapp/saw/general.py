@@ -815,11 +815,6 @@ class GeneralMixin:
         ------
         PowerWorldError
             If the SimAuto call fails.
-
-        Examples
-        --------
-        >>> saw.LogAddDateTime("DateTime", True, True, True)
-        # Adds a log entry labeled "DateTime" with current date, time, and milliseconds.
         """
         id = YesNo.from_bool(include_date)
         it = YesNo.from_bool(include_time)
@@ -856,11 +851,6 @@ class GeneralMixin:
         ------
         PowerWorldError
             If the SimAuto call fails (e.g., directory not found).
-
-        Examples
-        --------
-        >>> saw.LoadAuxDirectory("C:/SimCases/AuxFiles", "*.aux", True)
-        # Loads all .aux files from the directory in alphabetical order.
         """
         c = YesNo.from_bool(create_if_not_found)
         if filter_string:

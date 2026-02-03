@@ -11,7 +11,7 @@ GObject Base Class
    :members:
 
 FieldPriority Flags
-~~~~~~~~~~~~~~~~~~~
+-------------------
 
 The ``FieldPriority`` flag enum is used to categorize field attributes. Flags can be combined
 using the ``|`` operator:
@@ -53,7 +53,7 @@ during simulation.
     tsw.watch(Bus, [TS.Bus.VPU, TS.Bus.Freq])
 
 TS Field Reference
-~~~~~~~~~~~~~~~~~~
+------------------
 
 The following tables list all available transient stability field constants by category.
 Access fields using ``TS.<Category>.<Field>`` syntax (e.g., ``TS.Gen.P``, ``TS.Bus.VPU``).

@@ -32,7 +32,7 @@ Basic GIC model generation::
 
 Using PowerWorld's G-matrix directly::
 
-    >>> G_pw = wb.gic.gmatrix_from_powerworld()
+    >>> G_pw = wb.gic.gmatrix()
 
 See Also
 --------
@@ -93,7 +93,7 @@ class GIC(Indexable):
     GIC analysis requires certain options to be enabled for full functionality.
     The most important is ``set_pf_include(True)`` which must be called before
     retrieving GIC data like transformer coil resistances (GICCoilR fields).
-    Methods like ``model()`` and ``gmatrix_from_powerworld()`` automatically
+    Methods like ``model()`` and ``gmatrix()`` automatically
     enable this option. Use ``configure()`` to set multiple options at once.
 
     Example
@@ -102,7 +102,7 @@ class GIC(Indexable):
     >>> wb.gic.configure()  # Enable GIC with default options
     >>> wb.gic.storm(100, 90)  # 100 V/km, 90 degrees
     >>> wb.gic.model()
-    >>> G = wb.gic.gmatrix_from_powerworld()
+    >>> G = wb.gic.gmatrix()
 
     See Also
     --------

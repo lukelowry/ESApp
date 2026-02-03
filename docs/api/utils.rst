@@ -3,13 +3,8 @@ Utilities & Analysis
 
 The ``esapp.utils`` package provides analysis modules, visualization tools, and general helpers.
 
-Analysis Modules
-----------------
-
-These modules are accessible as attributes of ``GridWorkBench`` or can be used standalone.
-
 Contingency Builder
-~~~~~~~~~~~~~~~~~~~
+-------------------
 
 Fluent API for defining transient stability contingencies.
 
@@ -22,7 +17,7 @@ Fluent API for defining transient stability contingencies.
    :members:
 
 GIC Analysis
-~~~~~~~~~~~~
+------------
 
 Geomagnetically Induced Current (GIC) analysis tools.
 
@@ -33,7 +28,7 @@ Geomagnetically Induced Current (GIC) analysis tools.
    :show-inheritance:
 
 Network Topology
-~~~~~~~~~~~~~~~~
+----------------
 
 Network graph analysis including incidence matrices, Laplacians, and path calculations.
 
@@ -47,7 +42,7 @@ Network graph analysis including incidence matrices, Laplacians, and path calcul
    :members:
 
 Dynamics
-~~~~~~~~
+--------
 
 Transient stability simulation utilities for field-watching and result processing.
 

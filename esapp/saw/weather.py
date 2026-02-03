@@ -158,11 +158,6 @@ class WeatherMixin:
         -------
         str
             The response from the PowerWorld script command.
-
-        Examples
-        --------
-        >>> saw.WeatherPWWFileAllMeasValid("weather_data.pww", ["TEMP", "WINDSPEED"],
-        ...     "2024-03-01T00:00Z", "2024-03-01T23:59Z")
         """
         fields = format_list(field_list)
         return self._run_script("WeatherPWWFileAllMeasValid", f'"{filename}"', fields, start_time or None, end_time or None)
@@ -212,10 +207,6 @@ class WeatherMixin:
         See Also
         --------
         WeatherPWWSetDirectory : Sets the directory to search for PWW files.
-
-        Examples
-        --------
-        >>> saw.WeatherPWWLoadForDateTimeUTC("2024-03-06T18:00Z")
         """
         return self._run_script("WeatherPWWLoadForDateTimeUTC", f'"{iso_datetime}"')
 
@@ -244,10 +235,6 @@ class WeatherMixin:
         See Also
         --------
         WeatherPWWLoadForDateTimeUTC : Loads weather data using this directory.
-
-        Examples
-        --------
-        >>> saw.WeatherPWWSetDirectory("C:/WeatherData/PWW", include_subdirs=True)
         """
         sub = YesNo.from_bool(include_subdirs)
         return self._run_script("WeatherPWWSetDirectory", f'"{directory}"', sub)
@@ -278,11 +265,6 @@ class WeatherMixin:
         -------
         str
             The response from the PowerWorld script command.
-
-        Examples
-        --------
-        >>> saw.WeatherPWWFileCombine2("weather_march.pww", "weather_april.pww",
-        ...     "weather_combined.pww")
         """
         return self._run_script("WeatherPWWFileCombine2", f'"{source1}"', f'"{source2}"', f'"{dest}"')
 
@@ -323,10 +305,5 @@ class WeatherMixin:
         -------
         str
             The response from the PowerWorld script command.
-
-        Examples
-        --------
-        >>> saw.WeatherPWWFileGeoReduce("weather_full.pww", "weather_region.pww",
-        ...     30.0, 40.0, -100.0, -90.0)
         """
         return self._run_script("WeatherPWWFileGeoReduce", f'"{source}"', f'"{dest}"', min_lat, max_lat, min_lon, max_lon)

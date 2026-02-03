@@ -47,10 +47,6 @@ class PVMixin:
         -------
         str
             The response from the PowerWorld script command.
-
-        Examples
-        --------
-        >>> saw.PVRun('[INJECTIONGROUP "SolarGen"]', '[INJECTIONGROUP "UrbanLoad"]')
         """
         return self._run_script("PVRun", source, sink)
 
@@ -142,10 +138,6 @@ class PVMixin:
         -------
         str
             The response from the PowerWorld script command.
-
-        Examples
-        --------
-        >>> saw.PVSetSourceAndSink('[INJECTIONGROUP "SolarGen"]', '[INJECTIONGROUP "UrbanLoad"]')
         """
         return self._run_script("PVSetSourceAndSink", source, sink)
 
