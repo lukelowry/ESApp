@@ -85,7 +85,7 @@ Authors
 -------
 
 Developed by **Luke Lowery** and **Adam Birchfield** at Texas A&M University
-(`Birchfield Research Group <https://birchfield.engr.tamu.edu/>`_).
+(`Birchfield Research Group <https://birchfield.engr.tamu.edu/>`_). See my personal (`research website <https://lukelowry.github.io/>`_).
 
 License
 -------
