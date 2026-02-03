@@ -53,22 +53,8 @@ The base class collects these into queryable properties:
 Field Priority Flags
 ~~~~~~~~~~~~~~~~~~~~
 
-.. list-table::
-   :widths: 20 80
-   :header-rows: 1
-
-   * - Flag
-     - Meaning
-   * - PRIMARY
-     - Primary key that uniquely identifies the object
-   * - SECONDARY
-     - Alternate identifier (e.g., name fields)
-   * - REQUIRED
-     - Must be specified when creating new objects
-   * - OPTIONAL
-     - Can be read/written but not required
-   * - EDITABLE
-     - User-modifiable field (combined with other flags)
+See :class:`~esapp.components.gobject.FieldPriority` in the
+:doc:`API reference </api/comps>` for the full list of flags and their meanings.
 
 Updating Components
 -------------------
@@ -104,7 +90,7 @@ Usage Examples
 
 .. code-block:: python
 
-    from esapp.components import Bus, Gen, TS
+    from esapp.components import *
 
     # Data access with component classes
     data = pw[Bus, [Bus.BusNum, Bus.BusName, Bus.BusPUVolt]]

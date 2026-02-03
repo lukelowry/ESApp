@@ -11,7 +11,7 @@ from .misc import timing
 
 from .b3d import B3D
 
-from .gic import GIC, jac_decomp
+from .gic import GIC
 from .contingency import ContingencyBuilder, SimAction
 from .network import Network, BranchType
 from .dynamics import TSWatch, process_ts_results, get_ts_results
@@ -23,7 +23,6 @@ __all__ = [
     'B3D',
     # gic
     'GIC',
-    'jac_decomp',
     # contingency
     'ContingencyBuilder',
     'SimAction',

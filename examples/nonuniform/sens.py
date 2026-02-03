@@ -11,7 +11,7 @@ and require a live ``PowerWorld`` instance for bus category data.
 Example
 -------
 >>> from esapp import PowerWorld
->>> from esapp.utils import GIC, jac_decomp
+>>> from examples.nonuniform.sens import jac_decomp
 >>> from examples.nonuniform.sens import dBounddI, dIdE
 >>>
 >>> pw = PowerWorld("case.pwb")
@@ -29,9 +29,31 @@ from scipy.sparse import hstack
 from scipy.sparse.linalg import inv as sinv
 
 from esapp.components import Bus
-from esapp.utils.gic import jac_decomp
 
-__all__ = ['dBounddI', 'dIdE', 'signdiag']
+__all__ = ['jac_decomp', 'dBounddI', 'dIdE', 'signdiag']
+
+
+def jac_decomp(jac):
+    """
+    Decompose a power flow Jacobian into sub-matrices.
+
+    Parameters
+    ----------
+    jac : np.ndarray
+        Full Jacobian matrix of shape (2n, 2n).
+
+    Yields
+    ------
+    np.ndarray
+        Sub-matrices in order: dP/dTheta, dP/dV, dQ/dTheta, dQ/dV.
+    """
+    dim = jac.shape[0]
+    nbus = int(dim / 2)
+
+    yield jac[:nbus, :nbus]   # dP/dTheta
+    yield jac[:nbus, nbus:]   # dP/dV
+    yield jac[nbus:, :nbus]   # dQ/dTheta
+    yield jac[nbus:, nbus:]   # dQ/dV
 
 
 def signdiag(x):
@@ -95,7 +117,7 @@ def dIdE(H, E=None, i=None):
     Parameters
     ----------
     H : np.ndarray or sparse matrix
-        H-matrix (e.g., from ``wb.gic.H`` after calling ``model()``).
+        H-matrix (e.g., from ``pw.gic.H`` after calling ``model()``).
     E : np.ndarray, optional
         Electric field vector. If provided and i is None, computes i = H @ E.
     i : np.ndarray, optional

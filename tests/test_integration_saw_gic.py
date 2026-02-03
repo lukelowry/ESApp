@@ -28,7 +28,7 @@ pytestmark = [
 try:
     from esapp.saw import SAW, PowerWorldError, PowerWorldPrerequisiteError, create_object_string
     from esapp.workbench import PowerWorld
-    from esapp.utils import GIC, jac_decomp
+    from esapp.utils import GIC
     from esapp.components import Bus, Branch, Substation
 except ImportError:
     raise
@@ -239,14 +239,6 @@ class TestGIC:
         assert G_sparse.shape[0] > 0
         G_dense = wb.gic.gmatrix(sparse=False)
         assert isinstance(G_dense, np.ndarray)
-
-    @pytest.mark.order(7801)
-    def test_jac_decomp(self):
-        J = np.arange(16).reshape(4, 4).astype(float)
-        parts = list(jac_decomp(J))
-        assert len(parts) == 4
-        for p in parts:
-            assert p.shape == (2, 2)
 
     @pytest.mark.order(7850)
     def test_gic_gmatrix_comparison(self, gic_saw):

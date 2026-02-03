@@ -511,6 +511,46 @@ Use ``YesNo.from_bool(value)`` to convert Python booleans.
    * - ``A`` - ``O``
      - Rating sets A through O
 
+**FieldListColumn** - Column names for ``GetFieldList`` results
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 75
+
+   * - Value
+     - Description
+   * - ``KEY_FIELD``
+     - Whether the field is a key field
+   * - ``INTERNAL_FIELD_NAME``
+     - PowerWorld internal field name
+   * - ``FIELD_DATA_TYPE``
+     - Data type of the field
+   * - ``DESCRIPTION``
+     - Human-readable description
+   * - ``DISPLAY_NAME``
+     - Display name in PowerWorld UI
+   * - ``ENTERABLE``
+     - Whether the field can be edited
+
+**SpecificFieldListColumn** - Column names for ``GetSpecificFieldList`` results
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 75
+
+   * - Value
+     - Description
+   * - ``VARIABLENAME_LOCATION``
+     - Variable name with location
+   * - ``FIELD``
+     - Field identifier
+   * - ``COLUMN_HEADER``
+     - Column header label
+   * - ``FIELD_DESCRIPTION``
+     - Human-readable description
+   * - ``ENTERABLE``
+     - Whether the field can be edited
+
 **TSGetResultsMode** - Transient stability results save mode
 
 .. list-table::
@@ -529,13 +569,35 @@ Use ``YesNo.from_bool(value)`` to convert Python booleans.
 Helper Functions
 ----------------
 
-Functions for formatting filter parameters:
+**Filter formatting:**
 
 .. autofunction:: esapp.saw.format_filter
 
 .. autofunction:: esapp.saw.format_filter_selected_only
 
 .. autofunction:: esapp.saw.format_filter_areazone
+
+**Data conversion:**
+
+.. autofunction:: esapp.saw.df_to_aux
+
+.. autofunction:: esapp.saw.create_object_string
+
+.. autofunction:: esapp.saw.convert_to_windows_path
+
+.. autofunction:: esapp.saw.convert_list_to_variant
+
+.. autofunction:: esapp.saw.convert_df_to_variant
+
+.. autofunction:: esapp.saw.convert_nested_list_to_variant
+
+.. autofunction:: esapp.saw.get_temp_filepath
+
+.. autofunction:: esapp.saw.format_list
+
+.. autofunction:: esapp.saw.format_optional
+
+.. autofunction:: esapp.saw.format_optional_numeric
 
 Exceptions
 ----------
@@ -562,12 +624,39 @@ Exception classes for handling PowerWorld and COM errors.
      - Raised when COM communication fails (SimAuto crash, unresponsive, or invalid function call)
    * - ``CommandNotRespectedError``
      - Raised when PowerWorld silently ignores a command (e.g., setting a value outside allowed limits)
+   * - ``GridObjDNE``
+     - Raised when a grid object data query fails (object does not exist in the case)
+   * - ``FieldDataException``
+     - Raised when there is an issue with field data retrieval or parsing
+   * - ``AuxParseException``
+     - Raised when parsing an auxiliary file fails
+   * - ``ContainerDeletedException``
+     - Raised when attempting to access a container that has been deleted
+   * - ``PowerFlowException``
+     - Base class for power flow solution errors
+   * - ``BifurcationException``
+     - Raised when voltage bifurcation is suspected during power flow
+   * - ``DivergenceException``
+     - Raised when the power flow solution diverges
+   * - ``GeneratorLimitException``
+     - Raised when a generator has exceeded a limit during power flow
+   * - ``GICException``
+     - Raised when a GIC analysis error occurs
 
 .. code-block:: text
 
     Exception
     └── Error (base for all ESA++ exceptions)
         ├── COMError
+        ├── GridObjDNE
+        ├── FieldDataException
+        ├── AuxParseException
+        ├── ContainerDeletedException
+        ├── GICException
+        ├── PowerFlowException
+        │   ├── BifurcationException
+        │   ├── DivergenceException
+        │   └── GeneratorLimitException
         └── PowerWorldError
             ├── SimAutoFeatureError
             ├── PowerWorldPrerequisiteError

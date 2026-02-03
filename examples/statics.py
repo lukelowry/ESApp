@@ -136,9 +136,10 @@ class Statics:
         bus_to_idx: dict,
         jac_ids: list,
         sbase: float,
+        n_jac: int = 0,
     ) -> np.ndarray:
         """Map a bus-indexed interface vector into Jacobian row ordering."""
-        dF = np.zeros(len(jac_ids))
+        dF = np.zeros(n_jac if n_jac > 0 else len(jac_ids))
         for row, raw_label in enumerate(jac_ids):
             parts = raw_label.strip().strip("'\"").split()
             if len(parts) < 2:
@@ -194,13 +195,13 @@ class Statics:
         self.pw.esa.StoreState('CPF_PREV')
         yield lam_current
 
-        J0, jac_ids = self.pw.jacobian_with_ids(dense=True, form='P')
+        J0, jac_ids = self.pw.jacobian(dense=True, form='P', ids=True)
         n_jac = J0.shape[0]
 
         bus_nums = self.pw[Bus, 'BusNum']['BusNum'].to_numpy()
         bus_to_idx = {int(b): i for i, b in enumerate(bus_nums)}
 
-        dF_dlam = self._build_cpf_dFdlam(interface, bus_to_idx, jac_ids, sbase)
+        dF_dlam = self._build_cpf_dFdlam(interface, bus_to_idx, jac_ids, sbase, n_jac)
 
         step = step_size
         cont_param = n_jac
@@ -209,7 +210,7 @@ class Statics:
         crossed_nose = False
 
         for it in range(maxiter):
-            J = self.pw.jacobian(dense=True, form='P')
+            J, _ = self.pw.jacobian(dense=True, form='P', ids=True)
 
             J_aug = np.zeros((n_jac + 1, n_jac + 1))
             J_aug[:n_jac, :n_jac] = J

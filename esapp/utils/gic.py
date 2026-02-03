@@ -6,33 +6,8 @@ This module provides tools for analyzing geomagnetically induced currents
 in power systems, including matrix generation, sensitivity analysis, and
 integration with PowerWorld's GIC calculation engine.
 
-Classes
--------
-GIC
-    Main application class providing GIC analysis methods, model generation,
-    and PowerWorld integration.
-
-Key Features
-------------
-- Direct G-matrix retrieval from PowerWorld via SAW
-- Linear GIC model generation from network topology
-- Interface sensitivity analysis (dBound/dI)
-- E-field to GIC Jacobian computation
-- Time-varying GIC series support
-
-Example
--------
-Basic GIC model generation::
-
-    >>> from esapp import PowerWorld
-    >>> pw = PowerWorld("case.pwb")
-    >>> pw.gic.model()
-    >>> H = pw.gic.H  # Linear GIC function matrix
-    >>> G = pw.gic.G  # Conductance Laplacian
-
-Using PowerWorld's G-matrix directly::
-
-    >>> G_pw = pw.gic.gmatrix()
+The primary entry point is the :class:`GIC` class, accessed via ``pw.gic``
+from a :class:`~esapp.PowerWorld` instance.
 
 See Also
 --------
@@ -51,30 +26,7 @@ from .._descriptors import GICOption
 from ..components import GIC_Options_Value, GICInputVoltObject
 from ..components import Branch, Substation, Bus, Gen, GICXFormer
 
-__all__ = ['GIC', 'jac_decomp']
-
-
-def jac_decomp(jac):
-    """
-    Decompose a power flow Jacobian into sub-matrices.
-
-    Parameters
-    ----------
-    jac : np.ndarray
-        Full Jacobian matrix of shape (2n, 2n).
-
-    Yields
-    ------
-    np.ndarray
-        Sub-matrices in order: dP/dTheta, dP/dV, dQ/dTheta, dQ/dV.
-    """
-    dim = jac.shape[0]
-    nbus = int(dim / 2)
-
-    yield jac[:nbus, :nbus]   # dP/dTheta
-    yield jac[:nbus, nbus:]   # dP/dV
-    yield jac[nbus:, :nbus]   # dQ/dTheta
-    yield jac[nbus:, nbus:]   # dQ/dV
+__all__ = ['GIC']
 
 
 class GIC:

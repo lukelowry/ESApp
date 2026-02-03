@@ -116,6 +116,135 @@ def plot_hist(values, bins=20, title='', xlabel='', ylabel='Count',
 
 
 # ---------------------------------------------------------------------------
+# PTDF / LODF / sensitivity
+# ---------------------------------------------------------------------------
+
+def plot_ptdf(ptdf_df, n=20, figsize=(_W2, _H2)):
+    """PTDF bar chart (top-N by magnitude) + histogram (2-panel)."""
+    vals = ptdf_df['LinePTDF']
+    fig, axes = plt.subplots(1, 2, figsize=figsize)
+
+    top = vals.abs().sort_values(ascending=False).head(n)
+    colors = [_C4 if vals.loc[i] < 0 else _C1 for i in top.index]
+    labels = [f"{int(ptdf_df.loc[i, 'BusNum'])}-{int(ptdf_df.loc[i, 'BusNum:1'])}"
+              for i in top.index]
+    axes[0].barh(range(len(top)), vals.loc[top.index].values, color=colors)
+    axes[0].set_yticks(range(len(top)))
+    axes[0].set_yticklabels(labels, fontsize=7)
+    axes[0].invert_yaxis()
+    axes[0].axvline(x=0, color=_CG, linewidth=0.5)
+    format_plot(axes[0], title=f'Top {n} PTDFs',
+                xlabel='PTDF', plotarea='white', **_FS2)
+
+    axes[1].hist(vals.values, bins=30, color=_C1, edgecolor='white')
+    axes[1].axvline(x=0, color=_CG, linewidth=0.5)
+    format_plot(axes[1], title='PTDF Distribution',
+                xlabel='PTDF', ylabel='Count',
+                plotarea='white', **_FS2)
+
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_lodf(lodf_df, n=20, figsize=(_W2, _H2)):
+    """LODF bar chart (top-N by magnitude) + histogram (2-panel)."""
+    vals = lodf_df['LineLODF']
+    fig, axes = plt.subplots(1, 2, figsize=figsize)
+
+    top = vals.abs().sort_values(ascending=False).head(n)
+    colors = [_C4 if vals.loc[i] < 0 else _C1 for i in top.index]
+    labels = [f"{int(lodf_df.loc[i, 'BusNum'])}-{int(lodf_df.loc[i, 'BusNum:1'])}"
+              for i in top.index]
+    axes[0].barh(range(len(top)), vals.loc[top.index].values, color=colors)
+    axes[0].set_yticks(range(len(top)))
+    axes[0].set_yticklabels(labels, fontsize=7)
+    axes[0].invert_yaxis()
+    axes[0].axvline(x=0, color=_CG, linewidth=0.5)
+    format_plot(axes[0], title=f'Top {n} LODFs',
+                xlabel='LODF', plotarea='white', **_FS2)
+
+    axes[1].hist(vals.dropna().values, bins=30, color=_C1, edgecolor='white')
+    axes[1].axvline(x=0, color=_CG, linewidth=0.5)
+    format_plot(axes[1], title='LODF Distribution',
+                xlabel='LODF', ylabel='Count',
+                plotarea='white', **_FS2)
+
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_solver_comparison(results, figsize=(_W2, _H2)):
+    """Compare solver results: mismatch vs iteration (2-panel)."""
+    fig, axes = plt.subplots(1, 2, figsize=figsize)
+    pal = [_C1, _C2, _C3, _C4, _C5]
+
+    for i, (label, data) in enumerate(results.items()):
+        c = pal[i % len(pal)]
+        if 'mismatches' in data and data['mismatches']:
+            axes[0].semilogy(data['mismatches'], 'o-', color=c,
+                             markersize=3, label=label)
+        axes[1].bar(i, data.get('iterations', 0), color=c, label=label)
+
+    format_plot(axes[0], title='Convergence History',
+                xlabel='Iteration', ylabel='Max Mismatch',
+                plotarea='white', **_FS2)
+    axes[0].legend(fontsize=7)
+
+    axes[1].set_xticks(range(len(results)))
+    axes[1].set_xticklabels(list(results.keys()), fontsize=7, rotation=30)
+    format_plot(axes[1], title='Iterations to Converge',
+                ylabel='Iterations', plotarea='white', **_FS2)
+
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_snapshot_comparison(base, modified, field='BusPUVolt',
+                              figsize=(_W2, _H2)):
+    """Before/after voltage scatter + difference histogram (2-panel)."""
+    fig, axes = plt.subplots(1, 2, figsize=figsize)
+
+    axes[0].scatter(range(len(base)), base, s=12, c=_C1,
+                    edgecolors='white', linewidth=0.3, label='Base', alpha=0.7)
+    axes[0].scatter(range(len(modified)), modified, s=12, c=_C2,
+                    edgecolors='white', linewidth=0.3, label='Modified', alpha=0.7)
+    axes[0].axhline(y=0.95, color=_LIMIT, linestyle='--', alpha=0.5)
+    axes[0].axhline(y=1.05, color=_LIMIT, linestyle='--', alpha=0.5)
+    format_plot(axes[0], title='Voltage Comparison',
+                xlabel='Bus Index', ylabel='Voltage (pu)',
+                plotarea='white', **_FS2)
+    axes[0].legend(fontsize=7)
+
+    diff = modified - base
+    axes[1].hist(diff, bins=25, color=_C1, edgecolor='white')
+    axes[1].axvline(x=0, color=_CG, linewidth=0.5)
+    format_plot(axes[1], title=f'Voltage Change (max={np.abs(diff).max():.4f})',
+                xlabel='\u0394V (pu)', ylabel='Count',
+                plotarea='white', **_FS2)
+
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_state_chain(states, labels=None, figsize=(_W1, _H1)):
+    """Line plot of state-chain voltage trajectories."""
+    fig, ax = plt.subplots(figsize=figsize)
+    pal = [_C1, _C2, _C3, _C4, _C5]
+    for i, v in enumerate(states):
+        lbl = labels[i] if labels else f'State {i}'
+        ax.plot(range(len(v)), v, 'o-', color=pal[i % len(pal)],
+                markersize=3, label=lbl)
+    ax.axhline(y=0.95, color=_LIMIT, linestyle='--', alpha=0.5)
+    ax.axhline(y=1.05, color=_LIMIT, linestyle='--', alpha=0.5)
+    format_plot(ax, title='State Chain Voltages',
+                xlabel='Bus Index', ylabel='Voltage (pu)',
+                plotarea='white', **_FS2)
+    ax.legend(fontsize=7)
+    plt.tight_layout()
+    plt.show()
+
+
+# ---------------------------------------------------------------------------
 # Power system specific
 # ---------------------------------------------------------------------------
 

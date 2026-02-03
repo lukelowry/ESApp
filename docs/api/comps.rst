@@ -10,27 +10,6 @@ GObject Base Class
 .. automodule:: esapp.components.gobject
    :members:
 
-FieldPriority Flags
--------------------
-
-The ``FieldPriority`` flag enum is used to categorize field attributes. Flags can be combined
-using the ``|`` operator:
-
-- **PRIMARY**: Field is part of the primary key for the object
-- **SECONDARY**: Field is a secondary identifier (e.g., names)
-- **REQUIRED**: Field must be specified when creating objects
-- **OPTIONAL**: Field is not required
-- **EDITABLE**: Field can be modified by users
-
-Example:
-
-.. code-block:: python
-
-    from esapp.components.gobject import FieldPriority
-
-    # A field that is both required and editable
-    priority = FieldPriority.REQUIRED | FieldPriority.EDITABLE
-
 Transient Stability Fields
 --------------------------
 
