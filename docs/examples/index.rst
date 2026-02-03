@@ -10,5 +10,4 @@ workbench utilities.
    getting_started/01_reading_data
    getting_started/02_writing_data
    getting_started/03_components_and_fields
-   getting_started/04_power_flow
    getting_started/05_workbench_overview
