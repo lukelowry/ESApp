@@ -152,6 +152,7 @@ latex_elements = {
 \usepackage[scaled=0.9]{inconsolata}
 """,
     "preamble": r"""
+\setcounter{tocdepth}{3}
 \usepackage{mathrsfs}
 \usepackage{breakurl}
 \usepackage{booktabs}
