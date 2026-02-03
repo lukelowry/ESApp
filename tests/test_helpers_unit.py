@@ -982,15 +982,21 @@ class TestWorkbenchLogic:
         result = net._dc_lines()
         assert result is None
 
-    def test_gic_get_option_none_settings(self):
-        """GIC.get_gic_option returns None when settings() returns None."""
+    def test_gic_option_descriptor_missing_key(self):
+        """GICOption descriptor returns None for missing option key."""
         from esapp.utils.gic import GIC
+        import pandas as pd
 
         mock_pw = MagicMock()
+        # Return a DataFrame with no matching VariableName
+        mock_pw.__getitem__ = MagicMock(return_value=pd.DataFrame({
+            'VariableName': ['OtherOption'],
+            'ValueField': ['SomeValue']
+        }))
         gic = GIC(mock_pw)
-        with patch.object(GIC, 'settings', return_value=None):
-            result = gic.get_gic_option("IncludeInPowerFlow")
-            assert result is None
+        # pf_include looks for 'IncludeInPowerFlow' which isn't in the mock data
+        result = gic.pf_include
+        assert result is None
 
     def test_load_ts_csv_results_unlink_oserror(self, tmp_path):
         """load_ts_csv_results handles OSError on temp file unlink."""

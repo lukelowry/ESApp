@@ -216,22 +216,27 @@ class TestWorkbenchStatics:
         assert len(ids) > 0
 
     def test_solver_options(self, wb):
-        """Solver option descriptors."""
+        """Solver option descriptors: bool and non-bool round-trip."""
+        # Bool descriptors: set True, read back, set False, read back
         wb.do_one_iteration = True
+        assert wb.do_one_iteration is True
         wb.do_one_iteration = False
-
-        wb.max_iterations = 250
+        assert wb.do_one_iteration is False
 
         wb.disable_angle_rotation = True
+        assert wb.disable_angle_rotation is True
         wb.disable_angle_rotation = False
 
         wb.disable_opt_mult = True
+        assert wb.disable_opt_mult is True
         wb.disable_opt_mult = False
 
         wb.inner_ss_check = True
+        assert wb.inner_ss_check is True
         wb.inner_ss_check = False
 
         wb.disable_gen_mvr_check = True
+        assert wb.disable_gen_mvr_check is True
         wb.disable_gen_mvr_check = False
 
         wb.inner_check_gen_vars = True
@@ -239,6 +244,91 @@ class TestWorkbenchStatics:
 
         wb.inner_backoff_gen_vars = True
         wb.inner_backoff_gen_vars = False
+
+        # Non-bool descriptor: int round-trip
+        wb.max_iterations = 250
+        assert wb.max_iterations == 250
+        wb.max_iterations = 100
+        assert wb.max_iterations == 100
+
+        # Class-level access returns the descriptor itself
+        desc = type(wb).do_one_iteration
+        assert hasattr(desc, 'key')
+        assert desc.key == 'DoOneIteration'
+
+
+class TestWorkbenchConvenience:
+    """Convenience features: flows, overloads, snapshot, sensitivity, properties, summary."""
+
+    def test_flows_and_overloads(self, wb):
+        """Branch flows retrieval and overload detection."""
+        wb.pflow(getvolts=False)
+
+        f = wb.flows()
+        assert isinstance(f, pd.DataFrame)
+        assert not f.empty
+        assert 'LineMW' in f.columns
+        assert 'LineMVR' in f.columns
+        assert 'LineMVA' in f.columns
+        assert 'LinePercent' in f.columns
+
+        ov = wb.overloads(threshold=100.0)
+        assert isinstance(ov, pd.DataFrame)
+
+        ov_zero = wb.overloads(threshold=0.0)
+        assert len(ov_zero) >= len(ov)
+
+    def test_snapshot(self, wb):
+        """Snapshot context manager saves and restores state."""
+        wb.pflow(getvolts=False)
+        v_before = wb.voltage()
+
+        with wb.snapshot():
+            wb.flatstart()
+            v_flat = wb.voltage()
+            assert not np.allclose(np.abs(v_before.values), np.abs(v_flat.values), atol=1e-6)
+
+        v_after = wb.voltage()
+        np.testing.assert_allclose(np.abs(v_before.values), np.abs(v_after.values), atol=1e-10)
+
+    def test_ptdf(self, wb):
+        """PTDF calculation for a bus-to-bus transfer."""
+        wb.pflow(getvolts=False)
+        buses = wb[Bus]
+        bus1, bus2 = int(buses['BusNum'].iloc[0]), int(buses['BusNum'].iloc[1])
+
+        df = wb.ptdf(seller=bus1, buyer=bus2)
+        assert isinstance(df, pd.DataFrame)
+        assert 'LinePTDF' in df.columns
+
+    def test_lodf(self, wb):
+        """LODF calculation for a branch outage."""
+        wb.pflow(getvolts=False)
+        branches = wb[Branch]
+        row = branches.iloc[0]
+        key = (int(row['BusNum']), int(row['BusNum:1']), str(row['LineCircuit']))
+
+        df = wb.lodf(branch=key)
+        assert isinstance(df, pd.DataFrame)
+        assert 'LineLODF' in df.columns
+
+    def test_properties_and_summary(self, wb):
+        """Quick properties and case summary."""
+        assert wb.n_bus > 0
+        assert wb.n_branch > 0
+        assert wb.n_gen > 0
+        assert wb.sbase > 0
+
+        s = wb.summary()
+        assert isinstance(s, dict)
+        assert s['n_bus'] == wb.n_bus
+        assert s['n_branch'] == wb.n_branch
+        assert s['n_gen'] > 0
+        assert s['n_load'] > 0
+        assert s['total_gen_mw'] > 0
+        assert s['total_load_mw'] > 0
+        assert 0 < s['v_min'] <= s['v_max'] < 2.0
+        assert s['sbase'] > 0
 
 
 # -------------------------------------------------------------------------

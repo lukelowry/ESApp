@@ -331,7 +331,6 @@ def test_open_relative_path():
 
         assert instance.fname == '/abs/path/case.pwb'
         mock_saw_class.assert_called_once_with('/abs/path/case.pwb', CreateIfNotFound=True, early_bind=True)
-        mock_esa.TSInitialize.assert_called_once()
 
 
 def test_open_absolute_path():

@@ -5,27 +5,12 @@ Provides lightweight, Pythonic attribute access to PowerWorld option flags
 without repetitive boilerplate setter/getter methods.
 """
 
-from .components import Sim_Solution_Options
+from .components import Sim_Solution_Options, GIC_Options_Value
 from .saw._enums import YesNo
 
 
 class SolverOption:
-    """Descriptor for Sim_Solution_Options fields.
-
-    Supports bool (YES/NO), int, and float option types via the
-    ``is_bool`` parameter (default True).
-
-    Usage as a class-level attribute on PowerWorld::
-
-        class PowerWorld(Indexable):
-            do_one_iteration = SolverOption('DoOneIteration')
-            max_iterations   = SolverOption('MaxItr', is_bool=False)
-
-        pw.do_one_iteration = True   # sets YES/NO
-        pw.max_iterations = 100      # sets raw value
-        pw.do_one_iteration          # reads back as bool
-        pw.max_iterations            # reads back as-is
-    """
+    """Descriptor mapping a Python attribute to a Sim_Solution_Options field."""
 
     def __init__(self, key: str, is_bool: bool = True):
         self.key = key
@@ -37,7 +22,7 @@ class SolverOption:
     def __get__(self, obj, objtype=None):
         if obj is None:
             return self
-        val = obj[Sim_Solution_Options, self.key]
+        val = obj[Sim_Solution_Options, self.key][self.key].iloc[0]
         if self.is_bool:
             return val == YesNo.YES
         return val
@@ -50,17 +35,7 @@ class SolverOption:
 
 
 class GICOption:
-    """Descriptor for GIC_Options_Value settings.
-
-    Usage as a class-level attribute on GIC::
-
-        class GIC:
-            pf_include = GICOption('IncludeInPowerFlow')
-            calc_mode  = GICOption('CalcMode', is_bool=False)
-
-        gic.pf_include = True        # sets via _set_gic_option
-        gic.calc_mode = 'SnapShot'   # non-bool option
-    """
+    """Descriptor mapping a Python attribute to a GIC_Options_Value entry."""
 
     def __init__(self, key: str, is_bool: bool = True):
         self.key = key
@@ -72,10 +47,22 @@ class GICOption:
     def __get__(self, obj, objtype=None):
         if obj is None:
             return self
-        val = obj.get_gic_option(self.key)
-        if self.is_bool and val is not None:
+        df = obj._pw[GIC_Options_Value, "ValueField"]
+        row = df[df['VariableName'] == self.key]
+        if row.empty:
+            return None
+        val = row['ValueField'].iloc[0]
+        if self.is_bool:
             return val == YesNo.YES
         return val
 
     def __set__(self, obj, value):
-        obj._set_gic_option(self.key, value)
+        if self.is_bool:
+            value = YesNo.from_bool(value)
+        obj._pw.esa.EnterMode("EDIT")
+        obj._pw.esa.SetData(
+            'GIC_Options_Value',
+            ['VariableName', 'ValueField'],
+            [self.key, value]
+        )
+        obj._pw.esa.EnterMode("RUN")

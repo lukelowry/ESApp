@@ -125,33 +125,53 @@ class TestGIC:
 
     @pytest.mark.order(7710)
     def test_gic_options(self, wb):
-        """Descriptor-based options: pf_include, ts_include, calc_mode, configure."""
+        """Descriptor-based options: bool and non-bool round-trip, configure."""
         gic = wb.gic
 
+        # Bool descriptor round-trip
         gic.pf_include = True
-        assert gic.get_gic_option('IncludeInPowerFlow') == 'YES'
+        assert gic.pf_include is True
         gic.pf_include = False
-        assert gic.get_gic_option('IncludeInPowerFlow') == 'NO'
+        assert gic.pf_include is False
         gic.pf_include = True
 
         gic.ts_include = True
-        assert gic.get_gic_option('IncludeTimeDomain') == 'YES'
+        assert gic.ts_include is True
         gic.ts_include = False
-        assert gic.get_gic_option('IncludeTimeDomain') == 'NO'
+        assert gic.ts_include is False
 
+        # Additional bool descriptors
+        gic.update_line_volts = True
+        assert gic.update_line_volts is True
+        gic.update_line_volts = False
+        assert gic.update_line_volts is False
+        gic.update_line_volts = True
+
+        gic.calc_max_direction = True
+        assert gic.calc_max_direction is True
+        gic.calc_max_direction = False
+
+        gic.hotspot_include = False
+        assert gic.hotspot_include is False
+
+        # Non-bool descriptor round-trip
         gic.calc_mode = 'SnapShot'
-        assert gic.get_gic_option('CalcMode') == 'SnapShot'
+        assert gic.calc_mode == 'SnapShot'
         gic.calc_mode = 'TimeVarying'
-        assert gic.get_gic_option('CalcMode') == 'TimeVarying'
+        assert gic.calc_mode == 'TimeVarying'
         gic.calc_mode = 'SnapShot'
 
+        # configure() sets multiple options at once
         gic.configure(pf_include=True, ts_include=True, calc_mode='TimeVarying')
-        assert gic.get_gic_option('IncludeInPowerFlow') == 'YES'
-        assert gic.get_gic_option('IncludeTimeDomain') == 'YES'
-        assert gic.get_gic_option('CalcMode') == 'TimeVarying'
+        assert gic.pf_include is True
+        assert gic.ts_include is True
+        assert gic.calc_mode == 'TimeVarying'
         gic.configure()
 
-        assert wb.gic.get_gic_option('NonExistentOption12345') is None
+        # Class-level access returns the descriptor itself
+        desc = type(gic).pf_include
+        assert hasattr(desc, 'key')
+        assert desc.key == 'IncludeInPowerFlow'
 
     @pytest.mark.order(7750)
     def test_gic_storm_and_clear(self, wb):

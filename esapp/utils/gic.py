@@ -47,8 +47,6 @@ from pandas import DataFrame, read_csv
 from scipy.sparse import csr_matrix, eye as speye, hstack, vstack, diags
 from scipy.sparse.linalg import inv as sinv
 
-from esapp.saw._enums import YesNo
-
 from .._descriptors import GICOption
 from ..components import GIC_Options_Value, GICInputVoltObject
 from ..components import Branch, Substation, Bus, Gen, GICXFormer
@@ -111,58 +109,42 @@ class GIC:
     settings : View or modify all GIC settings.
     """
 
-    pf_include = GICOption('IncludeInPowerFlow')
-    ts_include = GICOption('IncludeTimeDomain')
-    calc_mode  = GICOption('CalcMode', is_bool=False)
+    # --- GIC Options (descriptors) ---
+
+    #: Include GIC effects in power flow calculations.
+    pf_include          = GICOption('IncludeInPowerFlow')
+    #: Include GIC effects in transient stability simulations.
+    ts_include          = GICOption('IncludeTimeDomain')
+    #: Calculation mode: ``'SnapShot'``, ``'TimeVarying'``, ``'NonUniformTimeVarying'``, or ``'SpatiallyUniformTimeVarying'``.
+    calc_mode           = GICOption('CalcMode', is_bool=False)
+
+    #: Electric field storm direction in degrees (float).
+    efield_angle        = GICOption('EfieldAngle', is_bool=False)
+    #: Electric field magnitude in V/distance (float).
+    efield_mag          = GICOption('EfieldMag', is_bool=False)
+    #: Automatically calculate maximum E-field direction.
+    calc_max_direction  = GICOption('CalcMaxDirection')
+
+    #: Auto-update line DC voltages during GIC solution.
+    update_line_volts   = GICOption('UpdateLineVoltages')
+    #: Skip DC voltage calculation on equivalent lines.
+    skip_equiv_lines    = GICOption('CalcInducedDCVoltEquiv')
+    #: Skip DC voltage calculation on low per-unit-distance R lines.
+    skip_low_r_lines    = GICOption('CalcInducedDCVoltLowR')
+    #: Minimum nominal kV to include GIC effects (float).
+    min_kv              = GICOption('IgnoreInducedDCVoltBelowkV', is_bool=False)
+    #: Maximum line segment length in km for non-uniform fields (float).
+    segment_length_km   = GICOption('SegmentLengthKM', is_bool=False)
+    #: Substation auto-insert option for buses without substations (str).
+    bus_no_sub          = GICOption('BusNoSub', is_bool=False)
+
+    #: Include hotspot in the electric field calculation.
+    hotspot_include     = GICOption('HotSpotInclude')
 
     def __init__(self, pw=None):
         self._pw = pw
 
     # --- GIC Options Configuration ---
-
-    def _set_gic_option(self, option: str, value) -> None:
-        """
-        Internal helper to set a GIC option.
-
-        Parameters
-        ----------
-        option : str
-            The GIC option name (e.g., 'IncludeInPowerFlow', 'CalcMode').
-        value : str or bool
-            The value to set. Booleans are converted to 'YES'/'NO'.
-        """
-        if isinstance(value, bool):
-            value = YesNo.from_bool(value)
-
-        self._pw.esa.EnterMode("EDIT")
-        self._pw.esa.SetData(
-            'GIC_Options_Value',
-            ['VariableName', 'ValueField'],
-            [option, value]
-        )
-        self._pw.esa.EnterMode("RUN")
-
-    def get_gic_option(self, option: str) -> str:
-        """
-        Get the current value of a GIC option.
-
-        Parameters
-        ----------
-        option : str
-            The GIC option name (e.g., 'IncludeInPowerFlow', 'CalcMode').
-
-        Returns
-        -------
-        str
-            The current value of the option.
-        """
-        settings = self.settings()
-        if settings is None:
-            return None
-        row = settings[settings['VariableName'] == option]
-        if row.empty:
-            return None
-        return row['ValueField'].iloc[0]
 
     def configure(
         self,

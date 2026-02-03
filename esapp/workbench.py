@@ -1,4 +1,5 @@
 from typing import List, Optional, Tuple, Union
+from contextlib import contextmanager
 import logging
 
 import numpy as np
@@ -9,7 +10,8 @@ from .utils.gic import GIC
 from .utils.network import Network
 from .utils.dynamics import get_ts_results, process_ts_results
 from .indexable import Indexable
-from .components import Bus, Branch, Gen, Load, Shunt, Area, Zone
+from .components import Bus, Branch, Gen, Load, Shunt, Area, Zone, Sim_Solution_Options
+from .saw._helpers import create_object_string
 from ._descriptors import SolverOption
 
 import tempfile
@@ -41,33 +43,50 @@ class PowerWorld(Indexable):
 
     # --- Solver Options (descriptors) ---
 
-    # Inner power flow loop
+    #: Solve only one Newton iteration per call.
     do_one_iteration       = SolverOption('DoOneIteration')
+    #: Disable optimal multiplier acceleration.
     disable_opt_mult       = SolverOption('DisableOptMult')
+    #: Start from flat voltage profile (1.0 pu, 0 deg).
     flat_start             = SolverOption('FlatStart')
+    #: Maximum Newton-Raphson iterations (int).
     max_iterations         = SolverOption('MaxItr', is_bool=False)
+    #: Maximum voltage-constrained loop iterations (int).
     max_vcl_iterations     = SolverOption('MaxItr:1', is_bool=False)
+    #: Power flow convergence tolerance (float).
     convergence_tol        = SolverOption('ConvergenceTol', is_bool=False)
+    #: Minimum voltage for constant-current loads (float, pu).
     min_volt_i_load        = SolverOption('MinVoltILoad', is_bool=False)
+    #: Minimum voltage for constant-impedance loads (float, pu).
     min_volt_s_load        = SolverOption('MinVoltSLoad', is_bool=False)
 
-    # Voltage control loop
+    #: Check switched shunt/contingency controls in inner loop.
     inner_ss_check         = SolverOption('SSContPFInnerLoop')
+    #: Disable generator MVR limit checking.
     disable_gen_mvr_check  = SolverOption('DisableGenMVRCheck')
+    #: Check generator VAR limits in inner loop.
     inner_check_gen_vars   = SolverOption('ChkVars')
+    #: Back off generator VAR limits in inner loop.
     inner_backoff_gen_vars = SolverOption('ChkVars:1')
+    #: Check transformer tap adjustments.
     check_taps             = SolverOption('ChkTaps')
+    #: Check switched shunt adjustments.
     check_shunts           = SolverOption('ChkShunts')
+    #: Check phase shifter adjustments.
     check_phase_shifters   = SolverOption('ChkPhaseShifters')
+    #: Prevent control oscillations.
     prevent_oscillations   = SolverOption('PreventOscillations')
 
-    # General
+    #: Disable automatic angle rotation to slack bus.
     disable_angle_rotation = SolverOption('DisableAngleRotation')
+    #: Allow multiple island solutions.
     allow_mult_islands     = SolverOption('AllowMultIslands')
+    #: Evaluate solution quality per island.
     eval_solution_island   = SolverOption('EvalSolutionIsland')
+    #: Enforce generator MW output limits.
     enforce_gen_mw_limits  = SolverOption('EnforceGenMWLimits')
 
-    # DC approximation
+    #: Enable DC power flow approximation mode.
     dc_mode                = SolverOption('DCPFMode')
 
     # --- Bus Voltage & Analysis ---
@@ -491,4 +510,137 @@ class PowerWorld(Indexable):
         """
         return self[Zone, :]
 
+    # --- Convenience Features ---
 
+    @contextmanager
+    def snapshot(self):
+        """Context manager that saves and restores case state.
+
+        Usage::
+
+            with pw.snapshot():
+                pw[Gen, "GenMW"] = modified_gen
+                pw.pflow()
+                v = pw.voltage()
+            # state restored here
+        """
+        self.esa.SaveState()
+        try:
+            yield
+        finally:
+            self.esa.LoadState()
+
+    def flows(self) -> DataFrame:
+        """Retrieve branch power flows and loading.
+
+        Returns
+        -------
+        DataFrame
+            Columns: ``LineMW``, ``LineMVR``, ``LineMVA``, ``LinePercent``,
+            plus branch key fields.
+        """
+        return self[Branch, ["LineMW", "LineMVR", "LineMVA", "LinePercent"]]
+
+    def overloads(self, threshold: float = 100.0) -> DataFrame:
+        """Return branches exceeding a loading threshold.
+
+        Parameters
+        ----------
+        threshold : float, default 100.0
+            Percent loading threshold.
+
+        Returns
+        -------
+        DataFrame
+            Subset of ``flows()`` where ``LinePercent > threshold``.
+        """
+        df = self.flows()
+        return df[df["LinePercent"] > threshold]
+
+    def ptdf(self, seller: int, buyer: int, method: str = "DC") -> DataFrame:
+        """Calculate Power Transfer Distribution Factors.
+
+        Parameters
+        ----------
+        seller : int
+            Seller bus number.
+        buyer : int
+            Buyer bus number.
+        method : str, default "DC"
+            Linear method: "DC", "DCPS", or "AC".
+
+        Returns
+        -------
+        DataFrame
+            Branch PTDF values (``LinePTDF`` column) plus key fields.
+        """
+        seller_str = create_object_string("Bus", seller)
+        buyer_str = create_object_string("Bus", buyer)
+        self.esa.CalculatePTDF(seller_str, buyer_str, method)
+        return self[Branch, ["LinePTDF"]]
+
+    def lodf(self, branch: tuple, method: str = "DC") -> DataFrame:
+        """Calculate Line Outage Distribution Factors.
+
+        Parameters
+        ----------
+        branch : tuple
+            Branch key as ``(from_bus, to_bus, circuit)``.
+        method : str, default "DC"
+            Linear method: "DC" or "DCPS".
+
+        Returns
+        -------
+        DataFrame
+            Branch LODF values (``LineLODF`` column) plus key fields.
+        """
+        branch_str = create_object_string("Branch", *branch)
+        self.esa.CalculateLODF(branch_str, method)
+        return self[Branch, ["LineLODF"]]
+
+    # --- Quick Properties ---
+
+    @property
+    def n_bus(self) -> int:
+        """Number of buses in the case."""
+        return len(self[Bus])
+
+    @property
+    def n_branch(self) -> int:
+        """Number of branches in the case."""
+        return len(self[Branch])
+
+    @property
+    def n_gen(self) -> int:
+        """Number of generators in the case."""
+        return len(self[Gen])
+
+    @property
+    def sbase(self) -> float:
+        """System MVA base."""
+        return float(self[Sim_Solution_Options, "SBase"]["SBase"].iloc[0])
+
+    def summary(self) -> dict:
+        """Quick overview of the current case state.
+
+        Returns
+        -------
+        dict
+            Keys: ``n_bus``, ``n_branch``, ``n_gen``, ``n_load``,
+            ``total_gen_mw``, ``total_load_mw``, ``v_min``, ``v_max``,
+            ``sbase``.
+        """
+        g = self.gens()
+        l = self.loads()
+        v_mag = self.voltage(complex=False, pu=True)[0]
+        return {
+            'n_bus': self.n_bus,
+            'n_branch': self.n_branch,
+            'n_gen': len(g),
+            'n_load': len(l),
+            'total_gen_mw': g['GenMW'].sum(),
+            'total_load_mw': l['LoadMW'].sum(),
+            'v_min': v_mag.min(),
+            'v_max': v_mag.max(),
+            'sbase': self.sbase,
+        }

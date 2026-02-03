@@ -48,9 +48,6 @@ class Indexable:
 
         # ESA Object & Transient Sim
         self.esa = SAW(self.fname, CreateIfNotFound=True, early_bind=True)
-
-        # Attempt and Initialize TS so we get initial values
-        self.esa.TSInitialize()
     
     def __getitem__(self, index) -> Optional[DataFrame]:
         """Retrieve data from PowerWorld using indexer notation.
