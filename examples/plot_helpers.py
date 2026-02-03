@@ -15,6 +15,9 @@ without scaling, so font sizes render at their true point size.
 
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.collections import LineCollection
+from matplotlib.colors import Normalize
+from matplotlib.cm import ScalarMappable
 
 # Import plotting utilities from examples.map
 try:
@@ -171,6 +174,200 @@ def plot_lodf(lodf_df, n=20, figsize=(_W2, _H2)):
 
     plt.tight_layout()
     plt.show()
+
+
+def plot_sensitivity_map(lines, values, shape=None, title='Sensitivity Map',
+                         clabel='Factor', cmap='RdBu_r', symmetric=True,
+                         figsize=(_W2, 2.8), ax=None, fig=None):
+    """Geographic network map with lines colored by sensitivity values.
+
+    Parameters
+    ----------
+    lines : DataFrame
+        Branch data with 'Longitude', 'Longitude:1', 'Latitude', 'Latitude:1'.
+    values : array-like
+        One value per branch (PTDF, LODF, etc.). Length must match ``lines``.
+    shape : str, optional
+        Shape name for geographic border overlay (e.g. 'Texas', 'US').
+    title : str
+        Plot title.
+    clabel : str
+        Colorbar label.
+    cmap : str
+        Matplotlib colormap name.
+    symmetric : bool
+        If True, center the colormap at zero.
+    """
+    show = ax is None
+    if ax is None:
+        fig, ax = plt.subplots(figsize=figsize)
+
+    vals = np.asarray(values, dtype=float)
+    valid = np.isfinite(vals)
+    vmax = np.abs(vals[valid]).max() if valid.any() else 1.0
+    norm = Normalize(vmin=-vmax if symmetric else vals[valid].min(),
+                     vmax=vmax)
+
+    cX = lines[['Longitude', 'Longitude:1']].to_numpy()
+    cY = lines[['Latitude', 'Latitude:1']].to_numpy()
+    segments = np.stack([
+        np.column_stack([cX[:, 0], cY[:, 0]]),
+        np.column_stack([cX[:, 1], cY[:, 1]]),
+    ], axis=1)
+
+    cm = plt.get_cmap(cmap)
+    colors = cm(norm(vals))
+    widths = 0.5 + 3.0 * np.abs(vals) / vmax if vmax > 0 else np.ones(len(vals))
+    widths[~valid] = 0.3
+
+    # Sort by magnitude so largest values draw on top
+    order = np.argsort(np.abs(vals))
+    lc = LineCollection(segments[order], colors=colors[order],
+                        linewidths=widths[order], zorder=4)
+    ax.add_collection(lc)
+
+    # Bus endpoints in neutral gray
+    ax.scatter(cX.ravel(), cY.ravel(), c=_CG, s=8, zorder=3,
+               edgecolors='white', linewidth=0.2)
+
+    if shape is not None:
+        border(ax, shape)
+
+    ax.autoscale_view()
+    sm = ScalarMappable(cmap=cm, norm=norm)
+    sm.set_array([])
+    if fig is not None:
+        fig.colorbar(sm, ax=ax, label=clabel, shrink=0.8)
+
+    format_plot(ax, title=title,
+                xlabel=r'Lon ($^\circ$E)', ylabel=r'Lat ($^\circ$N)',
+                plotarea='white', grid=False, **_FS2)
+    ax.set_aspect('equal')
+    if show:
+        plt.tight_layout()
+        plt.show()
+    return ax
+
+
+def plot_sensitivity_dual(lines, vals_a, vals_b, shape=None,
+                          titles=('PTDF', 'LODF'),
+                          clabels=('PTDF', 'LODF'),
+                          cmaps=('RdBu_r', 'RdBu_r'),
+                          symmetric=(True, True),
+                          figsize=(_W2, 2.8)):
+    """Side-by-side geographic sensitivity maps (2-panel)."""
+    fig, axes = plt.subplots(1, 2, figsize=figsize)
+    plot_sensitivity_map(lines, vals_a, shape=shape, title=titles[0],
+                         clabel=clabels[0], cmap=cmaps[0],
+                         symmetric=symmetric[0], ax=axes[0], fig=fig)
+    plot_sensitivity_map(lines, vals_b, shape=shape, title=titles[1],
+                         clabel=clabels[1], cmap=cmaps[1],
+                         symmetric=symmetric[1], ax=axes[1], fig=fig)
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_sensitivity_triple(lines, vals_list, shape=None,
+                            titles=('A', 'B', 'C'),
+                            clabels=('', '', ''),
+                            cmaps=('RdBu_r', 'RdBu_r', 'RdBu_r'),
+                            symmetric=(True, True, True),
+                            figsize=(_WFULL, 2.5)):
+    """Three-panel geographic sensitivity maps."""
+    fig, axes = plt.subplots(1, 3, figsize=figsize)
+    for ax, vals, t, cl, cm, sym in zip(axes, vals_list, titles,
+                                         clabels, cmaps, symmetric):
+        plot_sensitivity_map(lines, vals, shape=shape, title=t,
+                             clabel=cl, cmap=cm, symmetric=sym,
+                             ax=ax, fig=fig)
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_flow_map(lines, loading, shape=None,
+                  title='Branch Loading', clabel='Loading (%)',
+                  threshold=100.0, highlight_idx=None,
+                  figsize=(_W2, 2.8), ax=None, fig=None):
+    """Geographic map with lines colored by loading percentage.
+
+    Parameters
+    ----------
+    lines : DataFrame
+        Branch data with geographic endpoints.
+    loading : array-like
+        Branch loading (%) values.
+    threshold : float
+        Overload threshold shown as a colorbar marker.
+    highlight_idx : int or array-like, optional
+        Index(es) into ``lines`` to draw with a thick dashed overlay.
+    """
+    show = ax is None
+    if ax is None:
+        fig, ax = plt.subplots(figsize=figsize)
+
+    vals = np.asarray(loading, dtype=float)
+    valid = np.isfinite(vals)
+    vmax = max(vals[valid].max(), threshold) if valid.any() else threshold
+    norm = Normalize(vmin=0, vmax=vmax)
+
+    cX = lines[['Longitude', 'Longitude:1']].to_numpy()
+    cY = lines[['Latitude', 'Latitude:1']].to_numpy()
+    segments = np.stack([
+        np.column_stack([cX[:, 0], cY[:, 0]]),
+        np.column_stack([cX[:, 1], cY[:, 1]]),
+    ], axis=1)
+
+    cm = plt.get_cmap('YlOrRd')
+    colors = cm(norm(vals))
+    widths = 0.8 + 2.5 * vals / vmax
+    widths[~valid] = 0.3
+
+    # Sort by loading so heavily loaded lines draw on top
+    order = np.argsort(vals)
+    lc = LineCollection(segments[order], colors=colors[order],
+                        linewidths=widths[order], zorder=4)
+    ax.add_collection(lc)
+
+    # Highlight specific branches
+    if highlight_idx is not None:
+        hi = np.atleast_1d(highlight_idx)
+        hi_segs = segments[hi]
+        lc_hi = LineCollection(hi_segs, colors='black', linewidths=3.5,
+                               linestyles='dashed', zorder=5,
+                               label='Outaged')
+        ax.add_collection(lc_hi)
+        ax.legend(fontsize=7, loc='lower right')
+
+    ax.scatter(cX.ravel(), cY.ravel(), c=_CG, s=6, zorder=3,
+               edgecolors='white', linewidth=0.2)
+
+    if shape is not None:
+        border(ax, shape)
+
+    ax.autoscale_view()
+    sm = ScalarMappable(cmap=cm, norm=norm)
+    sm.set_array([])
+    if fig is not None:
+        fig.colorbar(sm, ax=ax, label=clabel, shrink=0.8)
+
+    format_plot(ax, title=title,
+                xlabel=r'Lon ($^\circ$E)', ylabel=r'Lat ($^\circ$N)',
+                plotarea='white', grid=False, **_FS2)
+    ax.set_aspect('equal')
+    if show:
+        plt.tight_layout()
+        plt.show()
+    return ax
+
+
+def plot_bus_markers(ax, lon, lat, indices, marker='*', color=_C4,
+                     size=120, label=None):
+    """Add star markers at specific bus locations on an existing axes."""
+    ax.scatter(lon[indices], lat[indices], marker=marker, c=color,
+               s=size, zorder=10, edgecolors='black', linewidth=0.5,
+               label=label)
+    if label:
+        ax.legend(fontsize=7, loc='lower right')
 
 
 def plot_solver_comparison(results, figsize=(_W2, _H2)):
