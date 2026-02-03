@@ -347,25 +347,25 @@ def test_component_access(wb, component_class):
     """
     Verifies that PowerWorld can read key fields for every defined component.
     """
-    if component_class.TYPE in CRASH_PRONE_COMPONENTS:
-        pytest.skip(f"Skipping {component_class.TYPE}: Known to cause SimAuto crashes.")
+    if component_class.TYPE() in CRASH_PRONE_COMPONENTS:
+        pytest.skip(f"Skipping {component_class.TYPE()}: Known to cause SimAuto crashes.")
 
     try:
         df = wb[component_class]
     except SimAutoFeatureError as e:
-        pytest.skip(f"Object type {component_class.TYPE} cannot be retrieved via SimAuto: {e.message}")
+        pytest.skip(f"Object type {component_class.TYPE()} cannot be retrieved via SimAuto: {e.message}")
     except (PowerWorldError, COMError) as e:
         err_msg = str(e)
         if "Access violation" in err_msg or "memory resources" in err_msg:
-            pytest.skip(f"Object type {component_class.TYPE} causes PW crash: {e}")
+            pytest.skip(f"Object type {component_class.TYPE()} causes PW crash: {e}")
         with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as tmp:
             tmp_path = tmp.name
         try:
-            fields = component_class.keys if component_class.keys else ["ALL"]
-            wb.esa.SaveObjectFields(tmp_path, component_class.TYPE, fields)
-            pytest.fail(f"Object type {component_class.TYPE} is supported but failed to read: {e}")
+            fields = component_class.keys() if component_class.keys() else ["ALL"]
+            wb.esa.SaveObjectFields(tmp_path, component_class.TYPE(), fields)
+            pytest.fail(f"Object type {component_class.TYPE()} is supported but failed to read: {e}")
         except PowerWorldError:
-            pytest.skip(f"Object type {component_class.TYPE} not supported by this PW version.")
+            pytest.skip(f"Object type {component_class.TYPE()} not supported by this PW version.")
         finally:
             if os.path.exists(tmp_path):
                 try: os.remove(tmp_path)
@@ -376,7 +376,7 @@ def test_component_access(wb, component_class):
     if df is not None:
         assert isinstance(df, pd.DataFrame)
         if not df.empty:
-            for key in component_class.keys:
+            for key in component_class.keys():
                 assert key in df.columns
 
 

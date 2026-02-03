@@ -216,8 +216,8 @@ class GIC:
             Current settings if value is None.
         """
         return self._pw.esa.GetParametersMultipleElement(
-                GIC_Options_Value.TYPE,
-                GIC_Options_Value.fields
+                GIC_Options_Value.TYPE(),
+                GIC_Options_Value.fields()
         )[['VariableName', 'ValueField']]
 
     def timevary_csv(self, fpath: str) -> None:
@@ -234,7 +234,7 @@ class GIC:
                 Branch '1' '2' '2', 0.1, 0.11, 0.14
         """
         csv = read_csv(fpath, header=None)
-        obj = GICInputVoltObject.TYPE
+        obj = GICInputVoltObject.TYPE()
         fields = ['WhoAmI'] + [f'GICObjectInputDCVolt:{i+1}' for i in range(csv.columns.size - 1)]
 
         for row in csv.to_records(False):
