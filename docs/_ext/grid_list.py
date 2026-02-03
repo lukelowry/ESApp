@@ -178,13 +178,14 @@ class TSFieldList(Directive):
             fields = categories[cat_name]
             total_fields += len(fields)
 
-            # Create section for this category
-            section = nodes.section()
+            # Create a container for this category (rubric keeps it
+            # out of the TOC while still looking like a heading)
+            section = nodes.container()
             section["ids"].append(f"ts-{cat_name.lower()}-fields")
 
-            # Add heading
-            title = nodes.title(text=f"TS.{cat_name}")
-            section += title
+            # Add heading (rubric = visual heading, not in TOC)
+            heading = nodes.rubric(text=f"TS.{cat_name}")
+            section += heading
 
             # Build a 3-column table: Field, PowerWorld Name, Description
             table = nodes.table()
