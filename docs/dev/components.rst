@@ -38,7 +38,7 @@ define fields with ``(PowerWorld name, data type, priority flags)``:
         """Name"""
         # ... more fields ...
 
-        ObjectString = 'Bus'  # Sets Bus.TYPE — must be last member
+        ObjectString = 'Bus'  # Sets Bus.TYPE() — must be last member
 
 The base class collects these into queryable classmethods:
 
