@@ -1094,11 +1094,10 @@ class TestTransientValidation:
             saw_obj.TSSetPlayInSignals("Sig1", times, signals)
 
     def test_ts_initialize_exception_logged(self, saw_obj):
-        """TSInitialize logs warning on exception instead of raising."""
-        saw_obj._pwcom.RunScriptCommand.side_effect = Exception("TS init failed")
-        saw_obj.TSInitialize()
-        saw_obj._pwcom.RunScriptCommand.side_effect = None
-        saw_obj._pwcom.RunScriptCommand.return_value = ("",)
+        """TSInitialize logs warning on PowerWorldError instead of raising."""
+        from esapp.saw._exceptions import PowerWorldError
+        with patch.object(saw_obj, '_run_script', side_effect=PowerWorldError("TS init failed")):
+            saw_obj.TSInitialize()
 
     def test_ts_clear_results_non_access_violation_raises(self, saw_obj):
         """TSClearResultsFromRAM re-raises non-access-violation errors."""

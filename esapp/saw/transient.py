@@ -4,6 +4,7 @@ from typing import List, Tuple, Union, Optional
 import numpy as np
 import pandas as pd
 from ._enums import YesNo, TSGetResultsMode
+from ._exceptions import PowerWorldError
 from ._helpers import format_list, get_temp_filepath, load_ts_csv_results, pack_args
 
 class TransientMixin:
@@ -34,7 +35,7 @@ class TransientMixin:
         """
         try:
             self._run_script("TSInitialize")
-        except Exception:
+        except PowerWorldError:
             self.log.warning("Failed to Initialize TS Values")
 
     def TSResultStorageSetAll(self, object="ALL", value=True):

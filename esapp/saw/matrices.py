@@ -41,37 +41,43 @@ class MatrixMixin:
         """
         if file:
             _tempfile_path = file
+            _cleanup = False
         else:
             _tempfile_path = get_temp_filepath(".mat")
             self._run_script("SaveYbusInMatlabFormat", f'"{_tempfile_path}"', "NO")
-        with open(_tempfile_path, "r") as f:
-            f.readline()
-            mat_str = f.read()
-        mat_str = re.sub(r"\s", "", mat_str)
-        lines = re.split(";", mat_str)
-        ie = r"[0-9]+"
-        fe = r"-*[0-9]+\.[0-9]+"
-        dr = re.compile(r"(?:Ybus)=(?:sparse\()({ie})".format(ie=ie))
-        exp = re.compile(r"(?:Ybus\()({ie}),({ie})(?:\)=)({fe})(?:\+j\*)(?:\()({fe})".format(ie=ie, fe=fe))
-        dim = dr.match(lines[0])[1]
-        n = int(dim)
-        row, col, data = [], [], []
-        for line in lines[1:]:
-            match = exp.match(line)
-            if match is None:
-                continue
-            idx1, idx2, real, imag = match.groups()
-            admittance = float(real) + 1j * float(imag)
-            row.append(int(idx1))
-            col.append(int(idx2))
-            data.append(admittance)
+            _cleanup = True
+        try:
+            with open(_tempfile_path, "r") as f:
+                f.readline()
+                mat_str = f.read()
+            mat_str = re.sub(r"\s", "", mat_str)
+            lines = re.split(";", mat_str)
+            ie = r"[0-9]+"
+            fe = r"-*[0-9]+\.[0-9]+"
+            dr = re.compile(r"(?:Ybus)=(?:sparse\()({ie})".format(ie=ie))
+            exp = re.compile(r"(?:Ybus\()({ie}),({ie})(?:\)=)({fe})(?:\+j\*)(?:\()({fe})".format(ie=ie, fe=fe))
+            dim = dr.match(lines[0])[1]
+            n = int(dim)
+            row, col, data = [], [], []
+            for line in lines[1:]:
+                match = exp.match(line)
+                if match is None:
+                    continue
+                idx1, idx2, real, imag = match.groups()
+                admittance = float(real) + 1j * float(imag)
+                row.append(int(idx1))
+                col.append(int(idx2))
+                data.append(admittance)
 
-        sparse_matrix = csr_matrix(
-            (data, (np.asarray(row) - 1, np.asarray(col) - 1)),
-            shape=(n, n),
-            dtype=complex,
-        )
-        return sparse_matrix.toarray() if full else sparse_matrix
+            sparse_matrix = csr_matrix(
+                (data, (np.asarray(row) - 1, np.asarray(col) - 1)),
+                shape=(n, n),
+                dtype=complex,
+            )
+            return sparse_matrix.toarray() if full else sparse_matrix
+        finally:
+            if _cleanup:
+                os.unlink(_tempfile_path)
 
     def get_gmatrix(self, full: bool = False) -> Union[np.ndarray, csr_matrix]:
         """Get the GIC conductance matrix (G).
@@ -100,6 +106,7 @@ class MatrixMixin:
         """
         g_matrix_path, id_file_path = self._make_temp_matrix_files()
         try:
+            # Double call is intentional — PW sometimes requires it for GMatrix.
             self._run_script("GICSaveGMatrix", f'"{g_matrix_path}"', f'"{id_file_path}"')
             self._run_script("GICSaveGMatrix", f'"{g_matrix_path}"', f'"{id_file_path}"')
             with open(g_matrix_path, "r") as f:
@@ -131,6 +138,7 @@ class MatrixMixin:
         """
         g_matrix_path, id_file_path = self._make_temp_matrix_files()
         try:
+            # Double call is intentional — PW sometimes requires it for GMatrix.
             self._run_script("GICSaveGMatrix", f'"{g_matrix_path}"', f'"{id_file_path}"')
             self._run_script("GICSaveGMatrix", f'"{g_matrix_path}"', f'"{id_file_path}"')
 

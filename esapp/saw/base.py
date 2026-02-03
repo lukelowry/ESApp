@@ -435,10 +435,12 @@ class SAWBase(object):
         if use_double_quotes:
             aux = aux.replace("'", '"')
         fpath = get_temp_filepath(".aux")
-        with open(fpath, "w") as f:
-            f.write(aux)
-        self.ProcessAuxFile(fpath)
-        os.unlink(fpath)
+        try:
+            with open(fpath, "w") as f:
+                f.write(aux)
+            self.ProcessAuxFile(fpath)
+        finally:
+            os.unlink(fpath)
 
     def update_ui(self) -> None:
         """Triggers a refresh of the PowerWorld Simulator user interface.
