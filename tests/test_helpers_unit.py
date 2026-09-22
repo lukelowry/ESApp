@@ -631,10 +631,19 @@ class TestSAWValidation:
     def test_merge_line_terminals(self, saw_obj):
         """MergeLineTerminals calls _run_script."""
         saw_obj.MergeLineTerminals()
+        saw_obj._pwcom.RunScriptCommand.assert_called_once_with("MergeLineTerminals(SELECTED);")
 
     def test_merge_ms_line_sections(self, saw_obj):
         """MergeMSLineSections calls _run_script."""
         saw_obj.MergeMSLineSections()
+        saw_obj._pwcom.RunScriptCommand.assert_called_once_with("MergeMSLineSections(SELECTED);")
+
+    @pytest.mark.parametrize("abort,keyword", [(True, "YES"), (False, "NO")])
+    def test_move_command(self, saw_obj, abort, keyword):
+        saw_obj.Move("[LOAD 1 1]", "[2 1]", how_much=25.0, abort_on_error=abort)
+        saw_obj._pwcom.RunScriptCommand.assert_called_once_with(
+            f"Move([LOAD 1 1], [2 1], 25.0, {keyword});"
+        )
 
     def test_estimate_voltages(self, saw_obj):
         """EstimateVoltages calls _run_script."""

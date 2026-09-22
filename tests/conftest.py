@@ -7,19 +7,12 @@ Provides reusable test fixtures for both offline (mocked) and online
 import pytest
 import os
 import hashlib
-import tempfile
-import warnings
-from typing import TYPE_CHECKING
+import shutil
+from contextlib import contextmanager
 from unittest.mock import Mock, patch, MagicMock
 from pathlib import Path
 
-if TYPE_CHECKING:
-    from esapp.saw import SAW
-
-try:
-    from esapp.saw import SAW
-except ImportError:
-    SAW = None  # type: ignore
+from esapp.saw import SAW
 
 
 def _get_test_case_path():
@@ -29,7 +22,7 @@ def _get_test_case_path():
     Priority order:
     1. Environment variable SAW_TEST_CASE
     2. config_test.py file
-    3. None (skip online tests)
+    3. None (live fixture reports missing configuration)
     """
     env_path = os.environ.get("SAW_TEST_CASE")
     if env_path:
@@ -39,8 +32,9 @@ def _get_test_case_path():
         import config_test
         if hasattr(config_test, 'SAW_TEST_CASE'):
             return config_test.SAW_TEST_CASE
-    except ImportError:
-        pass
+    except ModuleNotFoundError as error:
+        if error.name != "config_test":
+            raise
 
     return None
 
@@ -52,29 +46,25 @@ def _get_gic_test_cases():
     Priority order:
     1. Environment variable SAW_GIC_TEST_CASES (os.pathsep-separated paths)
     2. config_test.py file
-    3. Empty list (GIC parametrized tests skip)
+    3. Empty list (fall back to the main case)
 
     Returns a list of (path, label) tuples for parametrization.
-    Only includes paths that exist on disk.
+    Missing files are reported by the live fixture, not silently omitted.
     """
-    def _existing(paths):
-        cases = []
-        for path in paths:
-            if os.path.exists(path):
-                label = os.path.splitext(os.path.basename(path))[0]
-                cases.append((path, label))
-        return cases
+    def _cases(paths):
+        return [(str(path), Path(path).stem) for path in paths]
 
     env_paths = os.environ.get("SAW_GIC_TEST_CASES")
     if env_paths:
-        return _existing(p.strip() for p in env_paths.split(os.pathsep) if p.strip())
+        return _cases(p.strip() for p in env_paths.split(os.pathsep) if p.strip())
 
     try:
         import config_test
         if hasattr(config_test, 'GIC_TEST_CASES'):
-            return _existing(config_test.GIC_TEST_CASES)
-    except ImportError:
-        pass
+            return _cases(config_test.GIC_TEST_CASES)
+    except ModuleNotFoundError as error:
+        if error.name != "config_test":
+            raise
     return []
 
 
@@ -83,35 +73,24 @@ def _get_gic_test_cases():
 # -------------------------------------------------------------------------
 
 @pytest.fixture(scope="session")
-def saw_session():
-    """
-    Session-scoped SAW instance connected to a live PowerWorld case.
-
-    Configuration:
-        Set case path in config_test.py or via SAW_TEST_CASE env variable.
-    """
-    if SAW is None:
-        pytest.skip("esapp library not found.")
-
+def case_path():
+    """Validate live configuration and guard the original file against writes."""
     case_path = _get_test_case_path()
     if not case_path:
-        pytest.skip("SAW test case not configured. Set path in tests/config_test.py or SAW_TEST_CASE env variable.")
+        pytest.fail("Live tests require SAW_TEST_CASE or tests/config_test.py; use -m 'not integration' for offline tests.", pytrace=False)
+    with _unchanged_case(case_path) as source:
+        yield source
 
-    if not os.path.exists(case_path):
-        pytest.skip(f"SAW test case file not found: {case_path}")
 
-    print(f"\n[Session Setup] Connecting to PowerWorld with case: {case_path}")
-    saw = None
+@pytest.fixture(scope="session")
+def saw_session(case_path, tmp_path_factory):
+    """One COM connection; even legacy tests open a disposable case copy."""
+    working_case = shutil.copy2(case_path, tmp_path_factory.mktemp("powerworld") / case_path.name)
+    saw = SAW(str(working_case), CreateIfNotFound=True, early_bind=True)
     try:
-        saw = SAW(case_path, CreateIfNotFound=True, early_bind=True)
         yield saw
     finally:
-        print("\n[Session Teardown] Closing case and exiting PowerWorld...")
-        if saw is not None:
-            try:
-                saw.exit()
-            except Exception as e:
-                print(f"Warning: Error during SAW cleanup: {e}")
+        saw.exit()
 
 
 # -------------------------------------------------------------------------
@@ -127,32 +106,68 @@ def _file_hash(path):
     return h.hexdigest()
 
 
-@pytest.fixture(scope="session")
-def _case_file_hash():
-    """Record the on-disk hash of the test case file at session start."""
-    case_path = _get_test_case_path()
-    if not case_path or not os.path.exists(case_path):
-        yield None
-        return
-    yield _file_hash(case_path)
+@contextmanager
+def _unchanged_case(path):
+    source = Path(path).resolve()
+    if not source.is_file():
+        pytest.fail(f"Configured PowerWorld case does not exist: {source}", pytrace=False)
+    original_hash = _file_hash(source)
+    try:
+        yield source
+    finally:
+        assert source.is_file(), f"Original case deleted: {source}"
+        assert _file_hash(source) == original_hash, f"Original case modified: {source}"
 
 
-@pytest.fixture(autouse=True, scope="class")
-def _check_case_file_integrity(_case_file_hash):
-    """Fail loudly if any test class accidentally saves over the case file."""
-    yield
-    if _case_file_hash is None:
-        return
-    case_path = _get_test_case_path()
-    if not case_path or not os.path.exists(case_path):
-        return
-    current_hash = _file_hash(case_path)
-    if current_hash != _case_file_hash:
-        pytest.fail(
-            f"CASE FILE MODIFIED ON DISK! The test case file has been "
-            f"altered by a test. This will corrupt results for subsequent "
-            f"tests. File: {case_path}"
+@contextmanager
+def _fresh_case(saw, source, directory):
+    """Reload topology and options, not just the quantities in SaveState."""
+    previous_case = saw.pwb_file_path
+    properties = {name: getattr(saw, name) for name in saw.SIMAUTO_PROPERTIES}
+    working_case = shutil.copy2(source, directory / Path(source).name)
+    saw.CloseCase()
+    try:
+        saw.set_simauto_property("CreateIfNotFound", True)
+        saw.set_simauto_property("UIVisible", False)
+        saw.set_simauto_property("CurrentDir", str(directory))
+        saw.OpenCase(str(working_case))
+        saw.RunScriptCommand("EnterMode(EDIT);")
+        yield saw
+    finally:
+        saw.CloseCase()
+        saw.OpenCase(previous_case)
+        for name, value in properties.items():
+            saw.set_simauto_property(name, value)
+
+
+@pytest.fixture
+def live_case(saw_session, case_path, tmp_path):
+    """Independent case for behavioral tests; no state is shared between tests."""
+    with _fresh_case(saw_session, case_path, tmp_path) as saw:
+        yield saw
+
+
+@pytest.fixture
+def radial_case(live_case):
+    """Two buses joined by one line, with fully specified creation fields."""
+    live_case.NewCase()
+    for number in (1, 2):
+        live_case.CreateData(
+            "Bus", ["BusNum", "BusName", "BusNomVolt", "AreaNum", "ZoneNum"],
+            [number, f"TestBus{number}", 115.0, 1, 1],
         )
+    live_case.CreateData(
+        "Branch",
+        ["BusNum", "BusNum:1", "LineCircuit", "LineR", "LineX",
+         "LineAMVA", "LineAMVA:1", "LineAMVA:2", "LineStatus"],
+        [1, 2, "1", 0.02, 0.2, 100.0, 100.0, 100.0, "Closed"],
+    )
+    buses = live_case.GetParametersMultipleElement("Bus", ["BusNum"])
+    assert buses is not None and set(buses["BusNum"].astype(int)) == {1, 2}
+    branches = live_case.GetParametersMultipleElement("Branch", ["BusNum", "BusNum:1"])
+    assert branches is not None and len(branches) == 1
+    assert tuple(branches.iloc[0].astype(int)) == (1, 2)
+    return live_case
 
 
 # -------------------------------------------------------------------------
@@ -163,51 +178,21 @@ def pytest_generate_tests(metafunc):
     """Parametrize tests that request the gic_saw fixture."""
     if "gic_saw" in metafunc.fixturenames:
         cases = _get_gic_test_cases()
-        if cases:
-            metafunc.parametrize(
-                "gic_saw",
-                [path for path, _ in cases],
-                ids=[label for _, label in cases],
-                indirect=True,
-            )
-        else:
-            # Fall back to main case
+        if not cases:
             main = _get_test_case_path()
-            if main and os.path.exists(main):
-                label = os.path.splitext(os.path.basename(main))[0]
-                metafunc.parametrize("gic_saw", [main], ids=[label], indirect=True)
+            cases = [(main, Path(main).stem if main else "unconfigured")]
+        metafunc.parametrize(
+            "gic_saw", [path for path, _ in cases],
+            ids=[label for _, label in cases], indirect=True,
+        )
 
 
 @pytest.fixture
-def gic_saw(request, saw_session):
-    """
-    Reuses the session SAW instance but swaps in a different case file.
-
-    After the test, the original session case is reopened so subsequent
-    tests are not affected. This avoids creating a second PowerWorld COM
-    connection, which would conflict with the single-instance application.
-    """
-    case_path = request.param
-    original_case = _get_test_case_path()
-    label = os.path.splitext(os.path.basename(case_path))[0]
-
-    # Always reload the case from disk to ensure a clean state,
-    # even when it's the same as the session case (prior tests may
-    # have modified the in-memory state).
-    print(f"\n[GIC] Loading case: {label}")
-    saw_session.CloseCase()
-    saw_session.OpenCase(case_path)
-    try:
-        yield saw_session
-    finally:
-        # Restore the original session case if we switched to a different one
-        if os.path.normcase(os.path.abspath(case_path)) != os.path.normcase(os.path.abspath(original_case)):
-            print(f"\n[GIC] Restoring original case")
-            try:
-                saw_session.CloseCase()
-                saw_session.OpenCase(original_case)
-            except Exception:
-                pass
+def gic_saw(request, saw_session, tmp_path):
+    """Exercise each configured GIC case on a fresh copy."""
+    with _unchanged_case(request.param) as source:
+        with _fresh_case(saw_session, source, tmp_path) as saw:
+            yield saw
 
 
 # -------------------------------------------------------------------------
@@ -267,38 +252,22 @@ def temp_dir(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-def temp_file():
-    """Factory for temporary files with automatic cleanup."""
-    import tempfile
-    files = []
+def temp_file(tmp_path):
+    """Legacy filename factory backed by pytest's per-test directory."""
+    from itertools import count
+    sequence = count()
 
     def _create(suffix):
-        tf = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
-        tf.close()
-        files.append(tf.name)
-        return tf.name
+        path = tmp_path / f"output_{next(sequence)}{suffix}"
+        path.touch()
+        return str(path)
 
-    yield _create
-
-    for f in files:
-        if os.path.exists(f):
-            try:
-                os.remove(f)
-            except Exception:
-                pass
+    return _create
 
 
 # -------------------------------------------------------------------------
 # Test configuration
 # -------------------------------------------------------------------------
-
-def pytest_configure(config):
-    """Add custom markers for test organization."""
-    config.addinivalue_line("markers", "slow: marks tests as slow")
-    config.addinivalue_line("markers", "integration: marks tests requiring PowerWorld")
-    config.addinivalue_line("markers", "unit: marks tests with mocked dependencies")
-    config.addinivalue_line("markers", "requires_case: marks tests requiring a valid case file")
-
 
 def pytest_collection_modifyitems(config, items):
     """Auto-mark tests based on file naming."""
@@ -445,53 +414,37 @@ def ensure_areas(saw, min_count=2):
     return saw.GetParametersMultipleElement("Area", ["AreaNum"])
 
 
-@pytest.fixture(scope="class")
-def save_restore_state(saw_session):
-    """Saves case state before destructive tests and restores it after."""
-    state_name = "__test_save_restore_state__"
-    saw_session.StoreState(state_name)
-    yield saw_session
-    try:
-        saw_session.RestoreState(state_name)
-        saw_session.DeleteState(state_name)
-    except Exception:
-        pass
-
-
 # -------------------------------------------------------------------------
 # PW Log Capture — on test failure the PowerWorld message log is
 # retrieved and printed so you can see exactly what PW did.
 # -------------------------------------------------------------------------
 
-_PW_LOG_PATH = os.path.join(tempfile.gettempdir(), "esapp_test_pw_log.txt")
-
-
 @pytest.hookimpl(hookwrapper=True)
 def pytest_runtest_makereport(item, call):
-    """Record whether the test call phase failed."""
+    """Record failures for the log fixture."""
     outcome = yield
     report = outcome.get_result()
-    if report.when == "call" and report.failed:
+    if report.failed:
         item._pw_test_failed = True
 
 
 @pytest.fixture(autouse=True)
 def _capture_pw_log(request):
     """Clear the PW log before each test; on failure, dump it to stdout."""
-    should_capture = (
-        "saw_session" in request.fixturenames
-        or request.node.get_closest_marker("integration") is not None
+    fixture_name = next(
+        (name for name in ("live_case", "gic_saw", "saw_session") if name in request.fixturenames),
+        None,
     )
-    if not should_capture:
+    if fixture_name is None:
         yield
         return
 
-    saw_session = request.getfixturevalue("saw_session")
+    saw_session = request.getfixturevalue(fixture_name)
 
     try:
         saw_session.LogClear()
-    except Exception:
-        pass
+    except Exception as error:
+        request.node.add_report_section("setup", "PowerWorld log", f"Could not clear log: {error}")
 
     yield
 
@@ -500,17 +453,8 @@ def _capture_pw_log(request):
         return
 
     try:
-        saw_session.LogSave(_PW_LOG_PATH)
-        if os.path.exists(_PW_LOG_PATH):
-            with open(_PW_LOG_PATH, "r", errors="replace") as f:
-                pw_log = f.read().strip()
-            if pw_log:
-                # Print to stdout — pytest captures this and shows it
-                # in the "Captured stdout teardown" section of the failure.
-                print(f"\n{'=' * 60}")
-                print(f"PW Log ({request.node.name})")
-                print(f"{'=' * 60}")
-                print(pw_log)
-                print(f"{'=' * 60}")
-    except Exception:
-        pass
+        log_path = request.getfixturevalue("tmp_path") / "powerworld.log"
+        saw_session.LogSave(str(log_path))
+        request.node.add_report_section("teardown", "PowerWorld log", log_path.read_text(errors="replace"))
+    except Exception as error:
+        request.node.add_report_section("teardown", "PowerWorld log", f"Could not retrieve log: {error}")

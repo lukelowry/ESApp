@@ -541,11 +541,14 @@ class ModifyMixin:
         Parameters
         ----------
         element_a : str
-            The source element string (e.g., '[GEN 1]', '[LOAD 2]').
+            The source object identifier, including its ID (e.g., '[GEN 1 1]').
         destination : str
-            The destination object string (e.g., '[BUS 10]', '[AREA "ZoneA"]').
+            Bracketed destination keys, without an object type: '[busnum id]'
+            for generators, loads and shunts, or '[frombus tobus circuit]'
+            for branches. For example, '[10 1]' moves to bus 10, ID 1.
         how_much : float, optional
-            The percentage (0-100) of the element's value to move. Defaults to 100.0.
+            The percentage (0-100) to move for generators and loads.
+            Ignored for branches and shunts. Defaults to 100.0.
         abort_on_error : bool, optional
             If True, aborts the operation if an error occurs. Defaults to True.
 

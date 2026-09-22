@@ -17,7 +17,6 @@ USAGE:
 """
 
 import os
-import tempfile
 import pytest
 import pandas as pd
 import numpy as np
@@ -28,11 +27,11 @@ try:
     from esapp.components import Bus, Gen, Load, Branch, Contingency, Area, Zone, Shunt, GICXFormer, GObject
     from esapp import components as grid
     from esapp.workbench import PowerWorld
-    from esapp.saw import PowerWorldError, COMError, SimAutoFeatureError, create_object_string
+    from esapp.saw import SimAutoFeatureError, create_object_string
 except ImportError:
     raise
 
-CRASH_PRONE_COMPONENTS = []
+SIMAUTO_UNREADABLE = {"PWRegionSubGroupAux", "SwitchedShuntStatus_SSTHDvSimple"}
 
 @pytest.fixture(scope="module")
 def wb(saw_session):
@@ -347,31 +346,18 @@ def test_component_access(wb, component_class):
     """
     Verifies that PowerWorld can read key fields for every defined component.
     """
-    if component_class.TYPE() in CRASH_PRONE_COMPONENTS:
-        pytest.skip(f"Skipping {component_class.TYPE()}: Known to cause SimAuto crashes.")
+    if (
+        component_class.TYPE() in SIMAUTO_UNREADABLE
+        and (wb.saw.version, wb.saw.build_date) == (24, "December 11, 2025")
+    ):
+        with pytest.raises(
+            SimAutoFeatureError,
+            match=f"{component_class.TYPE()} object data cannot be retrieved through SimAuto",
+        ):
+            wb[component_class]
+        return
 
-    try:
-        df = wb[component_class]
-    except SimAutoFeatureError as e:
-        pytest.skip(f"Object type {component_class.TYPE()} cannot be retrieved via SimAuto: {e.message}")
-    except (PowerWorldError, COMError) as e:
-        err_msg = str(e)
-        if "Access violation" in err_msg or "memory resources" in err_msg:
-            pytest.skip(f"Object type {component_class.TYPE()} causes PW crash: {e}")
-        with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as tmp:
-            tmp_path = tmp.name
-        try:
-            fields = component_class.keys() if component_class.keys() else ["ALL"]
-            wb.saw.SaveObjectFields(tmp_path, component_class.TYPE(), fields)
-            pytest.fail(f"Object type {component_class.TYPE()} is supported but failed to read: {e}")
-        except PowerWorldError:
-            pytest.skip(f"Object type {component_class.TYPE()} not supported by this PW version.")
-        finally:
-            if os.path.exists(tmp_path):
-                try: os.remove(tmp_path)
-                except: pass
-    except Exception as e:
-        pytest.fail(f"Unexpected error reading {component_class.__name__}: {e}")
+    df = wb[component_class]
 
     if df is not None:
         assert isinstance(df, pd.DataFrame)

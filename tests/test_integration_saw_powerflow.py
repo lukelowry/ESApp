@@ -464,15 +464,26 @@ class TestTopology:
         tmp = temp_file(".pwb")
         saw_instance.SaveConsolidatedCase(tmp)
 
-    @pytest.mark.order(75000)
-    def test_do_facility_analysis(self, saw_instance, temp_file):
-        """DoFacilityAnalysis with and without set_selected."""
-        tmp = temp_file(".aux")
-        try:
-            saw_instance.DoFacilityAnalysis(tmp, set_selected=False)
-            saw_instance.DoFacilityAnalysis(tmp, set_selected=True)
-        except PowerWorldPrerequisiteError:
-            pytest.skip("No Facility/External buses configured in test case")
+    @pytest.mark.parametrize("set_selected", [False, True])
+    def test_do_facility_analysis(self, radial_case, tmp_path, set_selected):
+        radial_case.ChangeParametersSingleElement(
+            "Bus", ["BusNum", "BusEquiv", "Selected"], [1, "Study", "YES"]
+        )
+        radial_case.ChangeParametersSingleElement(
+            "Bus", ["BusNum", "BusEquiv", "Selected"], [2, "External", "NO"]
+        )
+        buses = radial_case.GetParametersMultipleElement("Bus", ["BusNum", "BusEquiv", "Selected"])
+        assert list(buses["BusEquiv"].str.strip()) == ["Study", "External"]
+        assert list(buses["Selected"].str.strip()) == ["YES", "NO"]
+        radial_case.UnSelectAll("Branch")
+        output = tmp_path / "minimum_cut.aux"
+
+        radial_case.DoFacilityAnalysis(str(output), set_selected=set_selected)
+
+        assert output.is_file() and "Branch" in output.read_text()
+        branches = radial_case.GetParametersMultipleElement("Branch", ["Selected"])
+        assert len(branches) == 1
+        assert branches.iloc[0]["Selected"].strip() == ("YES" if set_selected else "NO")
 
     @pytest.mark.order(75200)
     def test_find_radial_bus_paths(self, saw_instance):

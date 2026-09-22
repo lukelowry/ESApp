@@ -320,16 +320,26 @@ class TestFault:
         _configure_limited_ctg_auto_insert(saw_instance)
         saw_instance.FaultAutoInsert()
 
-    @pytest.mark.order(5550)
-    def test_fault_multiple(self, saw_instance):
-        _configure_limited_ctg_auto_insert(saw_instance)
-        saw_instance.FaultAutoInsert()
-        try:
-            saw_instance.FaultMultiple()
-        except PowerWorldPrerequisiteError as e:
-            if "No active faults" in str(e):
-                pytest.skip("No active faults defined after FaultAutoInsert for this case")
-            raise
+    def test_fault_multiple(self, live_case):
+        buses = live_case.GetParametersMultipleElement("Bus", ["BusNum"])
+        assert buses is not None and len(buses) >= 2
+        live_case.Delete("Fault")
+        names = ["TestFault1", "TestFault2"]
+        for name, bus in zip(names, buses["BusNum"].head(2)):
+            live_case.ChangeParametersSingleElement(
+                "Fault", ["FaultName", "WhoAmI", "FaultType", "CTGSkip"],
+                [name, f"BUS {int(bus)}", "3PB", "NO"],
+            )
+        fields = ["FaultName", "BusNum", "CTGSkip", "CTGSolved"]
+        faults = live_case.GetParametersMultipleElement("Fault", fields)
+        assert faults is not None and set(faults["FaultName"].str.strip()) == set(names)
+        assert set(faults["BusNum"].astype(int)) == set(buses["BusNum"].head(2).astype(int))
+        assert faults["CTGSkip"].str.strip().eq("NO").all()
+
+        live_case.FaultMultiple()
+
+        solved = live_case.GetParametersMultipleElement("Fault", fields)
+        assert solved["CTGSolved"].str.strip().eq("YES").all()
 
     @pytest.mark.order(5650)
     def test_fault_types(self, saw_instance):
