@@ -79,11 +79,11 @@ class Statics:
             **{zf: 0.0 for zf in self._ZIP_FIELDS},
         })
 
-        self.pw.esa.EnterMode('EDIT')
+        self.pw.saw.EnterMode('EDIT')
         try:
             self.pw[Load] = dispatch
         finally:
-            self.pw.esa.EnterMode('RUN')
+            self.pw.saw.EnterMode('RUN')
 
         self.DispatchPQ = dispatch[['BusNum', 'LoadID'] + self._ZIP_FIELDS].copy()
         self._dispatch_initialized = True
@@ -187,12 +187,12 @@ class Statics:
         log = (lambda msg, **kw: print(msg, **kw)) if verbose else (lambda *a, **k: None)
 
         if restore_when_done:
-            self.pw.esa.StoreState('CPF_BACKUP')
+            self.pw.saw.StoreState('CPF_BACKUP')
 
         lam_current = initialmw
         self.setload(SP=-lam_current * interface)
         self.pw.pflow(getvolts=False)
-        self.pw.esa.StoreState('CPF_PREV')
+        self.pw.saw.StoreState('CPF_PREV')
         yield lam_current
 
         J0, jac_ids = self.pw.jacobian(dense=True, form='P', ids=True)
@@ -250,7 +250,7 @@ class Statics:
                 if step < 0:
                     log(f'\n  Step below minimum ({min_step})')
                     break
-                self.pw.esa.RestoreState('CPF_PREV')
+                self.pw.saw.RestoreState('CPF_PREV')
                 log(f' -> retry (step={step:.4f})')
                 continue
 
@@ -271,7 +271,7 @@ class Statics:
                 step = self._cpf_halve_step(step, min_step)
                 if step < 0:
                     break
-                self.pw.esa.RestoreState('CPF_PREV')
+                self.pw.saw.RestoreState('CPF_PREV')
                 continue
 
             if tangent_prev[-1] > 0 and tangent[-1] < 0:
@@ -296,7 +296,7 @@ class Statics:
             elif angle > 0.3:
                 step = max(step * 0.5, min_step)
 
-            self.pw.esa.StoreState('CPF_PREV')
+            self.pw.saw.StoreState('CPF_PREV')
             tangent_prev = tangent.copy()
             lam_current = lam_pred
 
@@ -309,7 +309,7 @@ class Statics:
 
         self.clearloads()
         if restore_when_done:
-            self.pw.esa.RestoreState('CPF_BACKUP')
+            self.pw.saw.RestoreState('CPF_BACKUP')
 
     # ------------------------------------------------------------------
     # State chain management
@@ -323,11 +323,11 @@ class Statics:
     def pushstate(self, verbose: bool = False) -> None:
         """Push current state onto the state chain."""
         self.stateidx += 1
-        self.pw.esa.StoreState(f'GWBState{self.stateidx}')
+        self.pw.saw.StoreState(f'GWBState{self.stateidx}')
         if verbose:
             print(f'Pushed States -> {self.stateidx}')
         if self.stateidx >= self.maxstates:
-            self.pw.esa.DeleteState(f'GWBState{self.stateidx - self.maxstates}')
+            self.pw.saw.DeleteState(f'GWBState{self.stateidx - self.maxstates}')
 
     def irestore(self, n: int = 1, verbose: bool = False) -> None:
         """Restore the nth previous state from the chain."""
@@ -337,7 +337,7 @@ class Statics:
             raise Exception("State index out of range")
         if verbose:
             print(f'Restore -> {self.stateidx - n}')
-        self.pw.esa.RestoreState(f'GWBState{self.stateidx - n}')
+        self.pw.saw.RestoreState(f'GWBState{self.stateidx - n}')
 
     # ------------------------------------------------------------------
     # ZIP load interface

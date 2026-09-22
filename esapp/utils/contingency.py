@@ -124,7 +124,7 @@ class ContingencyBuilder:
 
     def to_dataframes(self) -> Tuple[DataFrame, DataFrame]:
         """
-        Generates DataFrames matching the ESA GObject schemas.
+        Generates DataFrames matching the esapp component schemas.
 
         Returns:
             Tuple[DataFrame, DataFrame]: (Contingency Definition, Element Definitions)

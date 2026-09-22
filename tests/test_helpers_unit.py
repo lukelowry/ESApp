@@ -847,21 +847,56 @@ class TestWorkbenchLogic:
         """PowerWorld initializes without fname."""
         from esapp.workbench import PowerWorld
         pw = PowerWorld()
-        assert pw.esa is None
+        assert pw.saw is None
         assert pw.fname is None
 
-    def test_open_file_not_found(self):
+    @pytest.mark.parametrize("relative", [True, False], ids=["relative", "absolute"])
+    def test_open_case(self, tmp_path, monkeypatch, relative):
+        """PowerWorld opens either path form and exposes the SAW connection."""
+        from esapp.workbench import PowerWorld
+
+        case_path = tmp_path / "case.pwb"
+        case_path.touch()
+        monkeypatch.chdir(tmp_path)
+        pw = PowerWorld()
+        pw.fname = case_path.name if relative else str(case_path)
+
+        with patch('esapp.workbench.SAW') as mock_saw_class:
+            pw.open()
+
+        assert pw.fname == str(case_path)
+        assert pw.saw is mock_saw_class.return_value
+        mock_saw_class.assert_called_once_with(
+            str(case_path), CreateIfNotFound=True, early_bind=True
+        )
+
+    def test_init_with_fname(self, tmp_path):
+        """Providing a case path opens a connection during construction."""
+        from esapp.workbench import PowerWorld
+
+        case_path = tmp_path / "case.pwb"
+        case_path.touch()
+        with patch('esapp.workbench.SAW') as mock_saw_class:
+            pw = PowerWorld(str(case_path))
+
+        assert pw.saw is mock_saw_class.return_value
+        mock_saw_class.assert_called_once_with(
+            str(case_path), CreateIfNotFound=True, early_bind=True
+        )
+
+    def test_open_file_not_found(self, tmp_path):
         """PowerWorld.open raises FileNotFoundError for missing file."""
         from esapp.workbench import PowerWorld
-        from unittest.mock import patch
 
         pw = PowerWorld()
-        pw.fname = "C:/nonexistent/file.pwb"
+        pw.fname = str(tmp_path / "missing.pwb")
 
-        with patch('esapp.indexable.path.isabs', return_value=True), \
-             patch('esapp.indexable.path.exists', return_value=False):
+        with patch('esapp.workbench.SAW') as mock_saw_class:
             with pytest.raises(FileNotFoundError, match="Case file not found"):
                 pw.open()
+
+        mock_saw_class.assert_not_called()
+        assert pw.saw is None
 
     def test_log_output(self):
         """PowerWorld.print_log reads and prints log content."""
@@ -869,14 +904,14 @@ class TestWorkbenchLogic:
         from unittest.mock import MagicMock
 
         pw = PowerWorld()
-        pw.esa = MagicMock()
+        pw.saw = MagicMock()
         pw._log_last_position = 0
 
         def mock_log_save(path, append=False):
             with open(path, "w") as f:
                 f.write("Some log output")
 
-        pw.esa.LogSave.side_effect = mock_log_save
+        pw.saw.LogSave.side_effect = mock_log_save
 
         result = pw.print_log(new_only=False, clear=False)
         assert "Some log output" in result
@@ -887,14 +922,14 @@ class TestWorkbenchLogic:
         from unittest.mock import MagicMock
 
         pw = PowerWorld()
-        pw.esa = MagicMock()
+        pw.saw = MagicMock()
         pw._log_last_position = 5
 
         def mock_log_save(path, append=False):
             with open(path, "w") as f:
                 f.write("Hello World")
 
-        pw.esa.LogSave.side_effect = mock_log_save
+        pw.saw.LogSave.side_effect = mock_log_save
 
         result = pw.print_log(new_only=True, clear=False)
         assert result == " World"
@@ -905,14 +940,14 @@ class TestWorkbenchLogic:
         from unittest.mock import MagicMock
 
         pw = PowerWorld()
-        pw.esa = MagicMock()
+        pw.saw = MagicMock()
         pw._log_last_position = 0
 
         def mock_log_save(path, append=False):
             with open(path, "w") as f:
                 f.write("   ")
 
-        pw.esa.LogSave.side_effect = mock_log_save
+        pw.saw.LogSave.side_effect = mock_log_save
 
         result = pw.print_log(new_only=False, clear=False)
         assert result == "   "
@@ -923,34 +958,34 @@ class TestWorkbenchLogic:
         from unittest.mock import MagicMock
 
         pw = PowerWorld()
-        pw.esa = MagicMock()
+        pw.saw = MagicMock()
         pw._log_last_position = 0
 
         def mock_log_save(path, append=False):
             with open(path, "w") as f:
                 f.write("Log content")
 
-        pw.esa.LogSave.side_effect = mock_log_save
+        pw.saw.LogSave.side_effect = mock_log_save
 
         pw.print_log(new_only=False, clear=True)
-        pw.esa.LogClear.assert_called_once()
+        pw.saw.LogClear.assert_called_once()
         assert pw._log_last_position == 0
 
     def test_close(self):
-        """PowerWorld.close calls esa.CloseCase."""
+        """PowerWorld.close calls saw.CloseCase."""
         from esapp.workbench import PowerWorld
 
         pw = PowerWorld()
-        pw.esa = MagicMock()
+        pw.saw = MagicMock()
         pw.close()
-        pw.esa.CloseCase.assert_called_once()
+        pw.saw.CloseCase.assert_called_once()
 
     def test_ts_solve_empty_results(self):
         """PowerWorld.ts_solve returns empty DataFrames when no results."""
         from esapp.workbench import PowerWorld
 
         pw = PowerWorld()
-        pw.esa = MagicMock()
+        pw.saw = MagicMock()
 
         with patch("esapp.workbench.get_ts_results", return_value=(None, None)):
             meta, data = pw.ts_solve("ctg1", ["TSBusVPU"])
@@ -1030,30 +1065,30 @@ class TestWorkbenchLogic:
         from esapp.saw._enums import YesNo
 
         mock_pw = MagicMock()
-        mock_esa = MagicMock()
-        mock_pw.esa = mock_esa
+        mock_saw = MagicMock()
+        mock_pw.saw = mock_saw
         gic = GIC(mock_pw)
 
         gic.pf_include = True
-        mock_esa.EnterMode.assert_any_call("EDIT")
-        mock_esa.SetData.assert_called_with(
+        mock_saw.EnterMode.assert_any_call("EDIT")
+        mock_saw.SetData.assert_called_with(
             'GIC_Options_Value',
             ['VariableName', 'ValueField'],
             ['IncludeInPowerFlow', YesNo.YES]
         )
-        mock_esa.EnterMode.assert_called_with("RUN")
+        mock_saw.EnterMode.assert_called_with("RUN")
 
     def test_gic_option_descriptor_nonbool_set(self):
         """GICOption non-bool descriptor passes value directly."""
         from esapp.utils.gic import GIC
 
         mock_pw = MagicMock()
-        mock_esa = MagicMock()
-        mock_pw.esa = mock_esa
+        mock_saw = MagicMock()
+        mock_pw.saw = mock_saw
         gic = GIC(mock_pw)
 
         gic.calc_mode = 'TimeVarying'
-        mock_esa.SetData.assert_called_with(
+        mock_saw.SetData.assert_called_with(
             'GIC_Options_Value',
             ['VariableName', 'ValueField'],
             ['CalcMode', 'TimeVarying']
@@ -1099,8 +1134,8 @@ class TestIndexableFallback:
         from unittest.mock import Mock
 
         instance = Indexable()
-        mock_esa = Mock()
-        instance.esa = mock_esa
+        mock_saw = Mock()
+        instance.saw = mock_saw
 
         update_df = pd.DataFrame({
             "BusNum": [999, 1000],
@@ -1108,11 +1143,11 @@ class TestIndexableFallback:
             "GenMW": [100.0, 200.0],
         })
 
-        mock_esa.ChangeParametersMultipleElementRect.side_effect = PowerWorldPrerequisiteError(
+        mock_saw.ChangeParametersMultipleElementRect.side_effect = PowerWorldPrerequisiteError(
             "Object not found in case"
         )
         error = PowerWorldPrerequisiteError("Object not found during creation")
-        mock_esa.ChangeParametersMultipleElement.side_effect = error
+        mock_saw.ChangeParametersMultipleElement.side_effect = error
 
         with pytest.raises(PowerWorldPrerequisiteError) as exc_info:
             instance[grid.Gen] = update_df
@@ -1126,8 +1161,8 @@ class TestIndexableFallback:
         from unittest.mock import Mock
 
         instance = Indexable()
-        mock_esa = Mock()
-        instance.esa = mock_esa
+        mock_saw = Mock()
+        instance.saw = mock_saw
 
         update_df = pd.DataFrame({
             "BusNum": [999],
@@ -1135,10 +1170,10 @@ class TestIndexableFallback:
             "GenMW": [100.0],
         })
 
-        mock_esa.ChangeParametersMultipleElementRect.side_effect = PowerWorldPrerequisiteError(
+        mock_saw.ChangeParametersMultipleElementRect.side_effect = PowerWorldPrerequisiteError(
             "Object not found in case"
         )
-        mock_esa.ChangeParametersMultipleElement.side_effect = PowerWorldPrerequisiteError(
+        mock_saw.ChangeParametersMultipleElement.side_effect = PowerWorldPrerequisiteError(
             "License expired"
         )
 
@@ -1152,7 +1187,7 @@ class TestIndexableFallback:
         from unittest.mock import Mock
 
         instance = Indexable()
-        instance.esa = Mock()
+        instance.saw = Mock()
 
         with pytest.raises(ValueError, match="Only the full slice"):
             instance[grid.Bus, [slice(0, 5)]]

@@ -10,7 +10,7 @@ USAGE:
     pytest tests/test_indexing.py -v
 """
 import pytest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock
 from typing import Type
 import pandas as pd
 from pandas.testing import assert_frame_equal
@@ -47,12 +47,9 @@ def pytest_generate_tests(metafunc):
 @pytest.fixture
 def indexable_instance() -> Indexable:
     """Provides an Indexable instance with a mocked SAW dependency."""
-    with patch('esapp.indexable.SAW') as mock_saw_class:
-        mock_esa = Mock()
-        mock_saw_class.return_value = mock_esa
-        instance = Indexable()
-        instance.esa = mock_esa
-        yield instance
+    instance = Indexable()
+    instance.saw = Mock()
+    return instance
 
 
 # =============================================================================
@@ -61,26 +58,26 @@ def indexable_instance() -> Indexable:
 
 def test_getitem_key_fields(indexable_instance: Indexable, g_object: Type[grid.GObject]):
     """idx[GObject] retrieves only key fields."""
-    mock_esa = indexable_instance.esa
+    mock_saw = indexable_instance.saw
     unique_keys = sorted(list(set(g_object.keys())))
 
     if not unique_keys:
         result = indexable_instance[g_object]
         assert result is None
-        mock_esa.GetParamsRectTyped.assert_not_called()
+        mock_saw.GetParamsRectTyped.assert_not_called()
         return
 
     mock_df = pd.DataFrame({k: [1, 2] for k in unique_keys})
-    mock_esa.GetParamsRectTyped.return_value = mock_df
+    mock_saw.GetParamsRectTyped.return_value = mock_df
 
     result_df = indexable_instance[g_object]
-    mock_esa.GetParamsRectTyped.assert_called_once_with(g_object.TYPE(), unique_keys)
+    mock_saw.GetParamsRectTyped.assert_called_once_with(g_object.TYPE(), unique_keys)
     assert_frame_equal(result_df, mock_df)
 
 
 def test_getitem_all_fields(indexable_instance: Indexable, g_object: Type[grid.GObject]):
     """idx[GObject, :] retrieves all fields."""
-    mock_esa = indexable_instance.esa
+    mock_saw = indexable_instance.saw
     expected_fields = sorted(list(set(g_object.keys()) | set(g_object.fields())))
 
     if not expected_fields:
@@ -89,16 +86,16 @@ def test_getitem_all_fields(indexable_instance: Indexable, g_object: Type[grid.G
         return
 
     mock_df = pd.DataFrame({f: [1] for f in expected_fields})
-    mock_esa.GetParamsRectTyped.return_value = mock_df
+    mock_saw.GetParamsRectTyped.return_value = mock_df
 
     result_df = indexable_instance[g_object, :]
-    mock_esa.GetParamsRectTyped.assert_called_once_with(g_object.TYPE(), expected_fields)
+    mock_saw.GetParamsRectTyped.assert_called_once_with(g_object.TYPE(), expected_fields)
     assert_frame_equal(result_df, mock_df)
 
 
 def test_getitem_specific_fields(indexable_instance: Indexable, g_object: Type[grid.GObject]):
     """idx[GObject, ['Field1']] retrieves specific fields plus all keys."""
-    mock_esa = indexable_instance.esa
+    mock_saw = indexable_instance.saw
     specific_fields = [f for f in g_object.fields() if f not in g_object.keys()]
     if not specific_fields:
         pytest.skip(f"{g_object.__name__} has no non-key fields.")
@@ -106,16 +103,16 @@ def test_getitem_specific_fields(indexable_instance: Indexable, g_object: Type[g
     field = specific_fields[0]
     expected = sorted(list(set(g_object.keys()) | {field}))
     mock_df = pd.DataFrame({f: [1, 2] for f in expected})
-    mock_esa.GetParamsRectTyped.return_value = mock_df
+    mock_saw.GetParamsRectTyped.return_value = mock_df
 
     result_df = indexable_instance[g_object, [field]]
-    mock_esa.GetParamsRectTyped.assert_called_once_with(g_object.TYPE(), expected)
+    mock_saw.GetParamsRectTyped.assert_called_once_with(g_object.TYPE(), expected)
     assert_frame_equal(result_df, mock_df)
 
 
 def test_getitem_empty_dataframe(indexable_instance: Indexable):
     """Empty DataFrame returned from PowerWorld."""
-    indexable_instance.esa.GetParamsRectTyped.return_value = pd.DataFrame()
+    indexable_instance.saw.GetParamsRectTyped.return_value = pd.DataFrame()
     result = indexable_instance[grid.Bus]
     assert isinstance(result, pd.DataFrame)
     assert result.empty
@@ -123,7 +120,7 @@ def test_getitem_empty_dataframe(indexable_instance: Indexable):
 
 def test_getitem_none_return(indexable_instance: Indexable):
     """None returned from PowerWorld."""
-    indexable_instance.esa.GetParamsRectTyped.return_value = None
+    indexable_instance.saw.GetParamsRectTyped.return_value = None
     assert indexable_instance[grid.Bus] is None
 
 
@@ -133,7 +130,7 @@ def test_getitem_none_return(indexable_instance: Indexable):
 
 def test_setitem_broadcast(indexable_instance: Indexable, g_object: Type[grid.GObject]):
     """idx[GObject, 'Field'] = value broadcasts to all rows."""
-    mock_esa = indexable_instance.esa
+    mock_saw = indexable_instance.saw
     editable_fields = [f for f in g_object.editable() if f not in g_object.keys()]
     if not editable_fields:
         pytest.skip(f"{g_object.__name__} has no editable non-key fields.")
@@ -145,23 +142,23 @@ def test_setitem_broadcast(indexable_instance: Indexable, g_object: Type[grid.GO
         # Keyless objects build the change DataFrame directly.
         indexable_instance[g_object, field] = 1.234
         expected_df = pd.DataFrame({field: [1.234]})
-        mock_esa.ChangeParametersMultipleElementRect.assert_called_once()
-        sent_df = mock_esa.ChangeParametersMultipleElementRect.call_args[0][2]
+        mock_saw.ChangeParametersMultipleElementRect.assert_called_once()
+        sent_df = mock_saw.ChangeParametersMultipleElementRect.call_args[0][2]
         assert_frame_equal(sent_df, expected_df)
     else:
         # Keyed objects take the SetData fast path for numeric scalars:
         # no key read, no Rect write.
         indexable_instance[g_object, field] = 1.234
-        mock_esa.RunScriptCommand.assert_called_once_with(
+        mock_saw.RunScriptCommand.assert_called_once_with(
             f"SetData({g_object.TYPE()}, [{field}], [1.234], ALL);"
         )
-        mock_esa.GetParamsRectTyped.assert_not_called()
-        mock_esa.ChangeParametersMultipleElementRect.assert_not_called()
+        mock_saw.GetParamsRectTyped.assert_not_called()
+        mock_saw.ChangeParametersMultipleElementRect.assert_not_called()
 
 
 def test_setitem_bulk_update_from_df(indexable_instance: Indexable, g_object: Type[grid.GObject]):
     """idx[GObject] = df performs bulk update."""
-    mock_esa = indexable_instance.esa
+    mock_saw = indexable_instance.saw
     settable_cols = list(g_object.settable())
     if not settable_cols:
         pytest.skip(f"{g_object.__name__} has no settable fields.")
@@ -169,14 +166,14 @@ def test_setitem_bulk_update_from_df(indexable_instance: Indexable, g_object: Ty
     update_df = pd.DataFrame({f: [10, 20] for f in settable_cols})
     indexable_instance[g_object] = update_df
 
-    mock_esa.ChangeParametersMultipleElementRect.assert_called_once_with(
+    mock_saw.ChangeParametersMultipleElementRect.assert_called_once_with(
         g_object.TYPE(), update_df.columns.tolist(), update_df
     )
 
 
 def test_setitem_broadcast_multiple_fields(indexable_instance: Indexable, g_object_multi_editable: Type[grid.GObject]):
     """idx[GObject, ['F1','F2']] = [v1, v2] broadcasts multiple values."""
-    mock_esa = indexable_instance.esa
+    mock_saw = indexable_instance.saw
     g_object = g_object_multi_editable
     editable_fields = [f for f in g_object.editable() if f not in g_object.keys()]
     # Filtering already ensures at least 2 editable non-key fields
@@ -188,47 +185,47 @@ def test_setitem_broadcast_multiple_fields(indexable_instance: Indexable, g_obje
 
     if not unique_keys:
         indexable_instance[g_object, fields] = values
-        sent_df = mock_esa.ChangeParametersMultipleElementRect.call_args[0][2]
+        sent_df = mock_saw.ChangeParametersMultipleElementRect.call_args[0][2]
         assert len(sent_df) == 1
         assert sent_df.iloc[0][fields[0]] == values[0]
         return
 
     # One numeric value per field takes the SetData fast path.
     indexable_instance[g_object, fields] = values
-    mock_esa.RunScriptCommand.assert_called_once_with(
+    mock_saw.RunScriptCommand.assert_called_once_with(
         f"SetData({g_object.TYPE()}, [{fields[0]}, {fields[1]}], [1.1, 2.2], ALL);"
     )
-    mock_esa.ChangeParametersMultipleElementRect.assert_not_called()
+    mock_saw.ChangeParametersMultipleElementRect.assert_not_called()
 
 
 def test_setitem_broadcast_array_uses_rect_path(indexable_instance: Indexable):
     """Per-object array broadcasts read keys and use the Rect write path."""
-    mock_esa = indexable_instance.esa
+    mock_saw = indexable_instance.saw
     keys = sorted(set(grid.Bus.keys()))
     field = [f for f in grid.Bus.editable() if f not in grid.Bus.keys()][0]
     mock_key_df = pd.DataFrame({k: [1, 2, 3] for k in keys})
-    mock_esa.GetParamsRectTyped.return_value = mock_key_df
+    mock_saw.GetParamsRectTyped.return_value = mock_key_df
 
     indexable_instance[grid.Bus, field] = [1.0, 2.0, 3.0]
 
-    mock_esa.RunScriptCommand.assert_not_called()
-    mock_esa.ChangeParametersMultipleElementRect.assert_called_once()
-    sent_df = mock_esa.ChangeParametersMultipleElementRect.call_args[0][2]
+    mock_saw.RunScriptCommand.assert_not_called()
+    mock_saw.ChangeParametersMultipleElementRect.assert_called_once()
+    sent_df = mock_saw.ChangeParametersMultipleElementRect.call_args[0][2]
     assert list(sent_df[field]) == [1.0, 2.0, 3.0]
 
 
 def test_setitem_broadcast_string_uses_rect_path(indexable_instance: Indexable):
     """Non-numeric scalar broadcasts read keys and use the Rect write path."""
-    mock_esa = indexable_instance.esa
+    mock_saw = indexable_instance.saw
     keys = sorted(set(grid.Bus.keys()))
     field = [f for f in grid.Bus.editable() if f not in grid.Bus.keys()][0]
     mock_key_df = pd.DataFrame({k: [1, 2] for k in keys})
-    mock_esa.GetParamsRectTyped.return_value = mock_key_df
+    mock_saw.GetParamsRectTyped.return_value = mock_key_df
 
     indexable_instance[grid.Bus, field] = "Connected"
 
-    mock_esa.RunScriptCommand.assert_not_called()
-    mock_esa.ChangeParametersMultipleElementRect.assert_called_once()
+    mock_saw.RunScriptCommand.assert_not_called()
+    mock_saw.ChangeParametersMultipleElementRect.assert_called_once()
 
 
 # =============================================================================
@@ -251,7 +248,7 @@ def test_setitem_non_settable_field_warns(indexable_instance: Indexable):
         pytest.skip("Bus has no non-settable fields.")
     with pytest.warns(UserWarning, match="Read-only field"):
         indexable_instance[grid.Bus, non_settable[0]] = 1.0
-    indexable_instance.esa.RunScriptCommand.assert_called_once()
+    indexable_instance.saw.RunScriptCommand.assert_called_once()
 
 
 def test_setitem_bulk_non_settable_column_warns(indexable_instance: Indexable):
@@ -262,7 +259,7 @@ def test_setitem_bulk_non_settable_column_warns(indexable_instance: Indexable):
     update_df = pd.DataFrame({"BusNum": [1, 2], non_settable[0]: [100, 200]})
     with pytest.warns(UserWarning, match="Read-only field"):
         indexable_instance[grid.Bus] = update_df
-    indexable_instance.esa.ChangeParametersMultipleElementRect.assert_called_once()
+    indexable_instance.saw.ChangeParametersMultipleElementRect.assert_called_once()
 
 
 # =============================================================================
@@ -271,13 +268,13 @@ def test_setitem_bulk_non_settable_column_warns(indexable_instance: Indexable):
 
 def test_setitem_allows_secondary_identifier_fields(indexable_instance: Indexable):
     """Bulk update with SECONDARY identifier fields is allowed (e.g. LoadID)."""
-    mock_esa = indexable_instance.esa
+    mock_saw = indexable_instance.saw
     assert "LoadID" in grid.Load.settable()
     update_df = pd.DataFrame({
         "BusNum": [1, 2], "LoadID": ["1", "2"], "LoadSMW": [10.0, 20.0]
     })
     indexable_instance[grid.Load] = update_df
-    mock_esa.ChangeParametersMultipleElementRect.assert_called_once()
+    mock_saw.ChangeParametersMultipleElementRect.assert_called_once()
 
 
 def test_gobject_identifiers_property():
@@ -290,29 +287,29 @@ def test_gobject_identifiers_property():
 
 def test_keyless_object_single_field(indexable_instance: Indexable):
     """Setting a field on a keyless object creates a single-row DataFrame."""
-    mock_esa = indexable_instance.esa
+    mock_saw = indexable_instance.saw
     assert not grid.Sim_Solution_Options.keys()
     editable = list(grid.Sim_Solution_Options.editable())
     assert len(editable) > 0
 
     indexable_instance[grid.Sim_Solution_Options, editable[0]] = "YES"
 
-    sent_df = mock_esa.ChangeParametersMultipleElementRect.call_args[0][2]
+    sent_df = mock_saw.ChangeParametersMultipleElementRect.call_args[0][2]
     assert len(sent_df) == 1
     assert sent_df.iloc[0][editable[0]] == "YES"
-    mock_esa.GetParamsRectTyped.assert_not_called()
+    mock_saw.GetParamsRectTyped.assert_not_called()
 
 
 def test_keyless_object_multiple_fields(indexable_instance: Indexable):
     """Setting multiple fields on a keyless object."""
-    mock_esa = indexable_instance.esa
+    mock_saw = indexable_instance.saw
     editable = list(grid.Sim_Solution_Options.editable())
     assert len(editable) >= 2
 
     fields = editable[:2]
     indexable_instance[grid.Sim_Solution_Options, fields] = ["YES", "NO"]
 
-    sent_df = mock_esa.ChangeParametersMultipleElementRect.call_args[0][2]
+    sent_df = mock_saw.ChangeParametersMultipleElementRect.call_args[0][2]
     assert len(sent_df) == 1
     assert sent_df.iloc[0][fields[0]] == "YES"
     assert sent_df.iloc[0][fields[1]] == "NO"
@@ -328,7 +325,7 @@ def test_keyless_object_value_length_mismatch(indexable_instance: Indexable):
 
 def test_setitem_with_nan_values(indexable_instance: Indexable):
     """NaN values are passed through to PowerWorld unchanged."""
-    mock_esa = indexable_instance.esa
+    mock_saw = indexable_instance.saw
     editable_fields = [f for f in grid.Bus.editable() if f not in grid.Bus.keys()]
     if not editable_fields:
         pytest.skip("Bus has no editable non-key fields.")
@@ -340,7 +337,7 @@ def test_setitem_with_nan_values(indexable_instance: Indexable):
     })
     indexable_instance[grid.Bus] = update_df
 
-    sent_df = mock_esa.ChangeParametersMultipleElementRect.call_args[0][2]
+    sent_df = mock_saw.ChangeParametersMultipleElementRect.call_args[0][2]
     assert pd.isna(sent_df.iloc[1][editable_fields[0]])
 
 
@@ -348,46 +345,9 @@ def test_setitem_with_nan_values(indexable_instance: Indexable):
 # Additional coverage tests
 # =============================================================================
 
-def test_open_relative_path():
-    """open() converts relative path to absolute."""
-    from os import path as ospath
-    with patch('esapp.indexable.SAW') as mock_saw_class, \
-         patch('esapp.indexable.path.isabs', return_value=False), \
-         patch('esapp.indexable.path.abspath', return_value='/abs/path/case.pwb'), \
-         patch('esapp.indexable.path.exists', return_value=True):
-
-        mock_esa = Mock()
-        mock_saw_class.return_value = mock_esa
-
-        instance = Indexable()
-        instance.fname = 'relative/case.pwb'
-        instance.open()
-
-        assert instance.fname == '/abs/path/case.pwb'
-        mock_saw_class.assert_called_once_with('/abs/path/case.pwb', CreateIfNotFound=True, early_bind=True)
-
-
-def test_open_absolute_path():
-    """open() preserves absolute path."""
-    with patch('esapp.indexable.SAW') as mock_saw_class, \
-         patch('esapp.indexable.path.isabs', return_value=True), \
-         patch('esapp.indexable.path.exists', return_value=True):
-
-        mock_esa = Mock()
-        mock_saw_class.return_value = mock_esa
-
-        instance = Indexable()
-        instance.fname = '/absolute/path/case.pwb'
-        instance.open()
-
-        assert instance.fname == '/absolute/path/case.pwb'
-        mock_saw_class.assert_called_once_with('/absolute/path/case.pwb', CreateIfNotFound=True, early_bind=True)
-
-
-
 def test_getitem_with_gobject_enum_field(indexable_instance: Indexable):
     """idx[GObject, GObject.Field] retrieves field using enum member."""
-    mock_esa = indexable_instance.esa
+    mock_saw = indexable_instance.saw
 
     # Get a GObject field enum member
     bus_fields = list(grid.Bus)
@@ -404,10 +364,10 @@ def test_getitem_with_gobject_enum_field(indexable_instance: Indexable):
     expected_fields = sorted(list(set(grid.Bus.keys()) | {field_name}))
 
     mock_df = pd.DataFrame({f: [1, 2] for f in expected_fields})
-    mock_esa.GetParamsRectTyped.return_value = mock_df
+    mock_saw.GetParamsRectTyped.return_value = mock_df
 
     result_df = indexable_instance[grid.Bus, field_member]
-    mock_esa.GetParamsRectTyped.assert_called_once_with(grid.Bus.TYPE(), expected_fields)
+    mock_saw.GetParamsRectTyped.assert_called_once_with(grid.Bus.TYPE(), expected_fields)
     assert_frame_equal(result_df, mock_df)
 
 
@@ -431,7 +391,7 @@ def test_setitem_bulk_update_not_dataframe(indexable_instance: Indexable):
 
 def test_setitem_broadcast_empty_dataframe(indexable_instance: Indexable, g_object_keyed_editable: Type[grid.GObject]):
     """Setting field on objects when no objects exist (empty DataFrame) is a no-op."""
-    mock_esa = indexable_instance.esa
+    mock_saw = indexable_instance.saw
     g_object = g_object_keyed_editable
     editable_fields = [f for f in g_object.editable() if f not in g_object.keys()]
 
@@ -439,33 +399,33 @@ def test_setitem_broadcast_empty_dataframe(indexable_instance: Indexable, g_obje
     assert g_object.keys(), f"{g_object.__name__} should have keys"
     assert editable_fields, f"{g_object.__name__} should have editable non-key fields"
 
-    mock_esa.GetParamsRectTyped.return_value = pd.DataFrame()
+    mock_saw.GetParamsRectTyped.return_value = pd.DataFrame()
 
     indexable_instance[g_object, editable_fields[0]] = 1.0
 
     # Should not call ChangeParametersMultipleElementRect since no objects exist
-    mock_esa.ChangeParametersMultipleElementRect.assert_not_called()
+    mock_saw.ChangeParametersMultipleElementRect.assert_not_called()
 
 
 def test_setitem_broadcast_none_dataframe(indexable_instance: Indexable):
     """Setting field when GetParamsRectTyped returns None is a no-op."""
-    mock_esa = indexable_instance.esa
+    mock_saw = indexable_instance.saw
     editable_fields = [f for f in grid.Bus.editable() if f not in grid.Bus.keys()]
 
     if not editable_fields:
         pytest.skip("Bus has no editable non-key fields.")
 
-    mock_esa.GetParamsRectTyped.return_value = None
+    mock_saw.GetParamsRectTyped.return_value = None
 
     indexable_instance[grid.Bus, editable_fields[0]] = 1.0
 
-    mock_esa.ChangeParametersMultipleElementRect.assert_not_called()
+    mock_saw.ChangeParametersMultipleElementRect.assert_not_called()
 
 
 def test_bulk_update_not_found_missing_identifiers(indexable_instance: Indexable):
     """ValueError when bulk update fails with missing primary keys."""
     from esapp.saw import PowerWorldPrerequisiteError
-    mock_esa = indexable_instance.esa
+    mock_saw = indexable_instance.saw
 
     # Create a DataFrame missing the primary key (GenID)
     update_df = pd.DataFrame({
@@ -474,7 +434,7 @@ def test_bulk_update_not_found_missing_identifiers(indexable_instance: Indexable
     })
 
     # Mock ChangeParametersMultipleElementRect to raise "not found" error
-    mock_esa.ChangeParametersMultipleElementRect.side_effect = PowerWorldPrerequisiteError(
+    mock_saw.ChangeParametersMultipleElementRect.side_effect = PowerWorldPrerequisiteError(
         "Object not found in case"
     )
 
@@ -486,7 +446,7 @@ def test_bulk_update_not_found_all_keys_present_falls_back(indexable_instance: I
     """When primary keys are present and Rect fails with 'not found',
     falls back to ChangeParametersMultipleElement to create the objects."""
     from esapp.saw import PowerWorldPrerequisiteError
-    mock_esa = indexable_instance.esa
+    mock_saw = indexable_instance.saw
 
     # Create a DataFrame with all primary keys present
     update_df = pd.DataFrame({
@@ -496,15 +456,15 @@ def test_bulk_update_not_found_all_keys_present_falls_back(indexable_instance: I
     })
 
     # Mock ChangeParametersMultipleElementRect to raise "not found" error
-    mock_esa.ChangeParametersMultipleElementRect.side_effect = PowerWorldPrerequisiteError(
+    mock_saw.ChangeParametersMultipleElementRect.side_effect = PowerWorldPrerequisiteError(
         "Object not found in case"
     )
 
     # The fallback ChangeParametersMultipleElement should be called instead of raising
     indexable_instance[grid.Gen] = update_df
 
-    mock_esa.ChangeParametersMultipleElement.assert_called_once()
-    call_args = mock_esa.ChangeParametersMultipleElement.call_args
+    mock_saw.ChangeParametersMultipleElement.assert_called_once()
+    call_args = mock_saw.ChangeParametersMultipleElement.call_args
     assert call_args[0][0] == "Gen"  # ObjectType
     assert "BusNum" in call_args[0][1]  # field list includes keys
 
@@ -512,7 +472,7 @@ def test_bulk_update_not_found_all_keys_present_falls_back(indexable_instance: I
 def test_bulk_update_other_error(indexable_instance: Indexable):
     """Other PowerWorldPrerequisiteError is re-raised without modification."""
     from esapp.saw import PowerWorldPrerequisiteError
-    mock_esa = indexable_instance.esa
+    mock_saw = indexable_instance.saw
 
     update_df = pd.DataFrame({
         "BusNum": [1, 2],
@@ -520,7 +480,7 @@ def test_bulk_update_other_error(indexable_instance: Indexable):
     })
 
     # Mock with a different error message (not "not found")
-    mock_esa.ChangeParametersMultipleElementRect.side_effect = PowerWorldPrerequisiteError(
+    mock_saw.ChangeParametersMultipleElementRect.side_effect = PowerWorldPrerequisiteError(
         "Some other PowerWorld error"
     )
 
@@ -534,7 +494,7 @@ def test_bulk_update_other_error(indexable_instance: Indexable):
 
 def test_setitem_bulk_enum_columns_and_bool_status(indexable_instance: Indexable):
     """Enum-member columns are normalized and bools serialized on bulk writes."""
-    mock_esa = indexable_instance.esa
+    mock_saw = indexable_instance.saw
     df = pd.DataFrame({
         grid.Gen.BusNum: [1, 2],
         grid.Gen.GenID: ["1", "1"],
@@ -543,7 +503,7 @@ def test_setitem_bulk_enum_columns_and_bool_status(indexable_instance: Indexable
     })
     indexable_instance[grid.Gen] = df
 
-    obj_type, cols, sent_df = mock_esa.ChangeParametersMultipleElementRect.call_args[0]
+    obj_type, cols, sent_df = mock_saw.ChangeParametersMultipleElementRect.call_args[0]
     assert obj_type == "Gen"
     assert sorted(cols) == sorted(["BusNum", "GenID", "GenStatus", "GenMW"])
     assert list(sent_df["GenStatus"]) == ["Closed", "Open"]
@@ -553,25 +513,25 @@ def test_setitem_bulk_enum_columns_and_bool_status(indexable_instance: Indexable
 
 def test_setitem_bulk_nullable_boolean_dtype(indexable_instance: Indexable):
     """Pandas' nullable 'boolean' dtype is serialized like plain bool."""
-    mock_esa = indexable_instance.esa
+    mock_saw = indexable_instance.saw
     df = pd.DataFrame({
         "BusNum": [1, 2], "GenID": ["1", "1"],
         "GenStatus": pd.array([True, False], dtype="boolean"),
     })
     indexable_instance[grid.Gen] = df
-    sent_df = mock_esa.ChangeParametersMultipleElementRect.call_args[0][2]
+    sent_df = mock_saw.ChangeParametersMultipleElementRect.call_args[0][2]
     assert list(sent_df["GenStatus"]) == ["Closed", "Open"]
 
 
 def test_setitem_broadcast_enum_field_bool_value(indexable_instance: Indexable):
     """idx[Gen, Gen.GenStatus] = True broadcasts the serialized vocabulary."""
-    mock_esa = indexable_instance.esa
+    mock_saw = indexable_instance.saw
     keys = sorted(set(grid.Gen.keys()))
-    mock_esa.GetParamsRectTyped.return_value = pd.DataFrame({k: [1, 2] for k in keys})
+    mock_saw.GetParamsRectTyped.return_value = pd.DataFrame({k: [1, 2] for k in keys})
 
     indexable_instance[grid.Gen, grid.Gen.GenStatus] = True
 
-    sent_df = mock_esa.ChangeParametersMultipleElementRect.call_args[0][2]
+    sent_df = mock_saw.ChangeParametersMultipleElementRect.call_args[0][2]
     assert list(sent_df["GenStatus"]) == ["Closed", "Closed"]
 
 
@@ -593,15 +553,15 @@ def test_setitem_unknown_field_warns(indexable_instance: Indexable):
     df = pd.DataFrame({grid.Load.BusNum: [1], grid.Gen.GenMW: [5.0]})
     with pytest.warns(UserWarning, match="Unknown field"):
         indexable_instance[grid.Load] = df
-    assert indexable_instance.esa.ChangeParametersMultipleElementRect.call_count == 2
+    assert indexable_instance.saw.ChangeParametersMultipleElementRect.call_count == 2
 
 
 def test_bulk_update_alternate_key_set_accepted(indexable_instance: Indexable):
     """Branch identified by BusNum/BusNum:1/LineCircuit passes the create
     fallback even though the generated primary keys demand BusName_NomVolt:1."""
     from esapp.saw import PowerWorldPrerequisiteError
-    mock_esa = indexable_instance.esa
-    mock_esa.ChangeParametersMultipleElementRect.side_effect = \
+    mock_saw = indexable_instance.saw
+    mock_saw.ChangeParametersMultipleElementRect.side_effect = \
         PowerWorldPrerequisiteError("Object not found")
 
     branch_df = pd.DataFrame({
@@ -609,14 +569,14 @@ def test_bulk_update_alternate_key_set_accepted(indexable_instance: Indexable):
     })
     indexable_instance[grid.Branch] = branch_df
 
-    mock_esa.ChangeParametersMultipleElement.assert_called_once()
+    mock_saw.ChangeParametersMultipleElement.assert_called_once()
 
 
 def test_bulk_update_incomplete_key_set_rejected(indexable_instance: Indexable):
     """No complete key set -> ValueError naming the accepted sets."""
     from esapp.saw import PowerWorldPrerequisiteError
-    mock_esa = indexable_instance.esa
-    mock_esa.ChangeParametersMultipleElementRect.side_effect = \
+    mock_saw = indexable_instance.saw
+    mock_saw.ChangeParametersMultipleElementRect.side_effect = \
         PowerWorldPrerequisiteError("Object not found")
 
     with pytest.raises(ValueError, match="missing key field"):
@@ -632,8 +592,8 @@ def test_bulk_update_edit_mode_hint(indexable_instance: Indexable):
     cls = classes[0]
     field = cls.edit_mode_only()[0]
 
-    mock_esa = indexable_instance.esa
-    mock_esa.ChangeParametersMultipleElementRect.side_effect = \
+    mock_saw = indexable_instance.saw
+    mock_saw.ChangeParametersMultipleElementRect.side_effect = \
         PowerWorldPrerequisiteError("Change failed")
 
     df = pd.DataFrame({k: [1] for k in cls.keys()})
@@ -653,7 +613,7 @@ def test_gobject_key_sets():
 
 def test_getitem_single_string_field(indexable_instance: Indexable):
     """idx[GObject, 'FieldName'] works with a single string field."""
-    mock_esa = indexable_instance.esa
+    mock_saw = indexable_instance.saw
 
     non_key_fields = [f for f in grid.Bus.fields() if f not in grid.Bus.keys()]
     if not non_key_fields:
@@ -663,8 +623,8 @@ def test_getitem_single_string_field(indexable_instance: Indexable):
     expected_fields = sorted(list(set(grid.Bus.keys()) | {field}))
 
     mock_df = pd.DataFrame({f: [1, 2] for f in expected_fields})
-    mock_esa.GetParamsRectTyped.return_value = mock_df
+    mock_saw.GetParamsRectTyped.return_value = mock_df
 
     result_df = indexable_instance[grid.Bus, field]
-    mock_esa.GetParamsRectTyped.assert_called_once_with(grid.Bus.TYPE(), expected_fields)
+    mock_saw.GetParamsRectTyped.assert_called_once_with(grid.Bus.TYPE(), expected_fields)
     assert_frame_equal(result_df, mock_df)

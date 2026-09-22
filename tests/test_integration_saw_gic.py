@@ -44,7 +44,7 @@ def saw_instance(saw_session):
 def wb(saw_session):
     """PowerWorld with live SAW connection."""
     workbench = PowerWorld()
-    workbench.esa = saw_session
+    workbench.saw = saw_session
     return workbench
 
 
@@ -246,7 +246,7 @@ class TestGIC:
         from scipy.sparse import issparse
 
         pw = PowerWorld()
-        pw.esa = gic_saw
+        pw.saw = gic_saw
         gic = pw.gic
         gic.pf_include = True
 

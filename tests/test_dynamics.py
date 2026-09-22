@@ -250,7 +250,7 @@ class TestTSWatch:
         mock_wb.__getitem__ = MagicMock(return_value=pd.DataFrame({'ObjectID': ['Gen 1']}))
 
         tsw.prepare(mock_wb)
-        mock_wb.esa.TSResultStorageSetAll.assert_called()
+        mock_wb.saw.TSResultStorageSetAll.assert_called()
 
     def test_prepare_returns_field_list(self):
         """prepare() returns list of field specifications."""
@@ -288,29 +288,29 @@ class TestGetTSResults:
 
     def test_returns_tuple(self):
         """get_ts_results() returns tuple of DataFrames."""
-        mock_esa = MagicMock()
-        mock_esa.TSGetResults.return_value = (
+        mock_saw = MagicMock()
+        mock_saw.TSGetResults.return_value = (
             pd.DataFrame({'ColHeader': ['Bus 1 | TSBusVPU']}),
             pd.DataFrame({'time': [0.0, 0.1], 'Bus 1 | TSBusVPU': [1.0, 0.95]})
         )
-        meta, data = get_ts_results(mock_esa, "Ctg1", ["Field1"])
+        meta, data = get_ts_results(mock_saw, "Ctg1", ["Field1"])
         assert isinstance(meta, pd.DataFrame)
         assert isinstance(data, pd.DataFrame)
 
     def test_calls_tsgetresults(self):
-        """get_ts_results() calls esa.TSGetResults with correct args."""
-        mock_esa = MagicMock()
-        mock_esa.TSGetResults.return_value = (pd.DataFrame(), pd.DataFrame())
-        get_ts_results(mock_esa, "Ctg1", ["Field1", "Field2"])
-        mock_esa.TSGetResults.assert_called_once_with(
+        """get_ts_results() calls saw.TSGetResults with correct args."""
+        mock_saw = MagicMock()
+        mock_saw.TSGetResults.return_value = (pd.DataFrame(), pd.DataFrame())
+        get_ts_results(saw=mock_saw, ctg="Ctg1", fields=["Field1", "Field2"])
+        mock_saw.TSGetResults.assert_called_once_with(
             "SEPARATE", ["Ctg1"], ["Field1", "Field2"]
         )
 
     def test_handles_none(self):
         """get_ts_results() returns (None, None) when TSGetResults returns None."""
-        mock_esa = MagicMock()
-        mock_esa.TSGetResults.return_value = None
-        meta, data = get_ts_results(mock_esa, "Ctg1", ["Field1"])
+        mock_saw = MagicMock()
+        mock_saw.TSGetResults.return_value = None
+        meta, data = get_ts_results(mock_saw, "Ctg1", ["Field1"])
         assert meta is None
         assert data is None
 
@@ -398,15 +398,15 @@ class TestTSSolve:
 
     @pytest.fixture
     def mock_wb(self):
-        """Create a mock workbench with ESA for ts_solve testing."""
+        """Create a mock workbench with SAW for ts_solve testing."""
         from esapp.workbench import PowerWorld
 
         pw = object.__new__(PowerWorld)
-        pw.esa = MagicMock()
-        pw.esa.TSAutoCorrect.return_value = None
-        pw.esa.TSInitialize.return_value = None
-        pw.esa.TSSolve.return_value = None
-        pw.esa.TSGetResults.return_value = (
+        pw.saw = MagicMock()
+        pw.saw.TSAutoCorrect.return_value = None
+        pw.saw.TSInitialize.return_value = None
+        pw.saw.TSSolve.return_value = None
+        pw.saw.TSGetResults.return_value = (
             pd.DataFrame({'ColHeader': ['Col1'], 'ObjectType': ['Bus'],
                           'PrimaryKey': ['1'], 'SecondaryKey': [None], 'VariableName': ['VPU']}),
             pd.DataFrame({'time': [0.0, 0.1], 'Col1': [1.0, 0.95]})
@@ -416,29 +416,29 @@ class TestTSSolve:
     def test_accepts_single_contingency(self, mock_wb):
         """ts_solve() accepts a single contingency name as string."""
         meta, data = mock_wb.ts_solve("Fault1", ["Col1"])
-        mock_wb.esa.TSSolve.assert_called_once_with("Fault1")
+        mock_wb.saw.TSSolve.assert_called_once_with("Fault1")
 
     def test_accepts_list_of_contingencies(self, mock_wb):
         """ts_solve() accepts a list of contingency names."""
         mock_wb.ts_solve(["Fault1", "Fault2"], ["Col1"])
-        assert mock_wb.esa.TSSolve.call_count == 2
+        assert mock_wb.saw.TSSolve.call_count == 2
 
     def test_calls_ts_initialize(self, mock_wb):
         """ts_solve() calls TSAutoCorrect and TSInitialize."""
         mock_wb.ts_solve("Fault1", ["Col1"])
-        mock_wb.esa.TSAutoCorrect.assert_called_once()
-        mock_wb.esa.TSInitialize.assert_called_once()
+        mock_wb.saw.TSAutoCorrect.assert_called_once()
+        mock_wb.saw.TSInitialize.assert_called_once()
 
     def test_returns_empty_when_no_results(self, mock_wb):
         """ts_solve() returns empty DataFrames when no results."""
-        mock_wb.esa.TSGetResults.return_value = (None, None)
+        mock_wb.saw.TSGetResults.return_value = (None, None)
         meta, data = mock_wb.ts_solve("Fault1", ["Col1"])
         assert meta.empty
         assert data.empty
 
     def test_handles_empty_df_in_results(self, mock_wb):
         """ts_solve() handles empty DataFrame in results."""
-        mock_wb.esa.TSGetResults.return_value = (
+        mock_wb.saw.TSGetResults.return_value = (
             pd.DataFrame({'ColHeader': ['Col1']}),
             pd.DataFrame()
         )
@@ -449,7 +449,7 @@ class TestTSSolve:
     def test_warns_no_fields(self, mock_wb, caplog):
         """ts_solve() logs warning when no fields are provided."""
         import logging
-        mock_wb.esa.TSGetResults.return_value = (None, None)
+        mock_wb.saw.TSGetResults.return_value = (None, None)
         with caplog.at_level(logging.WARNING):
             mock_wb.ts_solve("Fault1", [])
         assert "No fields provided" in caplog.text

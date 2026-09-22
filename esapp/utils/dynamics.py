@@ -55,7 +55,7 @@ class TSWatch:
 
     def prepare(self, pw) -> List[str]:
         """
-        Configure the ESA environment for simulation and build retrieval fields.
+        Configure SimAuto result storage and build retrieval fields.
 
         Parameters
         ----------
@@ -69,7 +69,7 @@ class TSWatch:
         """
         fields = []
         for gtype, flds in self._watch_fields.items():
-            pw.esa.TSResultStorageSetAll(object=gtype.TYPE(), value=True)
+            pw.saw.TSResultStorageSetAll(object=gtype.TYPE(), value=True)
 
             objs = pw[gtype, ['ObjectID']]
 
@@ -86,13 +86,13 @@ class TSWatch:
         return self._watch_fields
 
 
-def get_ts_results(esa, ctg: str, fields: List[str]) -> Tuple[Optional[DataFrame], Optional[DataFrame]]:
+def get_ts_results(saw, ctg: str, fields: List[str]) -> Tuple[Optional[DataFrame], Optional[DataFrame]]:
     """
     Retrieve results for a single contingency using TSGetResults.
 
     Parameters
     ----------
-    esa : SAW
+    saw : SAW
         The SAW (SimAuto Wrapper) instance.
     ctg : str
         Contingency name.
@@ -104,7 +104,7 @@ def get_ts_results(esa, ctg: str, fields: List[str]) -> Tuple[Optional[DataFrame
     Tuple[Optional[DataFrame], Optional[DataFrame]]
         Tuple of (Metadata DataFrame, Data DataFrame), or (None, None).
     """
-    result = esa.TSGetResults(TSGetResultsMode.SEPARATE, [ctg], fields)
+    result = saw.TSGetResults(TSGetResultsMode.SEPARATE, [ctg], fields)
     if result is None:
         return None, None
     return result

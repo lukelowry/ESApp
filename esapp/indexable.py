@@ -6,7 +6,6 @@ from numbers import Real
 from math import isfinite
 from pandas import DataFrame
 from pandas.api.types import is_bool_dtype
-from os import path
 from warnings import warn
 import numpy as np
 
@@ -24,34 +23,7 @@ class Indexable:
     bools to PowerWorld strings (``True`` -> ``"Closed"`` for GenStatus);
     reads return PowerWorld's strings as-is.
     """
-    esa: SAW
-    fname: str
-
-    def open(self):
-        """
-        Open the PowerWorld case and initialize transient stability.
-
-        This method validates the case path, initializes the SimAuto COM object,
-        and attempts to initialize transient stability to ensure initial values
-        are available for dynamic models.
-
-        Raises
-        ------
-        FileNotFoundError
-            If the case file does not exist on disk.
-        """
-        # Validate Path Name
-        if not path.isabs(self.fname):
-            self.fname = path.abspath(self.fname)
-
-        if not path.exists(self.fname):
-            raise FileNotFoundError(
-                f"Case file not found: '{self.fname}'\n"
-                f"Please verify the file path is correct and the file exists."
-            )
-
-        # ESA Object & Transient Sim
-        self.esa = SAW(self.fname, CreateIfNotFound=True, early_bind=True)
+    saw: SAW
     
     def __getitem__(self, index) -> Optional[DataFrame]:
         """Retrieve data from PowerWorld using indexer notation.
@@ -93,7 +65,7 @@ class Indexable:
             return None
 
         # 5. Retrieve data from PowerWorld
-        return self.esa.GetParamsRectTyped(gtype.TYPE(), sorted(list(fields_to_get)))
+        return self.saw.GetParamsRectTyped(gtype.TYPE(), sorted(list(fields_to_get)))
     
     def __setitem__(self, args, value) -> None:
         """Write grid data using indexer notation.
@@ -172,7 +144,7 @@ class Indexable:
                         f"Cannot create {gtype.TYPE()}: missing key field(s) {missing}. "
                         f"Accepted key sets: {accepted}."
                     ) from e
-                self.esa.ChangeParametersMultipleElement(
+                self.saw.ChangeParametersMultipleElement(
                     gtype.TYPE(), df.columns.tolist(), df.values.tolist()
                 )
             else:
@@ -262,7 +234,7 @@ class Indexable:
         if edit_only:
             raise type(err)(
                 f"{err} (field(s) {edit_only} are only enterable in EDIT mode — "
-                f"call esa.EnterMode('EDIT') first)"
+                f"call pw.saw.EnterMode('EDIT') first)"
             ) from err
         raise err
 
@@ -270,7 +242,7 @@ class Indexable:
         """Send a prepared DataFrame via ChangeParametersMultipleElementRect,
         annotating failures on EDIT-mode-only fields with a usable hint."""
         try:
-            self.esa.ChangeParametersMultipleElementRect(gtype.TYPE(), df.columns.tolist(), df)
+            self.saw.ChangeParametersMultipleElementRect(gtype.TYPE(), df.columns.tolist(), df)
         except PowerWorldError as e:
             self._raise_with_edit_hint(gtype, df.columns, e)
 
@@ -308,7 +280,7 @@ class Indexable:
                 field_list = ", ".join(fields)
                 value_list = ", ".join(str(v) for v in per_field)
                 try:
-                    self.esa.RunScriptCommand(
+                    self.saw.RunScriptCommand(
                         f"SetData({gtype.TYPE()}, [{field_list}], [{value_list}], ALL);"
                     )
                 except PowerWorldError as e:

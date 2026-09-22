@@ -114,7 +114,7 @@ def load_ts_csv_results(base_path: Path, delete_files: bool = False) -> Tuple[pd
 def get_temp_filepath(suffix: str = ".csv") -> str:
     """Generates a unique temporary filepath."""
     temp_dir = tempfile.gettempdir()
-    unique_name = f"esa_{uuid.uuid4()}{suffix}"
+    unique_name = f"saw_{uuid.uuid4()}{suffix}"
     return os.path.join(temp_dir, unique_name)
 
 

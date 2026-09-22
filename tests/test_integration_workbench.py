@@ -40,7 +40,7 @@ def wb(saw_session):
     Wraps the session-scoped SAW instance in a PowerWorld object.
     """
     workbench = PowerWorld()
-    workbench.esa = saw_session
+    workbench.saw = saw_session
     return workbench
 
 
@@ -362,7 +362,7 @@ def test_component_access(wb, component_class):
             tmp_path = tmp.name
         try:
             fields = component_class.keys() if component_class.keys() else ["ALL"]
-            wb.esa.SaveObjectFields(tmp_path, component_class.TYPE(), fields)
+            wb.saw.SaveObjectFields(tmp_path, component_class.TYPE(), fields)
             pytest.fail(f"Object type {component_class.TYPE()} is supported but failed to read: {e}")
         except PowerWorldError:
             pytest.skip(f"Object type {component_class.TYPE()} not supported by this PW version.")

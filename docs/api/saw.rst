@@ -3,7 +3,7 @@ SimAuto Wrapper (SAW)
 
 The ``SAW`` (SimAuto Wrapper) class provides complete access to PowerWorld's SimAuto API.
 It is organized into functional mixins for power flow, contingencies, optimization, sensitivity,
-transient stability, GIC, ATC, topology, and data management. Access SAW through ``pw.esa``
+transient stability, GIC, ATC, topology, and data management. Access SAW through ``pw.saw``
 from ``PowerWorld``.
 
 .. currentmodule:: esapp.saw

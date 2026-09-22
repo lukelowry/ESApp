@@ -33,7 +33,7 @@ pytestmark = [
 def net(saw_session):
     """Network instance connected to the session SAW."""
     pw = PowerWorld()
-    pw.esa = saw_session
+    pw.saw = saw_session
     return pw.network
 
 

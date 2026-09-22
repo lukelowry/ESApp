@@ -300,7 +300,7 @@ class Network:
         """
         Z = self.ybranch(asZ=True)
 
-        Ybus = self._pw.esa.get_ybus()
+        Ybus = self._pw.saw.get_ybus()
         AVG = np.abs(self.incidence()) / 2
         Y = AVG @ Ybus @ np.ones(Ybus.shape[0])
 

@@ -62,7 +62,7 @@ Tests without PowerWorld access should use `-m unit`. The `--maxfail=5` default 
 ## Architecture
 
 ### Entry Point: `PowerWorld` ([workbench.py](esapp/workbench.py))
-The main user-facing class. Creates a SAW connection, provides high-level grid analysis methods, and hosts embedded application modules (`network`, `gic`).
+The main user-facing class. Owns the case filename and `open()` connection setup, exposes the SAW connection as `pw.saw`, provides high-level grid analysis methods, and hosts embedded application modules (`network`, `gic`, `buscat`).
 
 ### SAW (SimAuto Wrapper): [esapp/saw/](esapp/saw/)
 `SAW` class in [saw.py](esapp/saw/saw.py) is composed via **mixin pattern** from ~18 focused modules:
@@ -75,7 +75,7 @@ The main user-facing class. Creates a SAW connection, provides high-level grid a
 - Other mixins: `GeneralMixin`, `ModifyMixin`, `TopologyMixin`, `GICMixin`, `OPFMixin`, `PVMixin`, `QVMixin`, `ATCMixin`, `FaultMixin`, `RegionsMixin`, `CaseActionsMixin`, `ScheduledActionsMixin`, `TimeStepMixin`, `WeatherMixin`
 
 ### Indexable Interface ([indexable.py](esapp/indexable.py))
-Pythonic `__getitem__` access for grid data: `pw[Bus, ["BusNum", "BusName"]]` returns a DataFrame. Both `PowerWorld` and `SAW` implement this.
+Pythonic `__getitem__` access for grid data: `pw[Bus, ["BusNum", "BusName"]]` returns a DataFrame. `PowerWorld` inherits this data-access interface, which uses its `saw` connection. `SAW` exposes the low-level SimAuto methods directly.
 
 ### Component Definitions: [esapp/components/](esapp/components/)
 - **grid.py** (auto-generated, ~13MB) - `GObject` subclasses for all PowerWorld object types (Bus, Gen, Load, Branch, etc.)

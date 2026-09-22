@@ -59,10 +59,10 @@ class GICOption:
     def __set__(self, obj, value):
         if self.is_bool:
             value = YesNo.from_bool(value)
-        obj._pw.esa.EnterMode("EDIT")
-        obj._pw.esa.SetData(
+        obj._pw.saw.EnterMode("EDIT")
+        obj._pw.saw.SetData(
             'GIC_Options_Value',
             ['VariableName', 'ValueField'],
             [self.key, value]
         )
-        obj._pw.esa.EnterMode("RUN")
+        obj._pw.saw.EnterMode("RUN")

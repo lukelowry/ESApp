@@ -30,7 +30,7 @@ pytestmark = [
 def pw(saw_session):
     """PowerWorld instance connected to the session SAW."""
     pw = PowerWorld()
-    pw.esa = saw_session
+    pw.saw = saw_session
     return pw
 
 

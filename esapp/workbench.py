@@ -11,6 +11,7 @@ from .utils.network import Network
 from .utils.buscat import BusCat
 from .utils.dynamics import get_ts_results, process_ts_results
 from .indexable import Indexable
+from .saw import SAW
 from .components import Bus, Branch, Gen, Load, Shunt, Area, Zone, Sim_Solution_Options
 from .saw._helpers import create_object_string
 from .saw._enums import JacobianForm, SolverMethod, LinearMethod, PowerWorldMode, BranchDeviceType
@@ -22,7 +23,11 @@ import os
 class PowerWorld(Indexable):
     """
     Main entry point for interacting with the PowerWorld grid model.
+
+    The underlying SimAuto wrapper is available as ``saw``.
     """
+    fname: Optional[str]
+
     def __init__(self, fname: Optional[str] = None):
         """
         Initialize the PowerWorld interface.
@@ -41,8 +46,18 @@ class PowerWorld(Indexable):
             self.fname = fname
             self.open()
         else:
-            self.esa = None
+            self.saw = None
             self.fname = None
+
+    def open(self):
+        """Open the configured case and establish a SimAuto connection."""
+        if not os.path.isabs(self.fname):
+            self.fname = os.path.abspath(self.fname)
+
+        if not os.path.exists(self.fname):
+            raise FileNotFoundError(f"Case file not found: '{self.fname}'")
+
+        self.saw = SAW(self.fname, CreateIfNotFound=True, early_bind=True)
 
     # --- Solver Options (descriptors) ---
 
@@ -214,7 +229,7 @@ class PowerWorld(Indexable):
         np.ndarray or scipy.sparse.csr_matrix
             The system admittance matrix (n_bus x n_bus).
         """
-        return self.esa.get_ybus(dense)
+        return self.saw.get_ybus(dense)
 
     def jacobian(self, dense: bool = False, form: Union[JacobianForm, str] = JacobianForm.RECTANGULAR, ids: bool = False):
         """
@@ -237,8 +252,8 @@ class PowerWorld(Indexable):
             ``(matrix, row_ids)`` when ``ids=True``.
         """
         if ids:
-            return self.esa.get_jacobian_with_ids(dense, form=form)
-        return self.esa.get_jacobian(dense, form=form)
+            return self.saw.get_jacobian_with_ids(dense, form=form)
+        return self.saw.get_jacobian(dense, form=form)
 
     # --- Network Delegation ---
 
@@ -291,7 +306,7 @@ class PowerWorld(Indexable):
             Complex voltage Series if ``getvolts=True`` (default), or
             None if ``getvolts=False``.
         """
-        self.esa.SolvePowerFlow(method)
+        self.saw.SolvePowerFlow(method)
         if getvolts:
             return self.voltage()
 
@@ -320,16 +335,16 @@ class PowerWorld(Indexable):
         if not fields:
             logger.warning("No fields provided. Simulation will run but no results will be retrieved.")
 
-        self.esa.TSAutoCorrect()
-        self.esa.TSInitialize()
+        self.saw.TSAutoCorrect()
+        self.saw.TSInitialize()
 
         all_meta_frames = []
         all_data_frames = {}
 
         for ctg in ctgs_list:
             logger.info(f"Solving contingency: {ctg}")
-            self.esa.TSSolve(ctg)
-            meta, df = get_ts_results(self.esa, ctg, fields)
+            self.saw.TSSolve(ctg)
+            meta, df = get_ts_results(self.saw, ctg, fields)
 
             if meta is None or df is None or df.empty:
                 logger.warning(f"No results returned for contingency: {ctg}")
@@ -350,7 +365,7 @@ class PowerWorld(Indexable):
 
     def flatstart(self) -> None:
         """Resets the case to a flat start (1.0 pu voltage, 0.0 angle)."""
-        self.esa.ResetToFlatStart()
+        self.saw.ResetToFlatStart()
 
     def save(self, filename: Optional[str] = None) -> None:
         """
@@ -361,7 +376,7 @@ class PowerWorld(Indexable):
         filename : str, optional
             Output file path. If None, overwrites the currently open case.
         """
-        self.esa.SaveCase(filename)
+        self.saw.SaveCase(filename)
 
     def log(self, message: str) -> None:
         """
@@ -372,7 +387,7 @@ class PowerWorld(Indexable):
         message : str
             The message text to append.
         """
-        self.esa.LogAdd(message)
+        self.saw.LogAdd(message)
 
     def print_log(self, clear: bool = False, new_only: bool = False):
         """
@@ -398,7 +413,7 @@ class PowerWorld(Indexable):
         tmp.close()
 
         try:
-            self.esa.LogSave(tmp_path, append=False)
+            self.saw.LogSave(tmp_path, append=False)
             with open(tmp_path, "r") as f:
                 content = f.read()
         finally:
@@ -415,22 +430,22 @@ class PowerWorld(Indexable):
             print(output)
 
         if clear:
-            self.esa.LogClear()
+            self.saw.LogClear()
             self._log_last_position = 0
 
         return output
 
     def close(self) -> None:
         """Closes the current case."""
-        self.esa.CloseCase()
+        self.saw.CloseCase()
 
     def edit_mode(self) -> None:
         """Enter PowerWorld into EDIT mode."""
-        self.esa.EnterMode(PowerWorldMode.EDIT)
+        self.saw.EnterMode(PowerWorldMode.EDIT)
 
     def run_mode(self) -> None:
         """Enter PowerWorld into RUN mode."""
-        self.esa.EnterMode(PowerWorldMode.RUN)
+        self.saw.EnterMode(PowerWorldMode.RUN)
 
     # --- Data Retrieval ---
 
@@ -527,11 +542,11 @@ class PowerWorld(Indexable):
                 v = pw.voltage()
             # state restored here
         """
-        self.esa.SaveState()
+        self.saw.SaveState()
         try:
             yield
         finally:
-            self.esa.LoadState()
+            self.saw.LoadState()
 
     def flows(self) -> DataFrame:
         """Retrieve branch power flows and loading.
@@ -579,7 +594,7 @@ class PowerWorld(Indexable):
         """
         seller_str = create_object_string("Bus", seller)
         buyer_str = create_object_string("Bus", buyer)
-        self.esa.CalculatePTDF(seller_str, buyer_str, method)
+        self.saw.CalculatePTDF(seller_str, buyer_str, method)
         return self[Branch, ["LinePTDF"]]
 
     def lodf(self, branch: tuple, method: Union[LinearMethod, str] = LinearMethod.DC) -> DataFrame:
@@ -598,7 +613,7 @@ class PowerWorld(Indexable):
             Branch LODF values (``LineLODF`` column) plus key fields.
         """
         branch_str = create_object_string("Branch", *branch)
-        self.esa.CalculateLODF(branch_str, method)
+        self.saw.CalculateLODF(branch_str, method)
         return self[Branch, ["LineLODF"]]
 
     # --- Quick Properties ---

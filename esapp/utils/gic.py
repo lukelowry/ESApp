@@ -167,7 +167,7 @@ class GIC:
         """
         # Ensure GIC is included in power flow before retrieving matrix
         self.pf_include = True
-        return self._pw.esa.get_gmatrix(full=not sparse)
+        return self._pw.saw.get_gmatrix(full=not sparse)
 
     def storm(self, maxfield: float, direction: float, solvepf: bool = True) -> None:
         """
@@ -182,11 +182,11 @@ class GIC:
         solvepf : bool, default True
             Whether to include GIC results in power flow solution.
         """
-        self._pw.esa.GICCalculate(maxfield, direction, solvepf)
+        self._pw.saw.GICCalculate(maxfield, direction, solvepf)
 
     def cleargic(self) -> None:
         """Clear all GIC calculation results from the case."""
-        self._pw.esa.RunScriptCommand("GICClear;")
+        self._pw.saw.RunScriptCommand("GICClear;")
 
     def loadb3d(self, ftype: str, fname: str, setuponload: bool = True) -> None:
         """
@@ -201,7 +201,7 @@ class GIC:
         setuponload : bool, default True
             Whether to set up time-varying series on load.
         """
-        self._pw.esa.GICLoad3DEfield(ftype, fname, setuponload)
+        self._pw.saw.GICLoad3DEfield(ftype, fname, setuponload)
 
     def settings(self, value: Optional[DataFrame] = None) -> Optional[DataFrame]:
         """
@@ -217,7 +217,7 @@ class GIC:
         DataFrame or None
             Current settings if value is None.
         """
-        return self._pw.esa.GetParametersMultipleElement(
+        return self._pw.saw.GetParametersMultipleElement(
                 GIC_Options_Value.TYPE(),
                 GIC_Options_Value.fields()
         )[['VariableName', 'ValueField']]
@@ -243,7 +243,7 @@ class GIC:
             values = list(row)
             # Quote the WhoAmI identifier (contains spaces) for PowerWorld
             values[0] = f'"{values[0]}"'
-            self._pw.esa.SetData(obj, fields, values)
+            self._pw.saw.SetData(obj, fields, values)
 
     # --- Model ---
 
