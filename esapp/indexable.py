@@ -151,9 +151,8 @@ class Indexable:
         Tries the fast Rect path first; on "not found", falls back to
         ``ChangeParametersMultipleElement``, which creates missing objects
         when ``CreateIfNotFound=True`` and PowerWorld is in EDIT mode.
-        Creation requires a complete key set (``gtype.key_sets()``) —
-        without one the fallback would silently write nothing, since its
-        "not found" errors are suppressed as expected during creation.
+        Creation requires a complete key set (``gtype.key_sets()``).
+        Errors from the creation fallback propagate to the caller.
         """
         if not isinstance(df, DataFrame):
             raise TypeError("A DataFrame is required for bulk updates.")
@@ -173,13 +172,9 @@ class Indexable:
                         f"Cannot create {gtype.TYPE()}: missing key field(s) {missing}. "
                         f"Accepted key sets: {accepted}."
                     ) from e
-                try:
-                    self.esa.ChangeParametersMultipleElement(
-                        gtype.TYPE(), df.columns.tolist(), df.values.tolist()
-                    )
-                except PowerWorldPrerequisiteError as create_err:
-                    if 'not found' not in str(create_err).lower():
-                        raise
+                self.esa.ChangeParametersMultipleElement(
+                    gtype.TYPE(), df.columns.tolist(), df.values.tolist()
+                )
             else:
                 raise
 

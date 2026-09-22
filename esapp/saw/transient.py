@@ -4,7 +4,6 @@ from typing import List, Tuple, Union, Optional
 import numpy as np
 import pandas as pd
 from ._enums import YesNo, TSGetResultsMode, KeyFieldType, FilterKeyword, FileFormat
-from ._exceptions import PowerWorldError
 from ._helpers import format_list, get_temp_filepath, load_ts_csv_results, pack_args
 
 class TransientMixin:
@@ -31,12 +30,9 @@ class TransientMixin:
         This command must be called before solving a transient stability
         run. It prepares the simulation engine with the model data.
 
-        This is a wrapper for the ``TSInitialize`` script command.
+        Failures propagate to the caller so dependent simulations do not run.
         """
-        try:
-            self._run_script("TSInitialize")
-        except PowerWorldError:
-            self.log.warning("Failed to Initialize TS Values")
+        self._run_script("TSInitialize")
 
     def TSResultStorageSetAll(self, object="ALL", value=True):
         """Sets the 'Store results in RAM' flag for all objects of a given type.

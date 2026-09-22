@@ -1091,8 +1091,8 @@ class TestWorkbenchLogic:
 class TestIndexableFallback:
     """Tests for Indexable.__setitem__ fallback on ChangeParametersMultipleElement."""
 
-    def test_fallback_create_suppresses_not_found(self):
-        """Fallback to ChangeParametersMultipleElement suppresses 'not found'."""
+    def test_fallback_create_propagates_not_found(self):
+        """A failed creation fallback must not report a successful write."""
         from esapp.saw import PowerWorldPrerequisiteError
         from esapp.indexable import Indexable
         from esapp import components as grid
@@ -1111,11 +1111,12 @@ class TestIndexableFallback:
         mock_esa.ChangeParametersMultipleElementRect.side_effect = PowerWorldPrerequisiteError(
             "Object not found in case"
         )
-        mock_esa.ChangeParametersMultipleElement.side_effect = PowerWorldPrerequisiteError(
-            "Object not found in case"
-        )
+        error = PowerWorldPrerequisiteError("Object not found during creation")
+        mock_esa.ChangeParametersMultipleElement.side_effect = error
 
-        instance[grid.Gen] = update_df
+        with pytest.raises(PowerWorldPrerequisiteError) as exc_info:
+            instance[grid.Gen] = update_df
+        assert exc_info.value is error
 
     def test_fallback_create_raises_other_error(self):
         """Fallback to ChangeParametersMultipleElement re-raises non-'not found' errors."""
@@ -1172,11 +1173,14 @@ class TestTransientValidation:
         with pytest.raises(ValueError, match="Dimension mismatch"):
             saw_obj.TSSetPlayInSignals("Sig1", times, signals)
 
-    def test_ts_initialize_exception_logged(self, saw_obj):
-        """TSInitialize logs warning on PowerWorldError instead of raising."""
+    def test_ts_initialize_propagates_error(self, saw_obj):
+        """Initialization failures must reach the caller."""
         from esapp.saw._exceptions import PowerWorldError
-        with patch.object(saw_obj, '_run_script', side_effect=PowerWorldError("TS init failed")):
-            saw_obj.TSInitialize()
+        error = PowerWorldError("TS init failed")
+        with patch.object(saw_obj, '_run_script', side_effect=error):
+            with pytest.raises(PowerWorldError) as exc_info:
+                saw_obj.TSInitialize()
+        assert exc_info.value is error
 
     def test_ts_clear_results_non_access_violation_raises(self, saw_obj):
         """TSClearResultsFromRAM re-raises non-access-violation errors."""
